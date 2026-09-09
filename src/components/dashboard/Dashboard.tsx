@@ -14,8 +14,10 @@ import { Modal } from '@/components/ui/Modal'
 import { TaskForm } from '@/components/tasks/TaskForm'
 import { GoalModal } from '@/components/tasks/GoalModal'
 import { SettingsModal } from '@/components/settings/SettingsModal'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useSettings } from '@/hooks/useSettings'
 import { clearStoredData } from '@/lib/storage'
+import { requestNotificationPermission } from '@/lib/notifications'
 
 const emptyForm: TaskFormValues = {
   name: '',
@@ -25,6 +27,8 @@ const emptyForm: TaskFormValues = {
   progress: '0',
   trackGoal: true,
 }
+
+type Confirmation = { type: 'delete'; taskId: string } | { type: 'reset' }
 
 export function Dashboard() {
   const { settings, ready: settingsReady, updateSettings } = useSettings()
@@ -47,6 +51,7 @@ export function Dashboard() {
   const [goalProgress, setGoalProgress] = useState('0')
   const [notice, setNotice] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null)
 
   useEffect(() => {
     if (!notice) return
@@ -81,10 +86,16 @@ export function Dashboard() {
     setModal('goal')
   }
 
-  const handleAdd = (event: FormEvent) => {
+  const handleAdd = async (event: FormEvent) => {
     if (addTask(event, form)) {
       closeModal()
       setNotice('Task added to your day.')
+      const permission = await requestNotificationPermission()
+      if (permission === 'denied') {
+        setNotice(
+          'Task added. Browser notifications are blocked; enable them in site settings.',
+        )
+      }
     }
   }
   const handleEdit = (event: FormEvent) => {
@@ -118,11 +129,22 @@ export function Dashboard() {
     setNotice(`${task.name} finished for today.`)
   }
   const handleDelete = (id: string) => {
-    if (window.confirm('Remove this task from today?')) deleteTask(id)
+    setConfirmation({ type: 'delete', taskId: id })
   }
   const handleReset = () => {
-    if (!window.confirm('Delete all local tasks and reset your settings?'))
+    setConfirmation({ type: 'reset' })
+  }
+  const closeConfirmation = () => setConfirmation(null)
+  const confirmAction = () => {
+    if (!confirmation) return
+
+    if (confirmation.type === 'delete') {
+      deleteTask(confirmation.taskId)
+      setNotice('Task removed from today.')
+      closeConfirmation()
       return
+    }
+
     clearStoredData()
     window.location.reload()
   }
@@ -295,6 +317,24 @@ export function Dashboard() {
           onSave={updateSettings}
           onReset={handleReset}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+      {confirmation?.type === 'delete' && (
+        <ConfirmModal
+          title="Remove this task?"
+          message="This will remove the task and its recorded time from today."
+          confirmLabel="Remove task"
+          onConfirm={confirmAction}
+          onClose={closeConfirmation}
+        />
+      )}
+      {confirmation?.type === 'reset' && (
+        <ConfirmModal
+          title="Clear local data?"
+          message="This will permanently remove today's tasks and reset all OnTask settings from this browser."
+          confirmLabel="Clear local data"
+          onConfirm={confirmAction}
+          onClose={closeConfirmation}
         />
       )}
     </main>

@@ -24,3 +24,27 @@ export function playCompletionSound() {
   oscillator.stop(context.currentTime + 0.35)
   oscillator.addEventListener('ended', () => void context.close())
 }
+
+export async function requestNotificationPermission() {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return 'unsupported' as const
+  }
+
+  if (Notification.permission !== 'default') return Notification.permission
+  return Notification.requestPermission()
+}
+
+export function notifyTaskCompletion(taskName: string) {
+  if (
+    typeof window === 'undefined' ||
+    !('Notification' in window) ||
+    Notification.permission !== 'granted'
+  ) {
+    return
+  }
+
+  new Notification('OnTask', {
+    body: `${taskName} finished for today.`,
+    icon: '/favicon.ico',
+  })
+}

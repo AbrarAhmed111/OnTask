@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { loadTasks, saveTasks } from '@/lib/storage'
 import { getLiveSeconds, useTimer } from '@/hooks/useTimer'
-import { playCompletionSound } from '@/lib/notifications'
+import { notifyTaskCompletion, playCompletionSound } from '@/lib/notifications'
 import { Settings, Task, TaskFormValues } from '@/types'
 
 export function useTasks(settings: Settings) {
@@ -24,6 +24,7 @@ export function useTasks(settings: Settings) {
       return
 
     if (settings.soundEnabled) playCompletionSound()
+    notifyTaskCompletion(active.name)
     setTasks(current => {
       const completed = current.map(task =>
         task.id === active.id
@@ -80,12 +81,15 @@ export function useTasks(settings: Settings) {
       startedAt: null,
     })
 
-  const finishTask = (task: Task, early = false) =>
+  const finishTask = (task: Task, early = false) => {
+    if (settings.soundEnabled) playCompletionSound()
+    notifyTaskCompletion(task.name)
     updateTask(task.id, {
       status: early ? 'skipped' : 'completed',
       workedSeconds: Math.round(getLiveSeconds(task, now)),
       startedAt: null,
     })
+  }
 
   const addTask = (event: FormEvent, form: TaskFormValues) => {
     event.preventDefault()
