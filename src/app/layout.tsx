@@ -1,11 +1,11 @@
-import "../assets/css/globals.css"; // CSS is now included here
-import { Toaster } from "react-hot-toast";
-import { ReactNode } from "react";
-import Providers from "@/store/Providers";
+import '../assets/css/globals.css' // CSS is now included here
+import { Toaster } from 'react-hot-toast'
+import { ReactNode } from 'react'
+import Providers from '@/store/Providers'
 
 type RootLayoutProps = {
-  children: ReactNode;
-};
+  children: ReactNode
+}
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
@@ -18,5 +18,5 @@ export default function RootLayout({ children }: RootLayoutProps) {
         </body>
       </html>
     </Providers>
-  );
+  )
 }
