@@ -1,148 +1,141 @@
-# Next.js + TypeScript + Supabase Template
+# OnTask
 
-A modern Next.js (App Router) template with TypeScript, Tailwind CSS, Redux Toolkit, and first-class Supabase integration (SSR-safe clients, auth middleware, and helpers).
+**A simple open-source daily work timer for focused work and long-term goal tracking.**
 
-This README documents only the template. Any auxiliary folders (e.g. `nizam-web`) are not part of this template and can be ignored.
+OnTask was built for a personal need.
 
-## 🚀 Features
+I wanted a simple tool that could help me structure my workday around **actual focused work time**, rather than fixed clock-based schedules. I looked at existing productivity and time-tracking apps, but many of them were subscription-based, included features I didn't need, or didn't support the workflow I had in mind.
 
-- **Next.js 15** (App Router) + **TypeScript**
-- **Supabase** integration:
-  - SSR-safe clients for server and browser
-  - Middleware to refresh sessions and gate routes
-  - Server auth helpers (`getCurrentUser`, `requireAuth`)
-- **Tailwind CSS** styling
-- **Redux Toolkit** state management
-- **ESLint + Prettier + Jest** for quality
+So I decided to build my own.
 
-## 📦 Directory Structure
+## Why OnTask?
 
-```
-src/
-├── app/                          # Next.js App Router
-│   ├── error.tsx
-│   ├── layout.tsx
-│   ├── not-found.tsx
-│   └── page.tsx
-├── assets/
-│   └── css/
-│       └── globals.css
-├── components/
-│   └── guards/
-│       └── AuthGate.tsx          # Client-side auth gate (optional)
-├── lib/
-│   ├── auth/
-│   │   ├── index.ts              # getCurrentUser / requireAuth
-│   │   └── signout.ts            # clientSignout
-│   └── supabase/
-│       ├── client.ts             # Browser client
-│       ├── server.ts             # Server client (SSR cookies)
-│       └── middleware.ts         # Routing + session refresh
-├── middleware.ts                 # App middleware -> uses supabase/middleware
-├── store/                        # Redux Toolkit store and providers
-└── utils/                        # Utilities (e.g., axios config)
-```
+OnTask is designed around a simple idea:
 
-## 🔐 Environment Variables
+> **Decide what you need to work on, work for the amount of time you planned, and keep moving toward your larger goals.**
 
-Create `.env.local` in the project root:
+The app separates three things:
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
+* **Daily Target** — how much focused work you want to complete today.
+* **Actual Work Time** — the time you actually spend working.
+* **Goal Progress** — how much of the larger project, course, or goal you have completed.
 
-Optional (only if you plan to use maintenance mode in middleware):
+These are intentionally kept separate.
 
-```env
-# Configure Edge Config separately in Vercel and add its token to your env if needed
-```
+For example, you might spend **2 hours** working on an LLM course today, while your overall course progress goes from **60% → 70%**. The app does not try to calculate your goal progress from the time you spent. You decide the percentage yourself.
 
-## 🧰 Supabase Usage
+## Features
 
-- Server components or server actions:
+### Daily Work Workflow
 
-```ts
-import { createClient } from '@/lib/supabase/server'
+* Set a daily focused-work target.
+* Create tasks for the day.
+* Assign a specific amount of work time to each task.
+* Start, pause, and resume tasks.
+* Track actual time spent working.
+* Complete tasks when their planned time is reached.
+* Continue working beyond the planned duration when needed.
+* Finish a task early when you are done for the day.
 
-export async function getData() {
-  const supabase = await createClient()
-  const { data } = await supabase.from('users').select('*')
-  return data
-}
-```
+### Long-Term Goal Tracking
 
-- Client components:
+* Link tasks to larger goals.
+* Track overall goal completion separately from daily work time.
+* Manually update goal progress.
+* See completed and remaining percentage.
+* Preserve goal progress across different days.
 
-```ts
-import { createClient } from '@/lib/supabase/client'
+### Daily Planning
 
-export function MyClientComponent() {
-  const supabase = createClient()
-  // use supabase on the client
-  return null
-}
-```
+* Create a default daily workflow.
+* Automatically start a new day from your template.
+* Reorder tasks based on priority.
+* Add, edit, skip, or remove tasks.
+* Adjust today's plan without changing your long-term goals.
 
-- Protect server routes (layouts/pages):
+### Work History
 
-```ts
-import { requireAuth } from '@/lib/auth'
+* Keep a lightweight history of previous workdays.
+* See total focused time completed each day.
+* View the tasks worked on during previous days.
 
-export default async function ProtectedLayout({ children }) {
-  await requireAuth()
-  return <>{children}</>
-}
-```
+## Example Workflow
 
-- Optional client-side protection:
+A typical day might look like:
 
-```tsx
-import { AuthGate } from '@/components/guards/AuthGate'
+| Task                  | Daily Target |
+| --------------------- | -----------: |
+| Project Development   |           3h |
+| Interview Preparation |       2h 30m |
+| LLM Course            |           2h |
+| Portfolio / GitHub    |          30m |
+| **Total**             |       **8h** |
 
-export default function Page() {
-  return (
-    <AuthGate>
-      <div>Protected content</div>
-    </AuthGate>
-  )
-}
-```
+The goal isn't to work according to a specific clock schedule.
 
-## 🔒 Middleware
+Instead, OnTask tracks **8 hours of actual focused work**.
 
-- `src/middleware.ts` delegates to `src/lib/supabase/middleware.ts` to:
-  - Keep Supabase sessions fresh
-  - Redirect unauthenticated users to sign-in/welcome
-  - Optionally support admin subdomain and maintenance mode (if configured)
+You can start whenever you're ready, pause whenever you need a break, and continue later.
 
-No configuration is required beyond Supabase env vars for basic auth gating.
+## What OnTask Is Not
 
-## ▶️ Getting Started
+OnTask intentionally avoids becoming a full productivity suite.
 
-```bash
-npm install
-npm run dev
-# visit http://localhost:3000
-```
+It does not try to be:
 
-## 📜 Scripts
+* A project management platform
+* A Kanban board
+* A calendar
+* A Pomodoro timer
+* A habit tracker
+* A team management tool
+* An analytics-heavy productivity platform
+* An AI productivity assistant
 
-- `npm run dev` – Start development server
-- `npm run build` – Build for production
-- `npm run start` – Start production server
-- `npm run lint` – Lint with ESLint
-- `npm run format` – Format with Prettier
-- `npm run test` – Run tests
+The goal is to keep the experience focused and simple.
 
-## 🚀 Deploy
+## Tech Stack
 
-Deploy to Vercel:
-1. Push to a Git repository
-2. Import the project in Vercel
-3. Add env vars (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
-4. Deploy
+> Technical details will be added as the project develops.
 
-## 📄 License
+* Next.js
+* TypeScript
+* Tailwind CSS
+* React
+* Local Storage
 
-MIT
+## Project Status
+
+OnTask is currently under development.
+
+The initial version focuses on the core workflow:
+
+1. Create your daily tasks.
+2. Set how much time you want to spend on each task.
+3. Start working.
+4. Pause and resume whenever needed.
+5. Track your actual focused work.
+6. Update your long-term goal progress.
+7. Complete your daily target.
+
+More information about the architecture and implementation will be added as development progresses.
+
+## Philosophy
+
+OnTask follows a simple principle:
+
+**Work when you're ready. Focus on one thing. Track the work you actually do. Keep moving toward the bigger goal.**
+
+No unnecessary complexity.
+
+No forced schedule.
+
+Just stay **OnTask**.
+
+## Open Source
+
+OnTask is open source and built primarily for personal use, but anyone is welcome to use, modify, and contribute to it.
+
+## License
+
+> License information will be added here.
