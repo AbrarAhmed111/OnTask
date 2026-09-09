@@ -1,0 +1,16 @@
+export function formatTime(seconds: number, short = false) {
+  const safe = Math.max(0, Math.floor(seconds))
+  const hours = Math.floor(safe / 3600)
+  const minutes = Math.floor((safe % 3600) / 60)
+  const secs = safe % 60
+  if (short && hours === 0) return `${minutes}m`
+  return `${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m${short ? '' : ` ${String(secs).padStart(2, '0')}s`}`
+}
+
+export function formatPlanned(minutes: number) {
+  const hours = Math.floor(minutes / 60)
+  const remainder = minutes % 60
+  return hours
+    ? `${hours}h${remainder ? ` ${remainder}m` : ''}`
+    : `${remainder}m`
+}
