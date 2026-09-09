@@ -1,12 +1,8 @@
-import { Metadata } from 'next';
-import * as React from 'react';
-import { RiAlarmWarningFill } from 'react-icons/ri';
-import Link from 'next/link';
+'use client'
 
-export const metadata: Metadata = {
-  title: 'Page Not Found | Jazzi Creates',
-  description: 'The page you are looking for does not exist.',
-};
+import * as React from 'react'
+import { RiAlarmWarningFill } from 'react-icons/ri'
+import Link from 'next/link'
 
 export default function NotFound() {
   return (
@@ -16,15 +12,16 @@ export default function NotFound() {
           size={80}
           className="mx-auto animate-pulse text-orange-500 mb-6"
         />
-        
+
         <h1 className="text-4xl font-bold text-gray-900 mb-4 md:text-6xl">
           404 - Page Not Found
         </h1>
-        
+
         <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">
-          Sorry, the page you are looking for doesn't exist or has been moved.
+          Sorry, the page you are looking for doesn&apos;t exist or has been
+          moved.
         </p>
-        
+
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             href="/"
@@ -32,7 +29,7 @@ export default function NotFound() {
           >
             Go Home
           </Link>
-          
+
           <button
             onClick={() => window.history.back()}
             className="px-6 py-3 bg-gray-800 hover:bg-gray-900 text-white font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
@@ -40,11 +37,11 @@ export default function NotFound() {
             Go Back
           </button>
         </div>
-        
+
         <div className="mt-12 text-sm text-gray-500">
           <p>If you believe this is an error, please contact support.</p>
         </div>
       </div>
     </main>
-  );
+  )
 }
