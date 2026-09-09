@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { Check, CirclePlus, Pause, Play, Plus, Target } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
@@ -47,6 +47,13 @@ export function Dashboard() {
   const [goalProgress, setGoalProgress] = useState('0')
   const [notice, setNotice] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
+
+  useEffect(() => {
+    if (!notice) return
+
+    const timeout = window.setTimeout(() => setNotice(''), 5000)
+    return () => window.clearTimeout(timeout)
+  }, [notice])
 
   const closeModal = () => {
     setModal(null)
