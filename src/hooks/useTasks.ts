@@ -124,6 +124,37 @@ export function useTasks(
 
   const deleteTask = (id: string) =>
     setTasks(current => current.filter(task => task.id !== id))
+
+  const restartTask = (task: Task) =>
+    setTasks(current => [
+      ...current,
+      {
+        ...task,
+        id: crypto.randomUUID(),
+        workedSeconds: 0,
+        status: 'pending',
+        startedAt: null,
+      },
+    ])
+
+  const reorderTasks = (fromIndex: number, toIndex: number) => {
+    setTasks(current => {
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= current.length ||
+        toIndex >= current.length
+      )
+        return current
+
+      const reordered = [...current]
+      const [movedTask] = reordered.splice(fromIndex, 1)
+      reordered.splice(toIndex, 0, movedTask)
+      return reordered
+    })
+  }
+
   const activeTask = tasks.find(task => task.status === 'active')
   const totalSeconds = Math.round(
     tasks.reduce((total, task) => total + getLiveSeconds(task, now), 0),
@@ -141,6 +172,8 @@ export function useTasks(
     finishTask,
     addTask,
     deleteTask,
+    restartTask,
+    reorderTasks,
     getLiveSeconds: (task: Task) => getLiveSeconds(task, now),
   }
 }

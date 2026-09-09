@@ -45,6 +45,8 @@ export function Dashboard() {
     finishTask,
     addTask,
     deleteTask,
+    restartTask,
+    reorderTasks,
     getLiveSeconds: liveSeconds,
   } = useTasks(
     settings,
@@ -247,7 +249,12 @@ export function Dashboard() {
               onFinish={handleFinish}
               onEdit={openEdit}
               onDelete={handleDelete}
+              onRestart={task => {
+                restartTask(task)
+                setNotice(`${task.name} restarted as a new task.`)
+              }}
               onUpdateGoal={openGoal}
+              onReorder={reorderTasks}
             />
           )}
           {tasks.length > 0 && (
