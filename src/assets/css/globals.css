@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body{
+    font-family: "Inter", sans-serif;
+  font-optical-sizing: auto;
+}
+
+.no-scroll {
+    scrollbar-width: none !important; /* Hides scrollbar in Firefox */
+    -ms-overflow-style: none !important; /* Hides scrollbar in IE & Edge */
+}
+
+.no-scroll::-webkit-scrollbar {
+    display: none !important; /* Hides scrollbar in Chrome, Safari, and Edge */
+}
