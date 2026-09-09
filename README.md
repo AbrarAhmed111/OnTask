@@ -1,141 +1,142 @@
 # OnTask
 
-**A simple open-source daily work timer for focused work and long-term goal tracking.**
+OnTask is a focused daily work timer for people who want to plan meaningful work, track actual focused time, and manually record progress toward larger goals.
 
-OnTask was built for a personal need.
+It is intentionally simple: open the dashboard, add today’s work, start one task, pause when needed, and keep moving.
 
-I wanted a simple tool that could help me structure my workday around **actual focused work time**, rather than fixed clock-based schedules. I looked at existing productivity and time-tracking apps, but many of them were subscription-based, included features I didn't need, or didn't support the workflow I had in mind.
+## Core Concepts
 
-So I decided to build my own.
+OnTask keeps three measurements separate:
 
-## Why OnTask?
+- **Daily focus target**: how much focused work you want to complete today.
+- **Actual work time**: the time recorded by active task timers. Paused time does not count.
+- **Long-term goal progress**: a percentage that you update manually for an optional larger goal.
 
-OnTask is designed around a simple idea:
-
-> **Decide what you need to work on, work for the amount of time you planned, and keep moving toward your larger goals.**
-
-The app separates three things:
-
-* **Daily Target** — how much focused work you want to complete today.
-* **Actual Work Time** — the time you actually spend working.
-* **Goal Progress** — how much of the larger project, course, or goal you have completed.
-
-These are intentionally kept separate.
-
-For example, you might spend **2 hours** working on an LLM course today, while your overall course progress goes from **60% → 70%**. The app does not try to calculate your goal progress from the time you spent. You decide the percentage yourself.
+Working for two hours does not automatically change goal progress. For example, you can work on a course for two hours and manually update its overall progress from 60% to 70%.
 
 ## Features
 
-### Daily Work Workflow
+### Daily Workflow
 
-* Set a daily focused-work target.
-* Create tasks for the day.
-* Assign a specific amount of work time to each task.
-* Start, pause, and resume tasks.
-* Track actual time spent working.
-* Complete tasks when their planned time is reached.
-* Continue working beyond the planned duration when needed.
-* Finish a task early when you are done for the day.
+- Add tasks with a planned duration.
+- Start, pause, and resume one task at a time.
+- Finish a task early when the planned duration is not needed.
+- Automatically mark a task complete when its planned duration is reached.
+- See actual work for each task and total focused work for the day.
+- Edit task names, durations, goal details, and goal percentages.
+- Remove completed tasks when they are no longer needed.
 
-### Long-Term Goal Tracking
+### Goal Tracking
 
-* Link tasks to larger goals.
-* Track overall goal completion separately from daily work time.
-* Manually update goal progress.
-* See completed and remaining percentage.
-* Preserve goal progress across different days.
+- Attach an optional long-term goal to a task.
+- Set and update the goal’s percentage manually.
+- View completed and remaining goal percentages independently from task time.
 
-### Daily Planning
+### Settings
 
-* Create a default daily workflow.
-* Automatically start a new day from your template.
-* Reorder tasks based on priority.
-* Add, edit, skip, or remove tasks.
-* Adjust today's plan without changing your long-term goals.
+Open the settings icon in the header to configure:
 
-### Work History
+- Daily focus target in hours and minutes.
+- Completion sound when a task reaches its target.
+- Whether the next pending task starts automatically after completion.
+- Reset of all locally stored tasks and settings.
 
-* Keep a lightweight history of previous workdays.
-* See total focused time completed each day.
-* View the tasks worked on during previous days.
+### First Launch
 
-## Example Workflow
+On a new installation, OnTask starts with an empty task list. The empty state guides you to add your first task and build the day’s workflow yourself.
 
-A typical day might look like:
+## What OnTask Does Not Include
 
-| Task                  | Daily Target |
-| --------------------- | -----------: |
-| Project Development   |           3h |
-| Interview Preparation |       2h 30m |
-| LLM Course            |           2h |
-| Portfolio / GitHub    |          30m |
-| **Total**             |       **8h** |
+OnTask is not intended to become a general productivity suite. It does not include:
 
-The goal isn't to work according to a specific clock schedule.
+- Daily history or analytics dashboards
+- Calendars or scheduling
+- Pomodoro sessions
+- Habit tracking or streaks
+- Productivity scores
+- Kanban boards or project management
+- Teams, sharing, or social features
+- AI productivity assistance
 
-Instead, OnTask tracks **8 hours of actual focused work**.
+## Technology
 
-You can start whenever you're ready, pause whenever you need a break, and continue later.
+- Next.js 15 App Router
+- React 18
+- TypeScript
+- Tailwind CSS
+- Lucide React icons
+- Browser `localStorage` for task and settings persistence
 
-## What OnTask Is Not
+The dashboard is local-first. Supabase infrastructure remains available in the repository for optional authenticated routes, but the public OnTask dashboard does not require Supabase credentials to run locally.
 
-OnTask intentionally avoids becoming a full productivity suite.
+## Project Structure
 
-It does not try to be:
+```text
+src/
+├── app/
+│   └── page.tsx
+├── components/
+│   ├── dashboard/
+│   ├── goals/
+│   ├── layout/
+│   ├── settings/
+│   ├── tasks/
+│   └── ui/
+├── hooks/
+│   ├── useSettings.ts
+│   ├── useTasks.ts
+│   └── useTimer.ts
+├── lib/
+│   ├── notifications.ts
+│   ├── storage.ts
+│   └── time.ts
+└── types/
+    └── index.ts
+```
 
-* A project management platform
-* A Kanban board
-* A calendar
-* A Pomodoro timer
-* A habit tracker
-* A team management tool
-* An analytics-heavy productivity platform
-* An AI productivity assistant
+## Getting Started
 
-The goal is to keep the experience focused and simple.
+Install dependencies:
 
-## Tech Stack
+```bash
+npm install
+```
 
-> Technical details will be added as the project develops.
+Start the development server:
 
-* Next.js
-* TypeScript
-* Tailwind CSS
-* React
-* Local Storage
+```bash
+npm run dev
+```
 
-## Project Status
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-OnTask is currently under development.
+## Available Scripts
 
-The initial version focuses on the core workflow:
+```bash
+npm run dev       # Start the development server
+npm run build     # Create a production build
+npm run start     # Serve the production build
+npm run lint      # Run ESLint with the repository configuration
+npm run format    # Format project files with Prettier
+```
 
-1. Create your daily tasks.
-2. Set how much time you want to spend on each task.
-3. Start working.
-4. Pause and resume whenever needed.
-5. Track your actual focused work.
-6. Update your long-term goal progress.
-7. Complete your daily target.
+## Local Data
 
-More information about the architecture and implementation will be added as development progresses.
+OnTask stores its dashboard data in the browser:
+
+- `ontask-tasks-v2`: today’s tasks, timer state, and goal associations.
+- `ontask-settings-v1`: daily target and notification preferences.
+
+Use **Settings → Reset local data** to remove both keys and return to the initial empty state.
 
 ## Philosophy
 
-OnTask follows a simple principle:
+> Work when you are ready. Focus on one thing. Track the work you actually do. Keep moving toward the bigger goal.
 
-**Work when you're ready. Focus on one thing. Track the work you actually do. Keep moving toward the bigger goal.**
+## Status
 
-No unnecessary complexity.
-
-No forced schedule.
-
-Just stay **OnTask**.
-
-## Open Source
-
-OnTask is open source and built primarily for personal use, but anyone is welcome to use, modify, and contribute to it.
+OnTask is under active development. The current implementation focuses on the single-dashboard daily workflow and local persistence.
 
 ## License
 
-> License information will be added here.
+License information will be added separately.
