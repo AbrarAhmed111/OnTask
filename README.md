@@ -1,18 +1,25 @@
 # OnTask
 
-OnTask is a focused daily work timer for people who want to plan meaningful work, track actual focused time, and manually record progress toward larger goals.
+OnTask is a focused daily work timer for people who want to plan meaningful
+work, track actual focused time, and manually record progress toward larger
+goals.
 
-It is intentionally simple: open the dashboard, add today’s work, start one task, pause when needed, and keep moving.
+It is intentionally simple: open the dashboard, add today’s work, start one
+task, pause when needed, and keep moving.
 
 ## Core Concepts
 
 OnTask keeps three measurements separate:
 
 - **Daily focus target**: how much focused work you want to complete today.
-- **Actual work time**: the time recorded by active task timers. Paused time does not count.
-- **Long-term goal progress**: a percentage that you update manually for an optional larger goal.
+- **Actual work time**: the time recorded by active task timers. Paused time
+  does not count.
+- **Long-term goal progress**: a percentage that you update manually for an
+  optional larger goal.
 
-Working for two hours does not automatically change goal progress. For example, you can work on a course for two hours and manually update its overall progress from 60% to 70%.
+Working for two hours does not automatically change goal progress. For example,
+you can work on a course for two hours and manually update its overall progress
+from 60% to 70%.
 
 ## Features
 
@@ -43,11 +50,13 @@ Open the settings icon in the header to configure:
 
 ### First Launch
 
-On a new installation, OnTask starts with an empty task list. The empty state guides you to add your first task and build the day’s workflow yourself.
+On a new installation, OnTask starts with an empty task list. The empty state
+guides you to add your first task and build the day’s workflow yourself.
 
 ## What OnTask Does Not Include
 
-OnTask is not intended to become a general productivity suite. It does not include:
+OnTask is not intended to become a general productivity suite. It does not
+include:
 
 - Daily history or analytics dashboards
 - Calendars or scheduling
@@ -67,7 +76,9 @@ OnTask is not intended to become a general productivity suite. It does not inclu
 - Lucide React icons
 - Browser `localStorage` for task and settings persistence
 
-The dashboard is local-first. Supabase infrastructure remains available in the repository for optional authenticated routes, but the public OnTask dashboard does not require Supabase credentials to run locally.
+The dashboard is local-first. Supabase infrastructure remains available in the
+repository for optional authenticated routes, but the public OnTask dashboard
+does not require Supabase credentials to run locally.
 
 ## Project Structure
 
@@ -127,16 +138,19 @@ OnTask stores its dashboard data in the browser:
 - `ontask-tasks-v2`: today’s tasks, timer state, and goal associations.
 - `ontask-settings-v1`: daily target and notification preferences.
 
-Use **Settings → Reset local data** to remove both keys and return to the initial empty state.
+Use **Settings → Reset local data** to remove both keys and return to the
+initial empty state.
 
 ## Philosophy
 
-> Work when you are ready. Focus on one thing. Track the work you actually do. Keep moving toward the bigger goal.
+> Work when you are ready. Focus on one thing. Track the work you actually do.
+> Keep moving toward the bigger goal.
 
 ## Status
 
-OnTask is under active development. The current implementation focuses on the single-dashboard daily workflow and local persistence.
+OnTask is under active development. The current implementation focuses on the
+single-dashboard daily workflow and local persistence.
 
 ## License
 
-License information will be added separately.
+OnTask is released under the [MIT License](LICENSE).

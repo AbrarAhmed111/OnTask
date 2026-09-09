@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { TaskForm } from '@/components/tasks/TaskForm'
 import { GoalModal } from '@/components/tasks/GoalModal'
+import { CompletionModal } from '@/components/tasks/CompletionModal'
 import { SettingsModal } from '@/components/settings/SettingsModal'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useSettings } from '@/hooks/useSettings'
@@ -32,6 +33,7 @@ type Confirmation = { type: 'delete'; taskId: string } | { type: 'reset' }
 
 export function Dashboard() {
   const { settings, ready: settingsReady, updateSettings } = useSettings()
+  const [completionTask, setCompletionTask] = useState<Task | null>(null)
   const {
     tasks,
     ready,
@@ -44,7 +46,10 @@ export function Dashboard() {
     addTask,
     deleteTask,
     getLiveSeconds: liveSeconds,
-  } = useTasks(settings)
+  } = useTasks(
+    settings,
+    task => settings.soundEnabled && setCompletionTask(task),
+  )
   const [modal, setModal] = useState<'add' | 'edit' | 'goal' | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<TaskFormValues>(emptyForm)
@@ -317,6 +322,12 @@ export function Dashboard() {
           onSave={updateSettings}
           onReset={handleReset}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+      {completionTask && (
+        <CompletionModal
+          taskName={completionTask.name}
+          onStop={() => setCompletionTask(null)}
         />
       )}
       {confirmation?.type === 'delete' && (
