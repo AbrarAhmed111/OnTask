@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import {
+  AlertTriangle,
   ChevronDown,
   ChevronUp,
   Loader2,
@@ -57,6 +58,15 @@ const STATUS_LABEL: Record<SummaryTaskStatus, string> = {
   completed: 'Completed',
   in_progress: 'In progress',
   skipped: 'Skipped',
+}
+
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div className="flex items-start gap-2 rounded-xl border border-coral/20 bg-coral/5 p-3 text-xs leading-5 text-coral">
+      <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+      <span>{message}</span>
+    </div>
+  )
 }
 
 function TaskRow({
@@ -124,6 +134,7 @@ function MemberBreakdown({
 
 export function WorkspaceSummarySection({
   ready,
+  error,
   summary,
   members,
   summaryDate,
@@ -132,6 +143,7 @@ export function WorkspaceSummarySection({
   onRegenerate,
 }: {
   ready: boolean
+  error?: string | null
   summary: WorkspaceDailySummary | null
   members: WorkspaceMember[]
   summaryDate: string | null
@@ -140,6 +152,8 @@ export function WorkspaceSummarySection({
   onRegenerate: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const hasNoRecordedWork =
+    !!summary && summary.structuredSnapshot.members.length === 0
 
   const generatedByMember = summary
     ? members.find(m => m.userId === summary.generatedBy)
@@ -153,7 +167,7 @@ export function WorkspaceSummarySection({
         <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight text-ink">
           <Sparkles size={15} /> Yesterday&apos;s Work
         </h2>
-        {summary && (
+        {summary && !hasNoRecordedWork && (
           <button
             onClick={() => setExpanded(current => !current)}
             className="flex items-center gap-1 text-[11px] font-semibold text-[var(--ws-accent,#375b4b)] transition hover:text-coral"
@@ -168,6 +182,21 @@ export function WorkspaceSummarySection({
         <div className="space-y-3 px-5 py-4">
           <Skeleton className="h-3 w-1/3" />
           <Skeleton className="h-8 w-40" />
+        </div>
+      ) : !summary && error ? (
+        <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
+          <ErrorBanner message={error} />
+          <p className="text-xs leading-5 text-muted">
+            Couldn&apos;t generate yesterday&apos;s summary.
+          </p>
+          <Button onClick={onGenerate} disabled={generating}>
+            {generating ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Sparkles size={14} />
+            )}
+            Retry
+          </Button>
         </div>
       ) : !summary ? (
         <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
@@ -184,6 +213,12 @@ export function WorkspaceSummarySection({
             )}
             Generate AI Summary
           </Button>
+        </div>
+      ) : hasNoRecordedWork ? (
+        <div className="px-5 py-8 text-center">
+          <p className="text-xs leading-5 text-muted">
+            No work was recorded on {formatDate(summary.summaryDate)}.
+          </p>
         </div>
       ) : (
         <div>
@@ -211,6 +246,12 @@ export function WorkspaceSummarySection({
               Regenerate
             </Button>
           </div>
+
+          {error && (
+            <div className="px-5 pb-4">
+              <ErrorBanner message={error} />
+            </div>
+          )}
 
           {expanded && (
             <div className="space-y-4 border-t border-line/70 px-5 py-4">

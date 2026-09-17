@@ -120,6 +120,7 @@ function WorkspaceDetail({
   const {
     summary,
     ready: summaryReady,
+    error: summaryError,
     generating: summaryGenerating,
     generate: generateSummary,
     summaryDate,
@@ -418,6 +419,7 @@ function WorkspaceDetail({
 
           <WorkspaceSummarySection
             ready={ready && summaryReady}
+            error={summaryError}
             summary={summary}
             members={members}
             summaryDate={summaryDate}
