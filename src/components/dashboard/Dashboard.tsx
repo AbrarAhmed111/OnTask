@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Check, CirclePlus, Pause, Play, Plus, Target } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
@@ -16,13 +17,23 @@ import { GoalModal } from '@/components/tasks/GoalModal'
 import { CompletionModal } from '@/components/tasks/CompletionModal'
 import { SettingsModal } from '@/components/settings/SettingsModal'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { DeleteParentModal } from '@/components/tasks/DeleteParentModal'
 import { AuthModal, AuthStep } from '@/components/auth/AuthModal'
 import { GoogleOneTap } from '@/components/auth/GoogleOneTap'
+import { MigrationModal } from '@/components/auth/MigrationModal'
 import { useSettings } from '@/hooks/useSettings'
 import { useAuth } from '@/hooks/useAuth'
-import { clearStoredData } from '@/lib/storage'
+import { useMyInvitations } from '@/hooks/useMyInvitations'
+import {
+  clearStoredData,
+  isMigrationResolved,
+  loadTasks,
+  markMigrationResolved,
+  saveTasks,
+} from '@/lib/storage'
 import { requestNotificationPermission } from '@/lib/notifications'
 import { clientSignout } from '@/lib/auth/signout'
+import { migrateGuestTasks } from '@/lib/tasks/migration'
 
 const emptyForm: TaskFormValues = {
   name: '',
@@ -33,9 +44,13 @@ const emptyForm: TaskFormValues = {
   trackGoal: true,
 }
 
-type Confirmation = { type: 'delete'; taskId: string } | { type: 'reset' }
+type Confirmation =
+  | { type: 'delete'; taskId: string }
+  | { type: 'reset' }
+  | { type: 'delete-parent'; task: Task; childCount: number }
 
 export function Dashboard() {
+  const router = useRouter()
   const { settings, ready: settingsReady, updateSettings } = useSettings()
   const {
     user,
@@ -43,6 +58,7 @@ export function Dashboard() {
     passwordRecovery,
     clearPasswordRecovery,
   } = useAuth()
+  const { invitations: myInvitations } = useMyInvitations(user)
   const [completionTask, setCompletionTask] = useState<Task | null>(null)
   const {
     tasks,
@@ -56,6 +72,7 @@ export function Dashboard() {
     addTask,
     deleteTask,
     restartTask,
+    moveTask,
     reorderTasks,
     getLiveSeconds: liveSeconds,
     error: dataError,
@@ -64,11 +81,13 @@ export function Dashboard() {
     settings,
     task => settings.soundEnabled && setCompletionTask(task),
   )
-  const [modal, setModal] = useState<'add' | 'edit' | 'goal' | 'auth' | null>(
-    null,
-  )
+  const [modal, setModal] = useState<
+    'add' | 'edit' | 'goal' | 'auth' | 'migration' | null
+  >(null)
   const [authStep, setAuthStep] = useState<AuthStep>('login')
+  const [migrationTaskCount, setMigrationTaskCount] = useState(0)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [pendingParentId, setPendingParentId] = useState<string | null>(null)
   const [form, setForm] = useState<TaskFormValues>(emptyForm)
   const [goalProgress, setGoalProgress] = useState('0')
   const [notice, setNotice] = useState('')
@@ -97,9 +116,33 @@ export function Dashboard() {
     clearPasswordRecovery()
   }, [passwordRecovery, clearPasswordRecovery])
 
+  useEffect(() => {
+    if (!user || !ready || isMigrationResolved()) return
+    const localTasks = loadTasks()
+    if (localTasks.length === 0) return
+    setMigrationTaskCount(localTasks.length)
+    setModal('migration')
+  }, [user, ready])
+
   const handleAuthenticated = () => {
     closeModal()
     setNotice('Signed in to OnTask.')
+  }
+
+  const handleMigrate = async () => {
+    const result = await migrateGuestTasks(loadTasks())
+    if (result.success) {
+      saveTasks([])
+      markMigrationResolved()
+      window.location.reload()
+    }
+    return result
+  }
+
+  const handleKeepLocal = () => {
+    markMigrationResolved()
+    closeModal()
+    setNotice('Your local tasks will stay on this device.')
   }
 
   const handleOpenWorkspaces = () => {
@@ -107,7 +150,7 @@ export function Dashboard() {
       openAuth('login')
       return
     }
-    setNotice('Shared Workspaces is coming soon.')
+    router.push('/workspaces')
   }
 
   const handleLogout = async () => {
@@ -118,9 +161,16 @@ export function Dashboard() {
   const closeModal = () => {
     setModal(null)
     setEditingId(null)
+    setPendingParentId(null)
   }
   const openAdd = () => {
     setForm({ ...emptyForm })
+    setPendingParentId(null)
+    setModal('add')
+  }
+  const openAddSubtask = (parentId: string) => {
+    setForm({ ...emptyForm })
+    setPendingParentId(parentId)
     setModal('add')
   }
   const openEdit = (task: Task) => {
@@ -142,9 +192,10 @@ export function Dashboard() {
   }
 
   const handleAdd = async (event: FormEvent) => {
-    if (addTask(event, form)) {
+    if (addTask(event, form, pendingParentId)) {
+      const wasSubtask = Boolean(pendingParentId)
       closeModal()
-      setNotice('Task added to your day.')
+      setNotice(wasSubtask ? 'Subtask added.' : 'Task added to your day.')
       const permission = await requestNotificationPermission()
       if (permission === 'denied') {
         setNotice(
@@ -186,6 +237,16 @@ export function Dashboard() {
   const handleDelete = (id: string) => {
     setConfirmation({ type: 'delete', taskId: id })
   }
+  const handleDeleteParent = (task: Task) => {
+    const childCount = tasks.filter(t => t.parentTaskId === task.id).length
+    setConfirmation({ type: 'delete-parent', task, childCount })
+  }
+  const handleMoveTo = (taskId: string, parentId: string | null) => {
+    moveTask(taskId, parentId)
+    setNotice(
+      parentId ? 'Task moved under its new parent.' : 'Task made standalone.',
+    )
+  }
   const handleReset = () => {
     setConfirmation({ type: 'reset' })
   }
@@ -200,8 +261,30 @@ export function Dashboard() {
       return
     }
 
+    if (confirmation.type === 'delete-parent') return
+
     clearStoredData()
     window.location.reload()
+  }
+  const confirmDeleteParentAndChildren = () => {
+    if (confirmation?.type !== 'delete-parent') return
+    tasks
+      .filter(task => task.parentTaskId === confirmation.task.id)
+      .forEach(child => deleteTask(child.id))
+    deleteTask(confirmation.task.id)
+    setNotice(`${confirmation.task.name} and its subtasks were removed.`)
+    closeConfirmation()
+  }
+  const confirmOrphanChildren = () => {
+    if (confirmation?.type !== 'delete-parent') return
+    tasks
+      .filter(task => task.parentTaskId === confirmation.task.id)
+      .forEach(child => moveTask(child.id, null))
+    deleteTask(confirmation.task.id)
+    setNotice(
+      `${confirmation.task.name} removed — its subtasks are now standalone.`,
+    )
+    closeConfirmation()
   }
 
   if (!authReady || !ready || !settingsReady)
@@ -210,8 +293,11 @@ export function Dashboard() {
   const completedTasks = tasks.filter(
     task => task.status === 'completed' || task.status === 'skipped',
   ).length
+  // Parents are containers, not runnable — never offer to auto-start one.
   const nextTask = tasks.find(
-    task => task.status === 'pending' || task.status === 'paused',
+    task =>
+      (task.status === 'pending' || task.status === 'paused') &&
+      !tasks.some(t => t.parentTaskId === task.id),
   )
   return (
     <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_80%_0%,#e4f0e6_0,transparent_30%),linear-gradient(135deg,#f8faf7_0%,#eff3ee_100%)] text-ink">
@@ -222,6 +308,7 @@ export function Dashboard() {
         onOpenAuth={() => openAuth('login')}
         onOpenWorkspaces={handleOpenWorkspaces}
         onLogout={handleLogout}
+        pendingInvitationCount={myInvitations.length}
       />
       <div className="mx-auto w-[min(1120px,calc(100%-32px))]">
         <section className="grid gap-9 py-12 sm:py-16 lg:grid-cols-[0.85fr_1.15fr] lg:items-end lg:gap-16">
@@ -310,6 +397,9 @@ export function Dashboard() {
               }}
               onUpdateGoal={openGoal}
               onReorder={reorderTasks}
+              onAddSubtask={openAddSubtask}
+              onDeleteParent={handleDeleteParent}
+              onMoveTo={handleMoveTo}
             />
           )}
           {tasks.length > 0 && (
@@ -342,14 +432,14 @@ export function Dashboard() {
       <Footer />
       {modal === 'add' && (
         <Modal
-          eyebrow="New focus"
-          title="Add a task to your day"
+          eyebrow={pendingParentId ? 'New subtask' : 'New focus'}
+          title={pendingParentId ? 'Add a subtask' : 'Add a task to your day'}
           onClose={closeModal}
         >
           <TaskForm
             values={form}
             setValues={setForm}
-            submitLabel="Add task"
+            submitLabel={pendingParentId ? 'Add subtask' : 'Add task'}
             onSubmit={handleAdd}
             onCancel={closeModal}
           />
@@ -383,6 +473,14 @@ export function Dashboard() {
           initialStep={authStep}
           onClose={closeModal}
           onAuthenticated={handleAuthenticated}
+        />
+      )}
+      {modal === 'migration' && (
+        <MigrationModal
+          taskCount={migrationTaskCount}
+          onMigrate={handleMigrate}
+          onKeepLocal={handleKeepLocal}
+          onClose={closeModal}
         />
       )}
       {authReady && !user && (
@@ -420,6 +518,15 @@ export function Dashboard() {
           message="This will permanently remove today's tasks and reset all OnTask settings from this browser."
           confirmLabel="Clear local data"
           onConfirm={confirmAction}
+          onClose={closeConfirmation}
+        />
+      )}
+      {confirmation?.type === 'delete-parent' && (
+        <DeleteParentModal
+          taskName={confirmation.task.name}
+          childCount={confirmation.childCount}
+          onDeleteAll={confirmDeleteParentAndChildren}
+          onOrphan={confirmOrphanChildren}
           onClose={closeConfirmation}
         />
       )}
