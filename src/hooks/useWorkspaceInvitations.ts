@@ -109,7 +109,18 @@ export function useWorkspaceInvitations(
     }
     const invitation = rowToInvitation(data as InvitationRow)
     setInvitations(current => [invitation, ...current])
-    return { success: true as const }
+    // The invitation record itself is already created and surfaces in-app
+    // regardless of what happens next, so a failed email doesn't fail this
+    // whole call — but it IS awaited, so the caller can tell the user
+    // truthfully whether the email actually went out.
+    const emailSent = await fetch('/api/workspace-invitations/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invitationId: invitation.id }),
+    })
+      .then(res => res.ok)
+      .catch(() => false)
+    return { success: true as const, emailSent }
   }
 
   const cancelInvitation = async (invitationId: string) => {
@@ -129,5 +140,28 @@ export function useWorkspaceInvitations(
     return { success: true as const }
   }
 
-  return { invitations, ready, error, inviteByEmail, cancelInvitation }
+  // Clears invitation history (cancelled/rejected/expired) — RLS (0012)
+  // rejects this for a still-'pending' row, so cancelling one always goes
+  // through cancelInvitation above instead of straight to delete.
+  const deleteInvitation = async (invitationId: string) => {
+    const supabase = createClient()
+    const { error: deleteError } = await supabase
+      .from('workspace_invitations')
+      .delete()
+      .eq('id', invitationId)
+    if (deleteError) {
+      return { success: false as const, error: deleteError.message }
+    }
+    setInvitations(current => current.filter(inv => inv.id !== invitationId))
+    return { success: true as const }
+  }
+
+  return {
+    invitations,
+    ready,
+    error,
+    inviteByEmail,
+    cancelInvitation,
+    deleteInvitation,
+  }
 }

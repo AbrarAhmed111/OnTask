@@ -4,6 +4,7 @@ import { FormEvent, useState } from 'react'
 import { AlertTriangle, Check, Loader2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { showErrorToast, showSuccessToast } from '@/lib/toast'
 
 export function InviteMemberModal({
   onInvite,
@@ -12,7 +13,7 @@ export function InviteMemberModal({
   onInvite: (
     email: string,
     message: string,
-  ) => Promise<{ success: boolean; error?: string }>
+  ) => Promise<{ success: boolean; error?: string; emailSent?: boolean }>
   onClose: () => void
 }) {
   const [email, setEmail] = useState('')
@@ -30,6 +31,13 @@ export function InviteMemberModal({
     if (!result.success) {
       setError(result.error || 'Failed to send invitation.')
       return
+    }
+    if (result.emailSent) {
+      showSuccessToast(`Invitation email sent to ${email.trim()}.`)
+    } else {
+      showErrorToast(
+        "Invitation created, but the email couldn't be sent — they'll still see it in-app.",
+      )
     }
     onClose()
   }
@@ -66,8 +74,8 @@ export function InviteMemberModal({
           />
         </label>
         <p className="text-[10px] leading-4 text-muted">
-          They&apos;ll see this invitation next time they sign in to OnTask — no
-          email is sent.
+          They&apos;ll get an email invitation, and also see it in-app next time
+          they sign in to OnTask.
         </p>
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? (
