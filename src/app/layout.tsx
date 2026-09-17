@@ -11,7 +11,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
     <html lang="en">
       <head></head>
       <body suppressHydrationWarning className="antialiased">
-        <Toaster position="top-center" reverseOrder={false} />
+        <Toaster position="bottom-right" reverseOrder={false} />
         {children}
       </body>
     </html>
