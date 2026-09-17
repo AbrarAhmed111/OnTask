@@ -26,6 +26,11 @@ export async function sendMail(options: {
 }) {
   await getTransporter().sendMail({
     from: `"OnTask" <${process.env.SMTP_FROM_EMAIL}>`,
+    // A real reply-to (rather than only ever sending from a bare "noreply"
+    // identity) is one of the few things a transactional sender fully
+    // controls that spam filters weigh — defaults to the same inbox if a
+    // dedicated one isn't configured.
+    replyTo: process.env.SMTP_REPLY_TO || process.env.SMTP_FROM_EMAIL,
     ...options,
   })
 }
