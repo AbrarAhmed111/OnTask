@@ -58,12 +58,27 @@ export async function POST(request: Request) {
     inviterProfile?.full_name || inviterProfile?.email || 'A teammate'
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
+  // Carries the invitation id + workspace name + invited address through to
+  // the client so a recipient with no session yet lands on a contextual
+  // "log in to join <workspace>" prompt (see useAuthGuard/Dashboard.tsx/
+  // workspaces/page.tsx), and — just as importantly — so a visitor who's
+  // already signed in as a *different* account can be told exactly that,
+  // rather than being shown a generic "invitation not found" for an
+  // invitation their session's RLS grant simply can't see. The email
+  // address isn't sensitive here: it's the same address this link was just
+  // emailed to.
+  const acceptUrl = `${baseUrl}/workspaces?${new URLSearchParams({
+    invite: invitationId,
+    workspace: workspaceName,
+    email: invitation.invited_email,
+  }).toString()}`
+
   const { subject, html, text } = buildInvitationEmail({
     workspaceName,
     inviterName,
     message: invitation.message,
     invitedEmail: invitation.invited_email,
-    acceptUrl: `${baseUrl}/workspaces`,
+    acceptUrl,
   })
 
   try {

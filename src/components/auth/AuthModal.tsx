@@ -21,15 +21,29 @@ const inputClass =
 
 export function AuthModal({
   initialStep = 'login',
+  inviteId,
+  inviteWorkspaceName,
+  prefillEmail,
   onClose,
   onAuthenticated,
 }: {
   initialStep?: AuthStep
+  // Set when this modal was opened from a workspace invitation link — swaps
+  // the generic login/signup copy for something that tells the visitor why
+  // they're being asked to sign in at all, and (for signup, see
+  // handleSignup) survives the email-confirmation round trip so a brand-new
+  // account still lands back on the invitation afterward.
+  inviteId?: string
+  inviteWorkspaceName?: string
+  // Known-correct address for this flow (e.g. the address a workspace
+  // invitation was sent to) — saves retyping it and steers a visitor away
+  // from accidentally authenticating with the wrong account.
+  prefillEmail?: string
   onClose: () => void
   onAuthenticated: () => void
 }) {
   const [step, setStep] = useState<AuthStep>(initialStep)
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(prefillEmail ?? '')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
@@ -92,10 +106,16 @@ export function AuthModal({
     }
     setLoading(true)
     const supabase = createClient()
+    const emailRedirectTo = inviteId
+      ? `${window.location.origin}/?${new URLSearchParams({ invite: inviteId, workspace: inviteWorkspaceName || '' }).toString()}`
+      : undefined
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName.trim() || undefined } },
+      options: {
+        data: { full_name: fullName.trim() || undefined },
+        emailRedirectTo,
+      },
     })
     setLoading(false)
     if (signUpError) {
@@ -156,10 +176,28 @@ export function AuthModal({
     onAuthenticated()
   }
 
-  const copy = STEP_COPY[step]
+  const copy =
+    inviteWorkspaceName && (step === 'login' || step === 'signup')
+      ? {
+          eyebrow: "You've been invited",
+          title:
+            step === 'login'
+              ? `Log in to join ${inviteWorkspaceName}`
+              : `Create an account to join ${inviteWorkspaceName}`,
+        }
+      : STEP_COPY[step]
 
   return (
     <Modal eyebrow={copy.eyebrow} title={copy.title} onClose={onClose}>
+      {inviteWorkspaceName && (step === 'login' || step === 'signup') && (
+        <p className="mb-4 text-xs leading-5 text-muted">
+          Once you&apos;re signed in, you&apos;ll be connected to{' '}
+          <strong className="font-semibold text-ink">
+            {inviteWorkspaceName}
+          </strong>
+          .
+        </p>
+      )}
       {error && (
         <div className="mb-4 flex items-start gap-2 rounded-xl border border-coral/20 bg-coral/5 p-3 text-xs leading-5 text-coral">
           <AlertTriangle size={15} className="mt-0.5 shrink-0" />

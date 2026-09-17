@@ -93,6 +93,11 @@ export function Dashboard() {
   const [notice, setNotice] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null)
+  const [inviteContext, setInviteContext] = useState<{
+    id: string
+    workspaceName: string
+    invitedEmail: string | null
+  } | null>(null)
 
   useEffect(() => {
     if (!notice) return
@@ -110,6 +115,29 @@ export function Dashboard() {
     setModal('auth')
   }
 
+  // A workspace invitation email link lands here as /?invite=&workspace=
+  // (guests bounced off /workspaces by useAuthGuard keep these params too —
+  // see useAuthGuard.ts). Already-signed-in visitors skip the modal
+  // entirely and go straight to the invitation; guests get a contextual
+  // login/signup prompt instead of the generic one.
+  useEffect(() => {
+    if (!authReady) return
+    const params = new URLSearchParams(window.location.search)
+    const invite = params.get('invite')
+    if (!invite) return
+    window.history.replaceState(null, '', window.location.pathname)
+    if (user) {
+      router.push(`/workspaces?invite=${encodeURIComponent(invite)}`)
+      return
+    }
+    setInviteContext({
+      id: invite,
+      workspaceName: params.get('workspace') || 'the workspace',
+      invitedEmail: params.get('email'),
+    })
+    openAuth('login')
+  }, [authReady, user, router])
+
   useEffect(() => {
     if (!passwordRecovery) return
     openAuth('reset')
@@ -126,6 +154,11 @@ export function Dashboard() {
 
   const handleAuthenticated = () => {
     closeModal()
+    if (inviteContext) {
+      router.push(`/workspaces?invite=${encodeURIComponent(inviteContext.id)}`)
+      setInviteContext(null)
+      return
+    }
     setNotice('Signed in to OnTask.')
   }
 
@@ -162,6 +195,7 @@ export function Dashboard() {
     setModal(null)
     setEditingId(null)
     setPendingParentId(null)
+    setInviteContext(null)
   }
   const openAdd = () => {
     setForm({ ...emptyForm })
@@ -471,6 +505,9 @@ export function Dashboard() {
       {modal === 'auth' && (
         <AuthModal
           initialStep={authStep}
+          inviteId={inviteContext?.id}
+          inviteWorkspaceName={inviteContext?.workspaceName}
+          prefillEmail={inviteContext?.invitedEmail ?? undefined}
           onClose={closeModal}
           onAuthenticated={handleAuthenticated}
         />

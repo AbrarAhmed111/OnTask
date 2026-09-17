@@ -15,7 +15,12 @@ export function useAuthGuard() {
   const [loggingOut, setLoggingOut] = useState(false)
 
   useEffect(() => {
-    if (authReady && !user) router.replace('/')
+    if (!authReady || user) return
+    // Preserve query params (e.g. an invitation's ?invite=&workspace=) so
+    // the home page can still pick them up and show a contextual login
+    // prompt instead of silently dropping them on the bounce to "/".
+    const query = typeof window !== 'undefined' ? window.location.search : ''
+    router.replace(query ? `/${query}` : '/')
   }, [authReady, user, router])
 
   const handleLogout = async () => {

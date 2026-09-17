@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CirclePlus, Mail, Users, X } from 'lucide-react'
+import { AlertTriangle, CirclePlus, Mail, Users, X } from 'lucide-react'
 import { WorkspacePageShell } from '@/components/layout/WorkspacePageShell'
 import { WorkspaceCard } from '@/components/workspaces/WorkspaceCard'
 import { CreateWorkspaceModal } from '@/components/workspaces/CreateWorkspaceModal'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { useMyInvitations } from '@/hooks/useMyInvitations'
+import { clientSignout } from '@/lib/auth/signout'
 import type { AuthUser } from '@/hooks/useAuth'
 import { WorkspaceInvitation } from '@/types/workspace'
 
@@ -48,6 +49,62 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
   const [creating, setCreating] = useState(false)
   const [rejecting, setRejecting] = useState<WorkspaceInvitation | null>(null)
   const [notice, setNotice] = useState('')
+  // Captured once on mount (then stripped from the URL) so it survives even
+  // after the query string is cleaned up — see the invitation-link flow in
+  // Dashboard.tsx/useAuthGuard.ts that lands a visitor here with ?invite=.
+  const [inviteLink, setInviteLink] = useState<{
+    id: string
+    workspaceName: string | null
+    invitedEmail: string | null
+  } | null>(null)
+  const [switchingAccount, setSwitchingAccount] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const invite = params.get('invite')
+    if (!invite) return
+    setInviteLink({
+      id: invite,
+      workspaceName: params.get('workspace'),
+      invitedEmail: params.get('email'),
+    })
+    window.history.replaceState(null, '', window.location.pathname)
+  }, [])
+
+  // The invited address is embedded in the link itself (see
+  // send-email/route.ts), so a visitor who's signed in as a *different*
+  // account can be told that directly — RLS means their session simply
+  // can't see this invitation row at all, which would otherwise look
+  // identical to "this invitation no longer exists."
+  const accountMismatch =
+    !!inviteLink?.invitedEmail &&
+    !!user.email &&
+    inviteLink.invitedEmail.toLowerCase() !== user.email.toLowerCase()
+
+  useEffect(() => {
+    if (!inviteLink || !invitationsReady || accountMismatch) return
+    if (!invitations.some(invitation => invitation.id === inviteLink.id)) {
+      setNotice(
+        "That invitation isn't pending anymore — it may already have been accepted, declined, or cancelled.",
+      )
+    }
+  }, [inviteLink, invitationsReady, invitations, accountMismatch])
+
+  const handleSwitchAccount = async () => {
+    if (!inviteLink) return
+    setSwitchingAccount(true)
+    await clientSignout()
+    const params = new URLSearchParams({ invite: inviteLink.id })
+    if (inviteLink.workspaceName)
+      params.set('workspace', inviteLink.workspaceName)
+    if (inviteLink.invitedEmail) params.set('email', inviteLink.invitedEmail)
+    // A hard navigation, not router.push — useAuthGuard's own redirect
+    // effect fires the instant `user` goes null too, and a client-side
+    // push here could lose this race and land on a bare "/" with the
+    // invite context dropped. This also guarantees a clean auth state for
+    // whichever account logs in next.
+    window.location.href = `/?${params.toString()}`
+  }
 
   useEffect(() => {
     if (error) setNotice(error)
@@ -108,6 +165,29 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
           {notice}
         </div>
       )}
+      {accountMismatch && inviteLink && (
+        <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-coral/30 bg-coral/5 p-5 animate-[fadeIn_180ms_ease-out] sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-coral" />
+            <p className="text-xs leading-5 text-coral">
+              The invitation to{' '}
+              <strong>{inviteLink.workspaceName || 'this workspace'}</strong>{' '}
+              was sent to <strong>{inviteLink.invitedEmail}</strong>, but
+              you&apos;re signed in as <strong>{user.email}</strong>. Log out
+              and sign in with that address to accept it, or ask the workspace
+              owner to invite <strong>{user.email}</strong> instead.
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            className="shrink-0"
+            disabled={switchingAccount}
+            onClick={handleSwitchAccount}
+          >
+            Log out &amp; switch account
+          </Button>
+        </div>
+      )}
       {invitationsReady && invitations.length > 0 && (
         <div className="mb-8 rounded-2xl border border-sage/40 bg-sage/5 p-5 animate-[fadeIn_220ms_ease-out] sm:p-6">
           <h2 className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-forest">
@@ -117,7 +197,19 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
             {invitations.map(invitation => (
               <div
                 key={invitation.id}
-                className="flex flex-col gap-3 rounded-xl border border-line bg-panel p-4 sm:flex-row sm:items-center sm:justify-between"
+                ref={element => {
+                  if (element && invitation.id === inviteLink?.id) {
+                    element.scrollIntoView({
+                      behavior: 'smooth',
+                      block: 'center',
+                    })
+                  }
+                }}
+                className={`flex flex-col gap-3 rounded-xl border bg-panel p-4 transition sm:flex-row sm:items-center sm:justify-between ${
+                  invitation.id === inviteLink?.id
+                    ? 'border-forest ring-4 ring-sage/25'
+                    : 'border-line'
+                }`}
               >
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-ink">
