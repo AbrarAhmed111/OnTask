@@ -44,6 +44,7 @@ export function useWorkspaceActivity(
   const userId = user?.id
   const [events, setEvents] = useState<ActivityEvent[]>([])
   const [ready, setReady] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!userId || !workspaceId) {
@@ -53,6 +54,7 @@ export function useWorkspaceActivity(
     }
     let cancelled = false
     const supabase = createClient()
+    setError(null)
 
     supabase
       .from('task_events')
@@ -60,8 +62,13 @@ export function useWorkspaceActivity(
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false })
       .limit(limit)
-      .then(({ data }) => {
-        if (cancelled || !data) return
+      .then(({ data, error: fetchError }) => {
+        if (cancelled) return
+        if (fetchError || !data) {
+          setError("Couldn't load activity.")
+          setReady(true)
+          return
+        }
         setEvents((data as TaskEventRow[]).map(rowToEvent))
         setReady(true)
       })
@@ -90,5 +97,5 @@ export function useWorkspaceActivity(
     }
   }, [userId, workspaceId, limit])
 
-  return { events, ready }
+  return { events, ready, error }
 }

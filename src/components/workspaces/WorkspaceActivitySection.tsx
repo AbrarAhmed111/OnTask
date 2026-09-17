@@ -1,4 +1,4 @@
-import { Activity } from 'lucide-react'
+import { Activity, AlertTriangle } from 'lucide-react'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { WorkspaceActivityFeed } from '@/components/workspaces/WorkspaceActivityFeed'
 import { ActivityEvent } from '@/hooks/useWorkspaceActivity'
@@ -15,10 +15,12 @@ function ActivityRowSkeleton() {
 
 export function WorkspaceActivitySection({
   ready,
+  error,
   events,
   members,
 }: {
   ready: boolean
+  error?: string | null
   events: ActivityEvent[]
   members: WorkspaceMember[]
 }) {
@@ -35,6 +37,11 @@ export function WorkspaceActivitySection({
           <ActivityRowSkeleton />
           <ActivityRowSkeleton />
           <ActivityRowSkeleton />
+        </div>
+      ) : error ? (
+        <div className="flex items-start gap-2 px-5 py-4 text-xs leading-5 text-coral">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
         </div>
       ) : (
         <WorkspaceActivityFeed events={events} members={members} />

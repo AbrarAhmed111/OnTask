@@ -112,10 +112,11 @@ function WorkspaceDetail({
   } = useWorkspaceTasks(workspaceId, user, members, task =>
     setCompletionTask(task),
   )
-  const { events: activityEvents, ready: activityReady } = useWorkspaceActivity(
-    workspaceId,
-    user,
-  )
+  const {
+    events: activityEvents,
+    ready: activityReady,
+    error: activityError,
+  } = useWorkspaceActivity(workspaceId, user)
   const {
     summary,
     ready: summaryReady,
@@ -402,6 +403,7 @@ function WorkspaceDetail({
 
           <WorkspaceActivitySection
             ready={ready && activityReady}
+            error={activityError}
             events={activityEvents}
             members={members}
           />
