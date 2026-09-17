@@ -13,6 +13,7 @@ export function Header({
   onOpenAuth,
   onOpenWorkspaces,
   onLogout,
+  pendingInvitationCount = 0,
 }: {
   onSettings: () => void
   user: AuthUser | null
@@ -20,6 +21,7 @@ export function Header({
   onOpenAuth: () => void
   onOpenWorkspaces: () => void
   onLogout: () => void
+  pendingInvitationCount?: number
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const initials = (user?.fullName || user?.email || '?')
@@ -46,9 +48,17 @@ export function Header({
         </div>
         <button
           onClick={onOpenWorkspaces}
-          className="hidden items-center gap-1.5 rounded-full border border-line bg-white/60 px-3 py-2 text-[11px] font-semibold text-forest transition hover:border-forest sm:flex"
+          className="relative hidden items-center gap-1.5 rounded-full border border-line bg-white/60 px-3 py-2 text-[11px] font-semibold text-forest transition hover:border-forest sm:flex"
         >
           <Users size={14} /> Shared Workspaces
+          {pendingInvitationCount > 0 && (
+            <span
+              aria-label={`${pendingInvitationCount} pending ${pendingInvitationCount === 1 ? 'invitation' : 'invitations'}`}
+              className="grid h-4 min-w-4 place-items-center rounded-full bg-coral px-1 font-mono text-[9px] font-bold text-white"
+            >
+              {pendingInvitationCount}
+            </span>
+          )}
         </button>
         {authReady && user ? (
           <div className="relative">
