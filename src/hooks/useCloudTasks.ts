@@ -80,8 +80,13 @@ export function useCloudTasks(
       })
   }
 
+  // Parents are pure containers — they never carry their own running timer,
+  // so starting one is a no-op rather than a crash if the UI ever lets it
+  // through (it shouldn't: parent cards render no Start button).
   const startTask = (id: string) => {
     if (!userId) return
+    const isParent = tasks.some(task => task.parentTaskId === id)
+    if (isParent) return
     setTasks(current =>
       current.map(task => {
         if (task.id === id)
@@ -147,7 +152,11 @@ export function useCloudTasks(
       })
   }
 
-  const addTask = (event: FormEvent, form: TaskFormValues) => {
+  const addTask = (
+    event: FormEvent,
+    form: TaskFormValues,
+    parentTaskId: string | null = null,
+  ) => {
     event.preventDefault()
     if (!userId) return false
     const plannedMinutes =
@@ -170,6 +179,7 @@ export function useCloudTasks(
         workedSeconds: 0,
         status: 'pending',
         startedAt: null,
+        parentTaskId,
         goalName,
         goalProgress,
       },
@@ -181,6 +191,7 @@ export function useCloudTasks(
       .insert({
         id,
         user_id: userId,
+        parent_task_id: parentTaskId,
         title: name,
         planned_seconds: plannedMinutes * 60,
         goal_name: goalName ?? null,
@@ -231,6 +242,7 @@ export function useCloudTasks(
       .insert({
         id,
         user_id: userId,
+        parent_task_id: task.parentTaskId,
         title: task.name,
         planned_seconds: task.plannedMinutes * 60,
         goal_name: task.goalName ?? null,
@@ -248,28 +260,55 @@ export function useCloudTasks(
       })
   }
 
+  // A task can only move under a root task that isn't itself a child (one
+  // level of nesting — also enforced server-side), and a task that currently
+  // has children of its own can't become someone else's child. Passing null
+  // makes it standalone.
+  const moveTask = (id: string, parentTaskId: string | null) => {
+    if (!userId || id === parentTaskId) return
+    const hasChildren = tasks.some(task => task.parentTaskId === id)
+    if (hasChildren && parentTaskId !== null) return
+    if (parentTaskId !== null) {
+      const target = tasks.find(task => task.id === parentTaskId)
+      if (!target || target.parentTaskId !== null) return
+    }
+    updateTask(id, { parentTaskId })
+  }
+
+  // Drag-reorder only applies among root-level cards (standalone tasks and
+  // parent containers) — subtasks keep the order they were created in.
   const reorderTasks = (fromIndex: number, toIndex: number) => {
     if (!userId) return
+    const rootIndices = tasks.reduce<number[]>((acc, task, index) => {
+      if (!task.parentTaskId) acc.push(index)
+      return acc
+    }, [])
     if (
       fromIndex === toIndex ||
       fromIndex < 0 ||
       toIndex < 0 ||
-      fromIndex >= tasks.length ||
-      toIndex >= tasks.length
+      fromIndex >= rootIndices.length ||
+      toIndex >= rootIndices.length
     )
       return
 
-    const reordered = [...tasks]
-    const [movedTask] = reordered.splice(fromIndex, 1)
-    reordered.splice(toIndex, 0, movedTask)
-    setTasks(reordered)
+    const roots = rootIndices.map(index => tasks[index])
+    const reorderedRoots = [...roots]
+    const [movedTask] = reorderedRoots.splice(fromIndex, 1)
+    reorderedRoots.splice(toIndex, 0, movedTask)
+
+    const next = [...tasks]
+    rootIndices.forEach((slot, i) => {
+      next[slot] = reorderedRoots[i]
+    })
+    setTasks(next)
 
     const supabase = createClient()
-    const prevPos = reordered[toIndex - 1]
-      ? positionsRef.current.get(reordered[toIndex - 1].id)
+    const prevPos = reorderedRoots[toIndex - 1]
+      ? positionsRef.current.get(reorderedRoots[toIndex - 1].id)
       : undefined
-    const nextPos = reordered[toIndex + 1]
-      ? positionsRef.current.get(reordered[toIndex + 1].id)
+    const nextPos = reorderedRoots[toIndex + 1]
+      ? positionsRef.current.get(reorderedRoots[toIndex + 1].id)
       : undefined
 
     const midpoint = (() => {
@@ -292,18 +331,18 @@ export function useCloudTasks(
       return
     }
 
-    // Gap exhausted (neighbors one apart, no integer midpoint) — respace the
-    // whole list in one statement. `reordered` already reflects the desired
-    // final order, so this single call both fixes the gap and applies the move.
-    const orderedIds = reordered.map(task => task.id)
+    // Gap exhausted among root positions — respace just the root-level
+    // subset in one statement; children's positions are untouched and stay
+    // correctly ordered within their own group regardless.
+    const orderedRootIds = reorderedRoots.map(task => task.id)
     void supabase
-      .rpc('renormalize_positions', { p_task_ids: orderedIds })
+      .rpc('renormalize_positions', { p_task_ids: orderedRootIds })
       .then(({ error: rpcError }) => {
         if (rpcError) {
           setError("Couldn't save the new order.")
           return
         }
-        orderedIds.forEach((taskId, index) => {
+        orderedRootIds.forEach((taskId, index) => {
           positionsRef.current.set(taskId, (index + 1) * 1000)
         })
       })
@@ -343,8 +382,11 @@ export function useCloudTasks(
           return
         }
         if (!settings.autoStartNextTask) return
+        // Parents are containers, not runnable — never auto-start one.
         const next = tasks.find(
-          task => task.status === 'pending' || task.status === 'paused',
+          task =>
+            (task.status === 'pending' || task.status === 'paused') &&
+            !tasks.some(t => t.parentTaskId === task.id),
         )
         if (!next) return
         setTasks(current =>
@@ -380,6 +422,7 @@ export function useCloudTasks(
     addTask,
     deleteTask,
     restartTask,
+    moveTask,
     reorderTasks,
     getLiveSeconds: (task: Task) => getLiveSeconds(task, now),
     error,

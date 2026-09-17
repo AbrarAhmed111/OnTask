@@ -44,6 +44,7 @@ export function rowToTask(row: PersonalTaskRow): Task {
     goalName: row.goal_name ?? undefined,
     goalProgress: row.goal_percentage ?? undefined,
     startedAt: row.started_at ? new Date(row.started_at).getTime() : null,
+    parentTaskId: row.parent_task_id,
   }
 }
 
@@ -51,28 +52,29 @@ export function taskStatusToRow(status: TaskStatus): PersonalTaskRow['status'] {
   return UI_TO_DB_STATUS[status]
 }
 
-// Used by the generic updateTask() path (title/plannedMinutes/goal edits) —
+type PatchableRowFields = Pick<
+  PersonalTaskRow,
+  | 'title'
+  | 'planned_seconds'
+  | 'goal_name'
+  | 'goal_percentage'
+  | 'parent_task_id'
+>
+
+// Used by the generic updateTask() path (title/plannedMinutes/goal edits,
+// and moving a task to a different parent or making it standalone) —
 // startedAt/status/workedSeconds are never sent this way; those are owned by
 // the start/pause/complete RPCs.
 export function taskPatchToRow(
   patch: Partial<Task>,
-): Partial<
-  Pick<
-    PersonalTaskRow,
-    'title' | 'planned_seconds' | 'goal_name' | 'goal_percentage'
-  >
-> {
-  const row: Partial<
-    Pick<
-      PersonalTaskRow,
-      'title' | 'planned_seconds' | 'goal_name' | 'goal_percentage'
-    >
-  > = {}
+): Partial<PatchableRowFields> {
+  const row: Partial<PatchableRowFields> = {}
   if (patch.name !== undefined) row.title = patch.name
   if (patch.plannedMinutes !== undefined)
     row.planned_seconds = patch.plannedMinutes * 60
   if (patch.goalName !== undefined) row.goal_name = patch.goalName ?? null
   if (patch.goalProgress !== undefined)
     row.goal_percentage = patch.goalProgress ?? null
+  if (patch.parentTaskId !== undefined) row.parent_task_id = patch.parentTaskId
   return row
 }

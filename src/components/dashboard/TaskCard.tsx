@@ -1,5 +1,6 @@
 import {
   Check,
+  CirclePlus,
   GripVertical,
   Pause,
   Pencil,
@@ -15,7 +16,10 @@ import { GoalProgress } from '@/components/goals/GoalProgress'
 
 type TaskCardProps = {
   task: Task
-  index: number
+  // Present only for root-level cards rendered by TaskList — drives both
+  // the numbered badge and drag-to-reorder. Subtask rows rendered inside
+  // ParentTaskCard omit these and get a plain dot indicator instead.
+  index?: number
   workedSeconds: number
   onStart: () => void
   onPause: () => void
@@ -24,9 +28,16 @@ type TaskCardProps = {
   onDelete: () => void
   onRestart: () => void
   onUpdateGoal: () => void
-  onDragStart: (event: React.DragEvent<HTMLElement>) => void
-  onDragOver: (event: React.DragEvent<HTMLElement>) => void
-  onDrop: (event: React.DragEvent<HTMLElement>) => void
+  onDragStart?: (event: React.DragEvent<HTMLElement>) => void
+  onDragOver?: (event: React.DragEvent<HTMLElement>) => void
+  onDrop?: (event: React.DragEvent<HTMLElement>) => void
+  // Only root-level, childless cards can be promoted to a parent.
+  onAddSubtask?: () => void
+  // Only tasks eligible to move (childless) get this — either a subtask
+  // moving to a different parent / going standalone, or a standalone task
+  // becoming a subtask of an existing parent.
+  moveOptions?: { id: string; name: string }[]
+  onMoveTo?: (parentId: string | null) => void
 }
 
 export function TaskCard({
@@ -43,8 +54,12 @@ export function TaskCard({
   onDragStart,
   onDragOver,
   onDrop,
+  onAddSubtask,
+  moveOptions,
+  onMoveTo,
 }: TaskCardProps) {
   const completed = task.status === 'completed' || task.status === 'skipped'
+  const draggable = index !== undefined && Boolean(onDragStart)
   const taskProgress = Math.min(
     100,
     (workedSeconds / (task.plannedMinutes * 60)) * 100,
@@ -59,25 +74,33 @@ export function TaskCard({
           : 'Ready'
   return (
     <article
-      draggable
+      draggable={draggable}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
       className={`group rounded-2xl border bg-panel shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md ${task.status === 'active' ? 'border-sage shadow-sage/10' : 'border-line'} ${completed ? 'animate-[complete_420ms_ease-out] bg-slate-50/70' : ''}`}
     >
       <div className="flex items-center gap-3 border-b border-line/70 px-4 py-4 sm:px-5">
-        <button
-          type="button"
-          aria-label={`Reorder ${task.name}`}
-          className="cursor-grab touch-none rounded-lg p-1 text-muted transition hover:bg-slate-100 hover:text-ink active:cursor-grabbing"
-          title="Drag to reorder"
-        >
-          <GripVertical size={16} />
-        </button>
+        {draggable && (
+          <button
+            type="button"
+            aria-label={`Reorder ${task.name}`}
+            className="cursor-grab touch-none rounded-lg p-1 text-muted transition hover:bg-slate-100 hover:text-ink active:cursor-grabbing"
+            title="Drag to reorder"
+          >
+            <GripVertical size={16} />
+          </button>
+        )}
         <div
           className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border font-mono text-[10px] ${completed ? 'border-coral bg-coral text-white' : task.status === 'active' ? 'border-forest bg-forest text-white' : 'border-sage text-forest'}`}
         >
-          {completed ? <Check size={15} /> : String(index + 1).padStart(2, '0')}
+          {completed ? (
+            <Check size={15} />
+          ) : index !== undefined ? (
+            String(index + 1).padStart(2, '0')
+          ) : (
+            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+          )}
         </div>
         <div className="min-w-0">
           <h3 className="truncate text-sm font-bold tracking-tight text-ink">
@@ -152,6 +175,29 @@ export function TaskCard({
             >
               Update goal
             </button>
+          )}
+          {onAddSubtask && (
+            <button
+              onClick={onAddSubtask}
+              className="inline-flex items-center gap-1 text-[10px] font-semibold text-forest transition hover:text-coral"
+            >
+              <CirclePlus size={13} /> Add subtask
+            </button>
+          )}
+          {onMoveTo && (
+            <select
+              aria-label={`Move ${task.name}`}
+              value={task.parentTaskId ?? ''}
+              onChange={event => onMoveTo(event.target.value || null)}
+              className="rounded-lg border border-line bg-white px-2 py-1.5 text-[10px] font-semibold text-forest outline-none focus:border-sage"
+            >
+              <option value="">Standalone</option>
+              {moveOptions?.map(option => (
+                <option key={option.id} value={option.id}>
+                  Move to &quot;{option.name}&quot;
+                </option>
+              ))}
+            </select>
           )}
           {completed && (
             <>

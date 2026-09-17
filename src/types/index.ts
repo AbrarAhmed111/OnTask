@@ -10,6 +10,7 @@ export type Task = {
   goalName?: string
   goalProgress?: number
   startedAt: number | null
+  parentTaskId: string | null
 }
 
 export type TaskFormValues = {

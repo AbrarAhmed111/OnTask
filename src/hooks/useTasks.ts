@@ -46,8 +46,12 @@ export function useTasks(
       )
       if (!settings.autoStartNextTask) return completed
 
+      // Parents are containers, not runnable — never auto-start one even if
+      // its own status still reads 'pending'.
       const next = completed.find(
-        task => task.status === 'pending' || task.status === 'paused',
+        task =>
+          (task.status === 'pending' || task.status === 'paused') &&
+          !completed.some(t => t.parentTaskId === task.id),
       )
       return next
         ? completed.map(task =>
@@ -65,9 +69,14 @@ export function useTasks(
     )
   }
 
+  // Parents are pure containers — they never carry their own running timer,
+  // so starting one is a no-op rather than a crash if the UI ever lets it
+  // through (it shouldn't: parent cards render no Start button).
   const startTask = (id: string) => {
-    setTasks(current =>
-      current.map(task => {
+    setTasks(current => {
+      const isParent = current.some(task => task.parentTaskId === id)
+      if (isParent) return current
+      return current.map(task => {
         if (task.id === id)
           return { ...task, status: 'active', startedAt: Date.now() }
         if (task.status === 'active')
@@ -78,8 +87,8 @@ export function useTasks(
             startedAt: null,
           }
         return task
-      }),
-    )
+      })
+    })
   }
 
   const pauseTask = (task: Task) =>
@@ -99,7 +108,11 @@ export function useTasks(
     })
   }
 
-  const addTask = (event: FormEvent, form: TaskFormValues) => {
+  const addTask = (
+    event: FormEvent,
+    form: TaskFormValues,
+    parentTaskId: string | null = null,
+  ) => {
     event.preventDefault()
     const plannedMinutes =
       Number(form.hours || 0) * 60 + Number(form.minutes || 0)
@@ -113,6 +126,7 @@ export function useTasks(
         workedSeconds: 0,
         status: 'pending',
         startedAt: null,
+        parentTaskId,
         goalName: form.trackGoal ? form.goal.trim() || undefined : undefined,
         goalProgress: form.trackGoal
           ? Math.min(100, Math.max(0, Number(form.progress) || 0))
@@ -137,21 +151,52 @@ export function useTasks(
       },
     ])
 
+  // A task can only move under a root task that isn't itself a child (one
+  // level of nesting), and a task that currently has children of its own
+  // can't become someone else's child. Passing null makes it standalone.
+  const moveTask = (id: string, parentTaskId: string | null) => {
+    setTasks(current => {
+      if (id === parentTaskId) return current
+      const hasChildren = current.some(task => task.parentTaskId === id)
+      if (hasChildren && parentTaskId !== null) return current
+      if (parentTaskId !== null) {
+        const target = current.find(task => task.id === parentTaskId)
+        if (!target || target.parentTaskId !== null) return current
+      }
+      return current.map(task =>
+        task.id === id ? { ...task, parentTaskId } : task,
+      )
+    })
+  }
+
+  // Drag-reorder only applies among root-level cards (standalone tasks and
+  // parent containers) — subtasks keep the order they were created in.
+  // Child rows are left exactly where they are; only root-level slots swap.
   const reorderTasks = (fromIndex: number, toIndex: number) => {
     setTasks(current => {
+      const rootIndices = current.reduce<number[]>((acc, task, index) => {
+        if (!task.parentTaskId) acc.push(index)
+        return acc
+      }, [])
       if (
         fromIndex === toIndex ||
         fromIndex < 0 ||
         toIndex < 0 ||
-        fromIndex >= current.length ||
-        toIndex >= current.length
+        fromIndex >= rootIndices.length ||
+        toIndex >= rootIndices.length
       )
         return current
 
-      const reordered = [...current]
-      const [movedTask] = reordered.splice(fromIndex, 1)
-      reordered.splice(toIndex, 0, movedTask)
-      return reordered
+      const roots = rootIndices.map(index => current[index])
+      const reorderedRoots = [...roots]
+      const [movedTask] = reorderedRoots.splice(fromIndex, 1)
+      reorderedRoots.splice(toIndex, 0, movedTask)
+
+      const next = [...current]
+      rootIndices.forEach((slot, i) => {
+        next[slot] = reorderedRoots[i]
+      })
+      return next
     })
   }
 
@@ -173,6 +218,7 @@ export function useTasks(
     addTask,
     deleteTask,
     restartTask,
+    moveTask,
     reorderTasks,
     getLiveSeconds: (task: Task) => getLiveSeconds(task, now),
   }
