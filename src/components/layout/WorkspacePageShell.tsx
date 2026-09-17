@@ -1,14 +1,13 @@
 'use client'
 
-import { ReactNode, useEffect, useState } from 'react'
+import { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
 import type { AuthUser } from '@/hooks/useAuth'
 import { useMyInvitations } from '@/hooks/useMyInvitations'
-import { clientSignout } from '@/lib/auth/signout'
 
 // Shared chrome for every /workspaces route. Guests are redirected home
 // (where the header's "Shared Workspaces" button opens the sign-in modal)
@@ -24,22 +23,11 @@ export function WorkspacePageShell({
   onDismissNotice?: () => void
   children: (context: { user: AuthUser }) => ReactNode
 }) {
-  const { user, ready } = useAuth()
+  const { user, ready, handleLogout } = useAuthGuard()
   const { invitations } = useMyInvitations(user)
   const router = useRouter()
-  const [loggingOut, setLoggingOut] = useState(false)
 
-  useEffect(() => {
-    if (ready && !user) router.replace('/')
-  }, [ready, user, router])
-
-  const handleLogout = async () => {
-    setLoggingOut(true)
-    await clientSignout()
-    router.push('/')
-  }
-
-  if (!ready || !user || loggingOut) {
+  if (!ready || !user) {
     return <main className="min-h-screen bg-paper" />
   }
 
@@ -50,9 +38,10 @@ export function WorkspacePageShell({
         user={user}
         authReady={ready}
         onOpenAuth={() => {}}
-        onOpenWorkspaces={() => router.push('/workspaces')}
+        onOpenWorkspaces={() => router.push('/')}
         onLogout={handleLogout}
         pendingInvitationCount={invitations.length}
+        context="workspaces"
       />
       <div className="mx-auto w-[min(1120px,calc(100%-32px))] pb-16 pt-10">
         {notice && (

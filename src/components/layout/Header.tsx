@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import fullLogo from '@/assets/img/Full-logo.png'
-import { LogOut, Settings2, Users } from 'lucide-react'
+import { Home, LogOut, Settings2, Users } from 'lucide-react'
 import type { AuthUser } from '@/hooks/useAuth'
 
 export function Header({
@@ -14,6 +15,7 @@ export function Header({
   onOpenWorkspaces,
   onLogout,
   pendingInvitationCount = 0,
+  context = 'personal',
 }: {
   onSettings: () => void
   user: AuthUser | null
@@ -22,6 +24,10 @@ export function Header({
   onOpenWorkspaces: () => void
   onLogout: () => void
   pendingInvitationCount?: number
+  // Which page this header is on — swaps the nav button's destination so it
+  // always points at "the other place" instead of linking back to the page
+  // you're already viewing.
+  context?: 'personal' | 'workspaces'
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const initials = (user?.fullName || user?.email || '?')
@@ -30,12 +36,14 @@ export function Header({
 
   return (
     <header className="mx-auto flex h-[76px] w-[min(1120px,calc(100%-32px))] items-center justify-between border-b border-line">
-      <Image
-        src={fullLogo}
-        alt="OnTask"
-        priority
-        className="h-11 w-[122px] rounded-xl bg-forest px-2.5 py-1.5 object-contain"
-      />
+      <Link href="/" aria-label="Go to your personal dashboard">
+        <Image
+          src={fullLogo}
+          alt="OnTask"
+          priority
+          className="h-11 w-[122px] rounded-xl bg-forest px-2.5 py-1.5 object-contain"
+        />
+      </Link>
       <div className="flex items-center gap-2.5">
         <div className="hidden items-center gap-2 rounded-full border border-line bg-white/60 px-3 py-2 text-[11px] text-muted sm:flex">
           <span className="h-1.5 w-1.5 rounded-full bg-coral" /> Today{' '}
@@ -50,8 +58,16 @@ export function Header({
           onClick={onOpenWorkspaces}
           className="relative hidden items-center gap-1.5 rounded-full border border-line bg-white/60 px-3 py-2 text-[11px] font-semibold text-forest transition hover:border-forest sm:flex"
         >
-          <Users size={14} /> Shared Workspaces
-          {pendingInvitationCount > 0 && (
+          {context === 'workspaces' ? (
+            <>
+              <Home size={14} /> Personal
+            </>
+          ) : (
+            <>
+              <Users size={14} /> Shared Workspaces
+            </>
+          )}
+          {context !== 'workspaces' && pendingInvitationCount > 0 && (
             <span
               aria-label={`${pendingInvitationCount} pending ${pendingInvitationCount === 1 ? 'invitation' : 'invitations'}`}
               className="grid h-4 min-w-4 place-items-center rounded-full bg-coral px-1 font-mono text-[9px] font-bold text-white"
