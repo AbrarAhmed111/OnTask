@@ -1,4 +1,12 @@
-import { LogOut, Mail, Trash2, UserMinus, UserPlus, X } from 'lucide-react'
+import {
+  AlertTriangle,
+  LogOut,
+  Mail,
+  Trash2,
+  UserMinus,
+  UserPlus,
+  X,
+} from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { PresenceDot } from '@/components/workspaces/PresenceDot'
@@ -29,6 +37,7 @@ function MemberRowSkeleton() {
 
 export function WorkspaceMembersSection({
   ready,
+  error,
   members,
   currentUserId,
   onlineUserIds,
@@ -42,6 +51,7 @@ export function WorkspaceMembersSection({
   onLeave,
 }: {
   ready: boolean
+  error?: string | null
   members: WorkspaceMember[]
   currentUserId: string
   onlineUserIds: Set<string>
@@ -80,6 +90,12 @@ export function WorkspaceMembersSection({
             </Button>
           )}
         </div>
+        {error && (
+          <div className="flex items-start gap-2 border-b border-line/70 px-5 py-3 text-xs leading-5 text-coral">
+            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
         <div className="divide-y divide-line/70">
           {!ready ? (
             <>

@@ -134,6 +134,10 @@ function WorkspaceDetail({
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [pendingParentId, setPendingParentId] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
+  const [memberActionError, setMemberActionError] = useState<string | null>(
+    null,
+  )
+  const [settingsError, setSettingsError] = useState<string | null>(null)
 
   useEffect(() => {
     if (tasksError) showErrorToast(tasksError)
@@ -201,11 +205,14 @@ function WorkspaceDetail({
     const result = await removeMember(pendingAction.member.userId)
     setPendingAction(null)
     if (result.success) {
+      setMemberActionError(null)
       showSuccessToast(
         `${pendingAction.member.fullName || pendingAction.member.email || 'Member'} removed from the workspace.`,
       )
     } else {
-      showErrorToast(result.error || 'Failed to remove member.')
+      const message = result.error || 'Failed to remove member.'
+      setMemberActionError(message)
+      showErrorToast(message)
     }
   }
 
@@ -216,7 +223,9 @@ function WorkspaceDetail({
       router.push('/workspaces')
       return
     }
-    showErrorToast(result.error || 'Failed to leave workspace.')
+    const message = result.error || 'Failed to leave workspace.'
+    setMemberActionError(message)
+    showErrorToast(message)
   }
 
   const handleGenerateSummary = async () => {
@@ -231,6 +240,21 @@ function WorkspaceDetail({
     } else {
       showErrorToast(result.error || 'Failed to regenerate summary.')
     }
+  }
+
+  const openMemberAction = (action: PendingAction) => {
+    setMemberActionError(null)
+    setPendingAction(action)
+  }
+
+  const handleUpdateWorkspace: typeof updateWorkspace = async patch => {
+    const result = await updateWorkspace(patch)
+    if (result.success) {
+      setSettingsError(null)
+    } else {
+      setSettingsError(result.error || 'Failed to save changes.')
+    }
+    return result
   }
 
   const handleCancelInvitation = async (id: string) => {
@@ -414,27 +438,32 @@ function WorkspaceDetail({
       {section === 'members' && (
         <WorkspaceMembersSection
           ready={ready}
+          error={memberActionError}
           members={members}
           currentUserId={user.id}
           onlineUserIds={onlineUserIds}
           isOwner={isOwner}
           onRemoveMember={member =>
-            setPendingAction({ type: 'remove', member })
+            openMemberAction({ type: 'remove', member })
           }
           invitationsReady={invitationsReady}
           invitations={invitations}
           onInvite={() => setInviting(true)}
           onCancelInvitation={handleCancelInvitation}
           onDeleteInvitation={handleDeleteInvitation}
-          onLeave={() => setPendingAction({ type: 'leave' })}
+          onLeave={() => openMemberAction({ type: 'leave' })}
         />
       )}
 
       {section === 'settings' && isOwner && (
         <WorkspaceSettingsSection
           ready={ready}
+          error={settingsError}
           workspace={workspace}
-          onEdit={() => setEditing(true)}
+          onEdit={() => {
+            setSettingsError(null)
+            setEditing(true)
+          }}
         />
       )}
 
@@ -493,7 +522,7 @@ function WorkspaceDetail({
       {editing && workspace && (
         <EditWorkspaceModal
           workspace={workspace}
-          onSave={updateWorkspace}
+          onSave={handleUpdateWorkspace}
           onClose={() => setEditing(false)}
         />
       )}

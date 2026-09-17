@@ -1,4 +1,4 @@
-import { Settings2 } from 'lucide-react'
+import { AlertTriangle, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Workspace } from '@/types/workspace'
@@ -16,10 +16,12 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 export function WorkspaceSettingsSection({
   ready,
+  error,
   workspace,
   onEdit,
 }: {
   ready: boolean
+  error?: string | null
   workspace: Workspace | null
   onEdit: () => void
 }) {
@@ -34,6 +36,12 @@ export function WorkspaceSettingsSection({
             Edit
           </Button>
         </div>
+        {error && (
+          <div className="flex items-start gap-2 border-b border-line/70 px-5 py-3 text-xs leading-5 text-coral">
+            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
         {!ready || !workspace ? (
           <div className="space-y-4 px-5 py-4">
             <Skeleton className="h-3.5 w-2/3" />
