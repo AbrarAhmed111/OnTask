@@ -1,4 +1,11 @@
-import { CircleCheck, CirclePlus, Clock3, ListTodo, Users } from 'lucide-react'
+import {
+  AlertTriangle,
+  CircleCheck,
+  CirclePlus,
+  Clock3,
+  ListTodo,
+  Users,
+} from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { WorkspaceTaskList } from '@/components/workspaces/WorkspaceTaskList'
@@ -49,6 +56,7 @@ function TaskRowSkeleton() {
 
 export function WorkspaceTasksSection({
   ready,
+  error,
   stats,
   workingNow,
   tasks,
@@ -69,6 +77,7 @@ export function WorkspaceTasksSection({
   onMoveTo,
 }: {
   ready: boolean
+  error?: string | null
   stats: {
     members: number
     working: number
@@ -124,6 +133,13 @@ export function WorkspaceTasksSection({
           </>
         )}
       </div>
+
+      {ready && error && (
+        <div className="mb-6 flex items-start gap-2 rounded-xl border border-coral/20 bg-coral/5 p-3 text-xs leading-5 text-coral">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {ready && workingNow.length > 0 && (
         <div className="mb-6 rounded-2xl border border-sage/40 bg-sage/5 p-5 sm:p-6">

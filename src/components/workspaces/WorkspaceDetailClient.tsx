@@ -371,6 +371,7 @@ function WorkspaceDetail({
         <div className="space-y-8">
           <WorkspaceTasksSection
             ready={ready && tasksReady}
+            error={tasksError}
             stats={stats}
             workingNow={workingNow}
             tasks={tasks}
