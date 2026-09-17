@@ -8,12 +8,15 @@ import {
   Loader2,
   RefreshCw,
   Sparkles,
+  UserPlus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { formatMemberEvent } from '@/lib/workspaceSummaryEvents'
 import {
   StructuredSnapshotMember,
-  StructuredSnapshotTask,
+  StructuredSnapshotTaskActivity,
+  StructuredSnapshotWorkspaceChanges,
   SummaryTaskStatus,
   WorkspaceDailySummary,
   WorkspaceMember,
@@ -69,26 +72,31 @@ function ErrorBanner({ message }: { message: string }) {
   )
 }
 
-function TaskRow({
+function TaskActivityRow({
   task,
   indented = false,
 }: {
-  task: StructuredSnapshotTask
+  task: StructuredSnapshotTaskActivity
   indented?: boolean
 }) {
   return (
     <div
       className={`flex items-center justify-between gap-3 py-1.5 text-xs ${indented ? 'pl-5' : ''}`}
     >
-      <span className="min-w-0 truncate text-ink">{task.name}</span>
+      <span className="min-w-0 truncate text-ink">{task.title}</span>
       <span className="flex shrink-0 items-center gap-2">
+        {task.progress_start !== null && task.progress_end !== null && (
+          <span className="font-mono text-[10px] text-muted">
+            {task.progress_start}%→{task.progress_end}%
+          </span>
+        )}
         <span className="font-mono text-[10px] text-muted">
           {formatHM(task.focused_seconds)}
         </span>
         <span
-          className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${STATUS_STYLE[task.status]}`}
+          className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${STATUS_STYLE[task.status_end]}`}
         >
-          {STATUS_LABEL[task.status]}
+          {STATUS_LABEL[task.status_end]}
         </span>
       </span>
     </div>
@@ -102,8 +110,8 @@ function MemberBreakdown({
   member: StructuredSnapshotMember
   note?: string
 }) {
-  const taskById = new Map(member.tasks.map(t => [t.task_id, t]))
-  const topLevel = member.tasks.filter(
+  const taskById = new Map(member.task_activity.map(t => [t.task_id, t]))
+  const topLevel = member.task_activity.filter(
     t => !t.parent_task_id || !taskById.has(t.parent_task_id),
   )
 
@@ -116,18 +124,117 @@ function MemberBreakdown({
         </span>
       </div>
       {note && <p className="mt-1.5 text-xs leading-5 text-muted">{note}</p>}
-      <div className="mt-2.5 divide-y divide-line/50 border-t border-line/50">
-        {topLevel.map(task => (
-          <div key={task.task_id}>
-            <TaskRow task={task} />
-            {member.tasks
-              .filter(t => t.parent_task_id === task.task_id)
-              .map(child => (
-                <TaskRow key={child.task_id} task={child} indented />
-              ))}
-          </div>
+
+      {member.events.length > 0 && (
+        <ul className="mt-2.5 list-disc space-y-1 border-t border-line/50 pl-5 pt-2.5 text-xs leading-5 text-ink">
+          {member.events.map((event, i) => (
+            <li key={i}>{formatMemberEvent(event)}</li>
+          ))}
+        </ul>
+      )}
+
+      {topLevel.length > 0 && (
+        <div className="mt-2.5 divide-y divide-line/50 border-t border-line/50">
+          {topLevel.map(task => (
+            <div key={task.task_id}>
+              <TaskActivityRow task={task} />
+              {member.task_activity
+                .filter(t => t.parent_task_id === task.task_id)
+                .map(child => (
+                  <TaskActivityRow key={child.task_id} task={child} indented />
+                ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function WorkspaceChangesSection({
+  changes,
+  summaryText,
+}: {
+  changes: StructuredSnapshotWorkspaceChanges
+  summaryText: string
+}) {
+  const items: string[] = []
+  if (changes.tasks_created > 0)
+    items.push(
+      `${changes.tasks_created} task${changes.tasks_created === 1 ? '' : 's'} created`,
+    )
+  if (changes.tasks_completed > 0)
+    items.push(
+      `${changes.tasks_completed} task${changes.tasks_completed === 1 ? '' : 's'} completed`,
+    )
+  if (changes.tasks_skipped > 0)
+    items.push(
+      `${changes.tasks_skipped} task${changes.tasks_skipped === 1 ? '' : 's'} skipped`,
+    )
+  if (changes.tasks_deleted > 0)
+    items.push(
+      `${changes.tasks_deleted} task${changes.tasks_deleted === 1 ? '' : 's'} deleted`,
+    )
+  changes.members_joined.forEach(m => items.push(`${m.display_name} joined`))
+  changes.members_removed.forEach(m => items.push(`${m.display_name} left`))
+  changes.invitations.forEach(inv => {
+    const statusText =
+      inv.status === 'accepted'
+        ? 'accepted'
+        : inv.status === 'rejected'
+          ? 'rejected'
+          : inv.status === 'cancelled'
+            ? 'cancelled'
+            : 'still pending'
+    items.push(
+      `${inv.invited_by_name} invited ${inv.invited_email} (${statusText})`,
+    )
+  })
+
+  if (items.length === 0) return null
+
+  return (
+    <div className="rounded-xl border border-line/70 bg-paper/60 p-4">
+      <p className="flex items-center gap-1.5 text-xs font-bold text-ink">
+        <UserPlus size={13} /> Workspace Changes
+      </p>
+      {summaryText && (
+        <p className="mt-1.5 text-xs leading-5 text-muted">{summaryText}</p>
+      )}
+      <ul className="mt-2.5 list-disc space-y-1 border-t border-line/50 pl-5 pt-2.5 text-xs leading-5 text-ink">
+        {items.map((item, i) => (
+          <li key={i}>{item}</li>
         ))}
-      </div>
+      </ul>
+    </div>
+  )
+}
+
+// Cross-member groupings by status — mechanically derived from task_activity,
+// never AI output (see summary_service.py's SummaryNarrative docstring: this
+// is exactly the kind of grouping that's 100% derivable from the snapshot,
+// so it's computed here rather than risking the model re-deriving it).
+function StatusRollup({
+  title,
+  entries,
+}: {
+  title: string
+  entries: { title: string; memberName: string }[]
+}) {
+  if (entries.length === 0) return null
+  return (
+    <div className="rounded-xl border border-line/70 bg-paper/60 p-4">
+      <p className="text-xs font-bold text-ink">
+        {title} <span className="font-mono text-muted">{entries.length}</span>
+      </p>
+      <ul className="mt-2.5 space-y-1 border-t border-line/50 pt-2.5 text-xs leading-5">
+        {entries.map((entry, i) => (
+          <li key={i} className="flex items-center justify-between gap-3">
+            <span className="min-w-0 truncate text-ink">{entry.title}</span>
+            <span className="shrink-0 text-muted">{entry.memberName}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -152,7 +259,7 @@ export function WorkspaceSummarySection({
   onRegenerate: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const hasNoRecordedWork =
+  const hasNoRecordedActivity =
     !!summary && summary.structuredSnapshot.members.length === 0
 
   const generatedByMember = summary
@@ -161,13 +268,33 @@ export function WorkspaceSummarySection({
   const generatedByName =
     generatedByMember?.fullName || generatedByMember?.email || 'A member'
 
+  const byStatus = (status: SummaryTaskStatus) =>
+    summary
+      ? summary.structuredSnapshot.members.flatMap(member =>
+          member.task_activity
+            .filter(task => task.status_end === status)
+            .map(task => ({
+              title: task.title,
+              memberName: member.display_name,
+            })),
+        )
+      : []
+
   return (
     <div className="rounded-2xl border border-line bg-panel shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-line/70 px-5 py-4">
-        <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight text-ink">
-          <Sparkles size={15} /> Yesterday&apos;s Work
-        </h2>
-        {summary && !hasNoRecordedWork && (
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight text-ink">
+            <Sparkles size={15} /> Yesterday&apos;s Work
+          </h2>
+          {!summary && !hasNoRecordedActivity && (
+            <p className="mt-1 text-[11px] leading-4 text-muted">
+              See what your workspace worked on, changed, completed, and
+              assigned yesterday.
+            </p>
+          )}
+        </div>
+        {summary && !hasNoRecordedActivity && (
           <button
             onClick={() => setExpanded(current => !current)}
             className="flex items-center gap-1 text-[11px] font-semibold text-[var(--ws-accent,#375b4b)] transition hover:text-coral"
@@ -214,10 +341,11 @@ export function WorkspaceSummarySection({
             Generate AI Summary
           </Button>
         </div>
-      ) : hasNoRecordedWork ? (
+      ) : hasNoRecordedActivity ? (
         <div className="px-5 py-8 text-center">
           <p className="text-xs leading-5 text-muted">
-            No work was recorded on {formatDate(summary.summaryDate)}.
+            No workspace activity was recorded on{' '}
+            {formatDate(summary.summaryDate)}.
           </p>
         </div>
       ) : (
@@ -273,13 +401,31 @@ export function WorkspaceSummarySection({
                     key={member.user_id}
                     member={member}
                     note={
-                      summary.narrative.member_notes.find(
+                      summary.narrative.members.find(
                         n => n.user_id === member.user_id,
                       )?.note
                     }
                   />
                 ))}
               </div>
+
+              <WorkspaceChangesSection
+                changes={summary.structuredSnapshot.workspace_changes}
+                summaryText={summary.narrative.workspace_changes_summary}
+              />
+
+              <StatusRollup
+                title="Completed Work"
+                entries={byStatus('completed')}
+              />
+              <StatusRollup
+                title="Still In Progress"
+                entries={byStatus('in_progress')}
+              />
+              <StatusRollup
+                title="Skipped Work"
+                entries={byStatus('skipped')}
+              />
 
               {summary.meta.used_fallback_template && (
                 <p className="text-[10px] leading-4 text-muted">
