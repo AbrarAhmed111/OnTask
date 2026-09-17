@@ -15,6 +15,7 @@ import {
 import { WorkspaceTasksSection } from '@/components/workspaces/WorkspaceTasksSection'
 import { WorkspaceMembersSection } from '@/components/workspaces/WorkspaceMembersSection'
 import { WorkspaceActivitySection } from '@/components/workspaces/WorkspaceActivitySection'
+import { WorkspaceSummarySection } from '@/components/workspaces/WorkspaceSummarySection'
 import { WorkspaceSettingsSection } from '@/components/workspaces/WorkspaceSettingsSection'
 import { WorkspaceTaskForm } from '@/components/workspaces/WorkspaceTaskForm'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -25,6 +26,7 @@ import { useWorkspace } from '@/hooks/useWorkspace'
 import { useWorkspaceInvitations } from '@/hooks/useWorkspaceInvitations'
 import { useWorkspaceTasks } from '@/hooks/useWorkspaceTasks'
 import { useWorkspaceActivity } from '@/hooks/useWorkspaceActivity'
+import { useWorkspaceSummary } from '@/hooks/useWorkspaceSummary'
 import { useWorkspacePresence } from '@/hooks/useWorkspacePresence'
 import type { AuthUser } from '@/hooks/useAuth'
 import { WorkspaceMember, WorkspaceTask } from '@/types/workspace'
@@ -114,6 +116,13 @@ function WorkspaceDetail({
     workspaceId,
     user,
   )
+  const {
+    summary,
+    ready: summaryReady,
+    generating: summaryGenerating,
+    generate: generateSummary,
+    summaryDate,
+  } = useWorkspaceSummary(workspaceId, user, workspace?.timezone ?? '')
   const onlineUserIds = useWorkspacePresence(workspaceId, user)
   const [section, setSection] = useState<WorkspaceSection>('overview')
   const [editing, setEditing] = useState(false)
@@ -207,6 +216,20 @@ function WorkspaceDetail({
       return
     }
     showErrorToast(result.error || 'Failed to leave workspace.')
+  }
+
+  const handleGenerateSummary = async () => {
+    const result = await generateSummary('generate')
+    if (!result.success)
+      showErrorToast(result.error || 'Failed to generate summary.')
+  }
+  const handleRegenerateSummary = async () => {
+    const result = await generateSummary('regenerate')
+    if (result.success) {
+      showSuccessToast('Summary regenerated.')
+    } else {
+      showErrorToast(result.error || 'Failed to regenerate summary.')
+    }
   }
 
   const handleCancelInvitation = async (id: string) => {
@@ -365,6 +388,16 @@ function WorkspaceDetail({
             onAddSubtask={openAddSubtask}
             onDeleteParent={handleDeleteParent}
             onMoveTo={handleMoveTo}
+          />
+
+          <WorkspaceSummarySection
+            ready={ready && summaryReady}
+            summary={summary}
+            members={members}
+            summaryDate={summaryDate}
+            generating={summaryGenerating}
+            onGenerate={handleGenerateSummary}
+            onRegenerate={handleRegenerateSummary}
           />
 
           <WorkspaceActivitySection
