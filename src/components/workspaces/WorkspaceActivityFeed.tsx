@@ -9,24 +9,50 @@ function describeEvent(event: ActivityEvent, actorName: string): string {
   switch (event.eventType) {
     case 'created':
       return `${actorName} created "${title}"${under}`
+    case 'edited':
+      return `${actorName} updated "${title}"${under}`
     case 'started':
       return `${actorName} started "${title}"${under}`
     case 'paused':
       return `${actorName} paused "${title}"${under}`
+    case 'resumed':
+      return `${actorName} resumed "${title}"${under}`
     case 'completed':
       return `${actorName} completed "${title}"${under}`
     case 'skipped':
       return `${actorName} skipped "${title}"${under}`
+    case 'reopened':
+      return `${actorName} reopened "${title}"${under}`
     case 'deleted':
       return `${actorName} deleted "${title}"${under}`
     case 'assigned':
       return `${actorName} assigned "${title}"${under} to ${event.metadata.to}`
     case 'reassigned':
       return `${actorName} reassigned "${title}"${under} from ${event.metadata.from} to ${event.metadata.to}`
+    case 'unassigned':
+      return `${actorName} unassigned "${title}"${under}`
+    case 'progress_changed':
+      return event.metadata.to !== undefined
+        ? `${actorName} updated progress on "${title}"${under} to ${event.metadata.to}%`
+        : `${actorName} updated progress on "${title}"${under}`
     case 'parent_changed':
       return event.metadata.to === 'Standalone'
         ? `${actorName} made "${title}" standalone`
         : `${actorName} moved "${title}" under "${event.metadata.to}"`
+    case 'member_invited':
+      return `${actorName} invited ${event.metadata.invited_email}`
+    case 'invitation_cancelled':
+      return `${actorName} cancelled the invitation to ${event.metadata.invited_email}`
+    case 'invitation_accepted':
+      return `${actorName} accepted an invitation to join`
+    case 'invitation_rejected':
+      return `${actorName} declined an invitation to join`
+    case 'member_joined':
+      return `${actorName} joined the workspace`
+    case 'member_removed':
+      return event.metadata.self_removed
+        ? `${actorName} left the workspace`
+        : `${actorName} removed ${event.metadata.removed_display_name} from the workspace`
     default:
       return `${actorName} updated "${title}"${under}`
   }
