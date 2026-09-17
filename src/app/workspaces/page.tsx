@@ -1,16 +1,33 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CirclePlus, Loader2, Mail, Users, X } from 'lucide-react'
+import { CirclePlus, Mail, Users, X } from 'lucide-react'
 import { WorkspacePageShell } from '@/components/layout/WorkspacePageShell'
 import { WorkspaceCard } from '@/components/workspaces/WorkspaceCard'
 import { CreateWorkspaceModal } from '@/components/workspaces/CreateWorkspaceModal'
 import { RejectInvitationModal } from '@/components/workspaces/RejectInvitationModal'
 import { Button } from '@/components/ui/Button'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { useMyInvitations } from '@/hooks/useMyInvitations'
 import type { AuthUser } from '@/hooks/useAuth'
 import { WorkspaceInvitation } from '@/types/workspace'
+
+function WorkspaceCardSkeleton() {
+  return (
+    <div className="flex flex-col justify-between rounded-2xl border border-line bg-panel p-5 shadow-sm sm:p-6">
+      <div>
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="mt-2.5 h-3 w-full" />
+        <Skeleton className="mt-1.5 h-3 w-4/5" />
+      </div>
+      <div className="mt-6 flex items-center justify-between">
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="h-3 w-20" />
+      </div>
+    </div>
+  )
+}
 
 export default function WorkspacesPage() {
   return (
@@ -60,15 +77,6 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
     return result
   }
 
-  if (!ready || !invitationsReady) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-24 text-muted">
-        <Loader2 size={22} className="animate-spin text-forest" />
-        <p className="text-xs">Loading your workspaces…</p>
-      </div>
-    )
-  }
-
   return (
     <>
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -76,24 +84,32 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-coral">
             Work with others
           </p>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
             Shared Workspaces{' '}
-            <span className="font-mono text-sm font-normal text-muted">
-              {workspaces.length}
-            </span>
+            {ready ? (
+              <span className="font-mono text-base font-normal text-muted">
+                {workspaces.length}
+              </span>
+            ) : (
+              <Skeleton className="inline-block h-5 w-6 align-middle" />
+            )}
           </h1>
+          <p className="mt-2 max-w-md text-xs leading-5 text-muted">
+            Plan together, assign tasks, and track focus time as a team — each
+            workspace keeps its own tasks, members, and activity feed.
+          </p>
         </div>
         <Button onClick={() => setCreating(true)}>
           <CirclePlus size={16} /> Create workspace
         </Button>
       </div>
       {notice && (
-        <div className="mb-6 rounded-xl border border-coral/20 bg-coral/5 px-4 py-3 text-xs text-coral">
+        <div className="mb-6 rounded-xl border border-coral/20 bg-coral/5 px-4 py-3 text-xs text-coral animate-[fadeIn_180ms_ease-out]">
           {notice}
         </div>
       )}
-      {invitations.length > 0 && (
-        <div className="mb-8 rounded-2xl border border-sage/40 bg-sage/5 p-5 sm:p-6">
+      {invitationsReady && invitations.length > 0 && (
+        <div className="mb-8 rounded-2xl border border-sage/40 bg-sage/5 p-5 animate-[fadeIn_220ms_ease-out] sm:p-6">
           <h2 className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-forest">
             <Mail size={14} /> Pending invitations
           </h2>
@@ -129,8 +145,14 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
           </div>
         </div>
       )}
-      {workspaces.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-sage/70 px-6 py-16 text-center">
+      {!ready ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map(i => (
+            <WorkspaceCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : workspaces.length === 0 ? (
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-sage/70 px-6 py-16 text-center animate-[fadeIn_220ms_ease-out]">
           <div className="grid h-12 w-12 place-items-center rounded-xl bg-sage/10 text-forest">
             <Users size={22} />
           </div>
@@ -145,7 +167,7 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
           </Button>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 animate-[fadeIn_220ms_ease-out] sm:grid-cols-2 lg:grid-cols-3">
           {workspaces.map(workspace => (
             <WorkspaceCard
               key={workspace.id}
