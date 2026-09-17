@@ -40,6 +40,9 @@ type TaskCardProps = {
   onMoveTo?: (parentId: string | null) => void
 }
 
+const ghostChip =
+  'inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-1.5 text-[10px] font-semibold text-muted transition hover:border-forest hover:text-forest'
+
 export function TaskCard({
   task,
   index,
@@ -80,7 +83,7 @@ export function TaskCard({
       onDrop={onDrop}
       className={`group rounded-2xl border bg-panel shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md ${task.status === 'active' ? 'border-sage shadow-sage/10' : 'border-line'} ${completed ? 'animate-[complete_420ms_ease-out] bg-slate-50/70' : ''}`}
     >
-      <div className="flex items-center gap-3 border-b border-line/70 px-4 py-4 sm:px-5">
+      <div className="flex items-center gap-3 px-4 py-4 sm:px-5">
         {draggable && (
           <button
             type="button"
@@ -102,47 +105,95 @@ export function TaskCard({
             <span className="h-1.5 w-1.5 rounded-full bg-current" />
           )}
         </div>
-        <div className="min-w-0">
-          <h3 className="truncate text-sm font-bold tracking-tight text-ink">
-            {task.name}
-          </h3>
-          <p className="mt-1 text-[10px] text-muted">
-            {task.goalName || 'Personal focus session'}
-          </p>
-        </div>
+        <h3 className="min-w-0 truncate text-sm font-bold tracking-tight text-ink">
+          {task.name}
+        </h3>
         <span
-          className={`ml-auto rounded-full px-2.5 py-1 font-mono text-[9px] uppercase ${task.status === 'active' ? 'bg-sage/20 text-forest' : completed ? 'bg-coral/10 text-coral' : 'bg-slate-100 text-muted'}`}
+          className={`ml-auto shrink-0 rounded-full px-2.5 py-1 font-mono text-[9px] uppercase ${task.status === 'active' ? 'bg-sage/20 text-forest' : completed ? 'bg-coral/10 text-coral' : 'bg-slate-100 text-muted'}`}
         >
           {statusLabel}
         </span>
         <button
           aria-label={`Edit ${task.name}`}
           onClick={onEdit}
-          className="rounded-lg p-2 text-muted transition hover:bg-slate-100 hover:text-ink"
+          className="shrink-0 rounded-lg p-2 text-muted transition hover:bg-slate-100 hover:text-ink"
         >
           <Pencil size={15} />
         </button>
       </div>
-      <div className="grid gap-6 px-4 py-5 sm:grid-cols-[1fr_1fr_auto] sm:px-5 sm:pl-[68px]">
+
+      <div className="space-y-4 px-4 pb-5 sm:px-5 sm:pl-[68px]">
         <div>
-          <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-muted">
-            Today&apos;s work
-          </span>
-          <strong className="mt-1.5 block text-lg font-bold tracking-tight text-ink">
-            {formatTime(workedSeconds)}{' '}
-            <small className="text-[11px] font-medium text-muted">
-              / {formatPlanned(task.plannedMinutes)}
-            </small>
-          </strong>
-          <ProgressBar value={taskProgress} tone="coral" className="mt-3 h-1" />
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-muted">
+                Today&apos;s work
+              </span>
+              <strong className="mt-1.5 block text-2xl font-bold tracking-tight text-ink">
+                {formatTime(workedSeconds)}{' '}
+                <small className="text-xs font-medium text-muted">
+                  / {formatPlanned(task.plannedMinutes)}
+                </small>
+              </strong>
+            </div>
+            <span className="shrink-0 rounded-full bg-sage/15 px-2.5 py-1 font-mono text-[11px] font-bold text-forest">
+              {Math.round(taskProgress)}%
+            </span>
+          </div>
+          <ProgressBar
+            value={taskProgress}
+            tone="coral"
+            className="mt-3 h-1.5"
+          />
         </div>
+
         {task.goalName && (
           <GoalProgress
             name={task.goalName}
             progress={task.goalProgress || 0}
           />
         )}
-        <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/70 px-4 py-3 sm:px-5 sm:pl-[68px]">
+        <div className="flex flex-wrap items-center gap-2">
+          {onAddSubtask && (
+            <button onClick={onAddSubtask} className={ghostChip}>
+              <CirclePlus size={13} /> Subtask
+            </button>
+          )}
+          {task.goalName && (
+            <button onClick={onUpdateGoal} className={ghostChip}>
+              Update goal
+            </button>
+          )}
+          {onMoveTo && (
+            <select
+              aria-label={`Move ${task.name}`}
+              value={task.parentTaskId ?? ''}
+              onChange={event => onMoveTo(event.target.value || null)}
+              className="rounded-full border border-line bg-white/70 px-2.5 py-1.5 text-[10px] font-semibold text-muted outline-none transition hover:border-forest focus:border-sage"
+            >
+              <option value="">Standalone</option>
+              {moveOptions?.map(option => (
+                <option key={option.id} value={option.id}>
+                  Move to &quot;{option.name}&quot;
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {!completed && workedSeconds > 0 && (
+            <button onClick={onFinish} className={ghostChip}>
+              Finish early
+            </button>
+          )}
+          {completed && (
+            <button onClick={onRestart} className={ghostChip}>
+              <RotateCcw size={13} /> Restart
+            </button>
+          )}
           {!completed && (
             <Button
               variant={task.status === 'active' ? 'danger' : 'primary'}
@@ -160,62 +211,14 @@ export function TaskCard({
               )}
             </Button>
           )}
-          {!completed && workedSeconds > 0 && (
-            <button
-              onClick={onFinish}
-              className="text-[10px] font-semibold text-forest transition hover:text-coral"
-            >
-              Finish early
-            </button>
-          )}
-          {task.goalName && (
-            <button
-              onClick={onUpdateGoal}
-              className="text-[10px] font-semibold text-forest transition hover:text-coral"
-            >
-              Update goal
-            </button>
-          )}
-          {onAddSubtask && (
-            <button
-              onClick={onAddSubtask}
-              className="inline-flex items-center gap-1 text-[10px] font-semibold text-forest transition hover:text-coral"
-            >
-              <CirclePlus size={13} /> Add subtask
-            </button>
-          )}
-          {onMoveTo && (
-            <select
-              aria-label={`Move ${task.name}`}
-              value={task.parentTaskId ?? ''}
-              onChange={event => onMoveTo(event.target.value || null)}
-              className="rounded-lg border border-line bg-white px-2 py-1.5 text-[10px] font-semibold text-forest outline-none focus:border-sage"
-            >
-              <option value="">Standalone</option>
-              {moveOptions?.map(option => (
-                <option key={option.id} value={option.id}>
-                  Move to &quot;{option.name}&quot;
-                </option>
-              ))}
-            </select>
-          )}
-          {completed && (
-            <>
-              <button
-                onClick={onRestart}
-                className="inline-flex items-center gap-1 text-[10px] font-semibold text-forest transition hover:text-coral"
-              >
-                <RotateCcw size={14} /> Restart
-              </button>
-              <button
-                aria-label={`Delete ${task.name}`}
-                onClick={onDelete}
-                className="rounded-lg p-2 text-muted transition hover:bg-coral/10 hover:text-coral"
-              >
-                <Trash2 size={15} />
-              </button>
-            </>
-          )}
+          <span className="mx-0.5 h-5 w-px shrink-0 bg-line" />
+          <button
+            aria-label={`Delete ${task.name}`}
+            onClick={onDelete}
+            className="shrink-0 rounded-lg p-2 text-muted transition hover:bg-coral/10 hover:text-coral"
+          >
+            <Trash2 size={15} />
+          </button>
         </div>
       </div>
     </article>
