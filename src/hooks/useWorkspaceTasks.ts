@@ -238,6 +238,7 @@ export function useWorkspaceTasks(
 
   const updateTask = (id: string, update: Partial<WorkspaceTask>) => {
     if (!userId) return
+    const before = tasks.find(task => task.id === id)
     setTasks(current =>
       current.map(task => (task.id === id ? { ...task, ...update } : task)),
     )
@@ -255,7 +256,34 @@ export function useWorkspaceTasks(
       .update(row)
       .eq('id', id)
       .then(({ error: updateError }) => {
-        if (updateError) setError("Couldn't save your changes.")
+        if (updateError) {
+          setError("Couldn't save your changes.")
+          return
+        }
+        const parentTitle = before?.parentTaskId
+          ? tasks.find(t => t.id === before.parentTaskId)?.name
+          : undefined
+        // Progress is logged separately from a plain edit — the aggregator
+        // reconstructs progress_start/progress_end for the AI summary from
+        // this event's from/to, never from the task's current value, so a
+        // later edit can't rewrite what progress looked like that day.
+        if (
+          update.goalProgress !== undefined &&
+          update.goalProgress !== before?.goalProgress
+        ) {
+          logEvent(id, 'progress_changed', {
+            title: update.name ?? before?.name,
+            parent_title: parentTitle,
+            from: before?.goalProgress ?? null,
+            to: update.goalProgress ?? null,
+          })
+        }
+        if (update.name !== undefined || update.plannedMinutes !== undefined) {
+          logEvent(id, 'edited', {
+            title: update.name ?? before?.name,
+            parent_title: parentTitle,
+          })
+        }
       })
   }
 
@@ -413,7 +441,12 @@ export function useWorkspaceTasks(
         const parentTitle = task?.parentTaskId
           ? tasks.find(t => t.id === task.parentTaskId)?.name
           : undefined
-        logEvent(id, task?.assignedTo ? 'reassigned' : 'assigned', {
+        const eventType = !newAssigneeId
+          ? 'unassigned'
+          : task?.assignedTo
+            ? 'reassigned'
+            : 'assigned'
+        logEvent(id, eventType, {
           title: task?.name,
           from: fromName,
           to: toName,
