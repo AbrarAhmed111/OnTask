@@ -381,6 +381,7 @@ function WorkspaceDetail({
 
   return (
     <WorkspaceShell
+      workspaceId={workspaceId}
       workspace={workspace}
       members={members}
       role={role}

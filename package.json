@@ -10,6 +10,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^2.12.0",
     "@supabase/ssr": "^0.8.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.575.0",
@@ -19,6 +20,7 @@
     "react-dom": "^18.0.0",
     "react-hot-toast": "^2.6.0",
     "react-icons": "^5.5.0",
+    "react-redux": "^9.3.0",
     "recharts": "^3.7.0",
     "use-intl": "^4.8.3"
   },

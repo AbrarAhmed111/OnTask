@@ -15,6 +15,7 @@ import {
 import { Skeleton } from '@/components/ui/Skeleton'
 import { PresenceDot } from '@/components/workspaces/PresenceDot'
 import { getWorkspaceTheme } from '@/lib/workspaceThemes'
+import { useAppSelector } from '@/lib/redux/hooks'
 import type { AuthUser } from '@/hooks/useAuth'
 import { Workspace, WorkspaceMember, WorkspaceRole } from '@/types/workspace'
 
@@ -110,6 +111,7 @@ function MemberChip({
 // both would drift out of alignment whenever the viewport crosses that
 // breakpoint — this avoids that by never centering the shell itself).
 export function WorkspaceShell({
+  workspaceId,
   workspace,
   members,
   role,
@@ -122,6 +124,7 @@ export function WorkspaceShell({
   onLogout,
   children,
 }: {
+  workspaceId: string
   workspace: Workspace | null
   members: WorkspaceMember[]
   role: WorkspaceRole | null
@@ -136,6 +139,11 @@ export function WorkspaceShell({
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [now, setNow] = useState<Date | null>(null)
+  // Cached identity from a previous visit — lets the header paint the real
+  // name/color/timezone immediately on refresh instead of a skeleton and a
+  // green-then-real-color flash, while `ready` (and everything gated on it,
+  // like members) still waits for the actual network fetch.
+  const cached = useAppSelector(state => state.workspaceCache.byId[workspaceId])
 
   useEffect(() => {
     setNow(new Date())
@@ -144,19 +152,22 @@ export function WorkspaceShell({
   }, [])
 
   const isOwner = role === 'owner'
-  const theme = getWorkspaceTheme(workspace?.accent)
+  const displayName = workspace?.name ?? cached?.name
+  const displayTimezone = workspace?.timezone ?? cached?.timezone
+  const theme = getWorkspaceTheme(workspace?.accent ?? cached?.accent)
+  const showHeaderSkeleton = !ready && !cached
   const items = NAV_ITEMS.filter(item => !item.ownerOnly || isOwner)
   const headerPreview = members.slice(0, HEADER_PREVIEW_COUNT)
   const headerOverflow = members.length - headerPreview.length
   const compactPreview = members.slice(0, COMPACT_PREVIEW_COUNT)
   const compactOverflow = members.length - compactPreview.length
   const workspaceTime =
-    workspace?.timezone && now
+    displayTimezone && now
       ? new Intl.DateTimeFormat('en-US', {
           hour: 'numeric',
           minute: '2-digit',
           timeZoneName: 'short',
-          timeZone: workspace.timezone,
+          timeZone: displayTimezone,
         }).format(now)
       : null
 
@@ -185,7 +196,7 @@ export function WorkspaceShell({
           </div>
           <div className="flex min-w-0 flex-1 items-center gap-3 pr-4 sm:pr-6">
             <div className="min-w-0 max-w-[48%] shrink-0 sm:max-w-[44%]">
-              {!ready ? (
+              {showHeaderSkeleton ? (
                 <>
                   <Skeleton className="h-2.5 w-32" />
                   <Skeleton className="mt-2 h-7 w-48" />
@@ -196,7 +207,7 @@ export function WorkspaceShell({
                     Let&apos;s start working in
                   </p>
                   <h1 className="truncate text-3xl font-extrabold capitalize tracking-tight text-ink">
-                    {workspace?.name}
+                    {displayName}
                   </h1>
                 </>
               )}
@@ -251,7 +262,7 @@ export function WorkspaceShell({
               )}
               {workspaceTime && (
                 <div
-                  title={workspace?.timezone}
+                  title={displayTimezone}
                   className="hidden items-center gap-1.5 rounded-full border border-line bg-white/60 px-3 py-1.5 text-[11px] font-semibold text-muted md:flex"
                 >
                   <Clock

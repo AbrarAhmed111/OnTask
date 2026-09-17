@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { AuthUser } from '@/hooks/useAuth'
 import { Workspace, WorkspaceMember, WorkspaceRole } from '@/types/workspace'
+import { useAppDispatch } from '@/lib/redux/hooks'
+import { upsertWorkspaceIdentity } from '@/lib/redux/workspaceCacheSlice'
 
 type WorkspaceRow = {
   id: string
@@ -60,6 +62,7 @@ function rowToMember(row: WorkspaceMemberRow): WorkspaceMember {
 // caller's own role, so pages can show owner-only controls contextually.
 export function useWorkspace(workspaceId: string, user: AuthUser | null) {
   const userId = user?.id
+  const dispatch = useAppDispatch()
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [members, setMembers] = useState<WorkspaceMember[]>([])
   const [ready, setReady] = useState(false)
@@ -98,8 +101,17 @@ export function useWorkspace(workspaceId: string, user: AuthUser | null) {
         setReady(true)
         return
       }
-      setWorkspace(rowToWorkspace(workspaceResult.data as WorkspaceRow))
+      const loaded = rowToWorkspace(workspaceResult.data as WorkspaceRow)
+      setWorkspace(loaded)
       setReady(true)
+      dispatch(
+        upsertWorkspaceIdentity({
+          id: loaded.id,
+          name: loaded.name,
+          accent: loaded.accent,
+          timezone: loaded.timezone,
+        }),
+      )
     })
 
     // Realtime payloads carry only the raw row (no embedded profiles join),
@@ -134,7 +146,7 @@ export function useWorkspace(workspaceId: string, user: AuthUser | null) {
       document.removeEventListener('visibilitychange', handleVisibility)
       supabase.removeChannel(channel)
     }
-  }, [userId, workspaceId])
+  }, [userId, workspaceId, dispatch])
 
   const role = members.find(member => member.userId === userId)?.role ?? null
 
@@ -157,7 +169,16 @@ export function useWorkspace(workspaceId: string, user: AuthUser | null) {
     if (updateError) {
       return { success: false as const, error: updateError.message }
     }
-    setWorkspace(current => (current ? { ...current, ...patch } : current))
+    const updated = { ...workspace, ...patch }
+    setWorkspace(updated)
+    dispatch(
+      upsertWorkspaceIdentity({
+        id: updated.id,
+        name: updated.name,
+        accent: updated.accent,
+        timezone: updated.timezone,
+      }),
+    )
     return { success: true as const }
   }
 
