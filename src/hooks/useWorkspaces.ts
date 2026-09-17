@@ -11,6 +11,7 @@ type WorkspaceRow = {
   description: string | null
   owner_id: string
   timezone: string
+  accent: string
   created_at: string
   updated_at: string
 }
@@ -22,6 +23,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
     description: row.description,
     ownerId: row.owner_id,
     timezone: row.timezone,
+    accent: row.accent,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

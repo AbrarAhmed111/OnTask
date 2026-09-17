@@ -6,6 +6,7 @@ export type Workspace = {
   description: string | null
   ownerId: string
   timezone: string
+  accent: string
   createdAt: string
   updatedAt: string
 }
