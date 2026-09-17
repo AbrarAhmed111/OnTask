@@ -5,6 +5,41 @@ import { ChevronDown, ChevronRight, CirclePlus, Trash2 } from 'lucide-react'
 import { WorkspaceMember, WorkspaceTask } from '@/types/workspace'
 import { WorkspaceTaskCard } from '@/components/workspaces/WorkspaceTaskCard'
 
+function AssigneeStack({ members }: { members: WorkspaceMember[] }) {
+  const shown = members.slice(0, 3)
+  const overflow = members.length - shown.length
+  return (
+    <div className="flex shrink-0 items-center">
+      <div className="flex -space-x-1.5">
+        {shown.map(member => (
+          <span
+            key={member.userId}
+            title={member.fullName || member.email || 'Member'}
+            className="grid h-5 w-5 place-items-center overflow-hidden rounded-full border-2 border-panel bg-[var(--ws-accent,#375b4b)] text-[8px] font-bold text-white"
+          >
+            {member.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={member.avatarUrl}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              (member.fullName || member.email || '?').charAt(0).toUpperCase()
+            )}
+          </span>
+        ))}
+      </div>
+      {overflow > 0 && (
+        <span className="-ml-1.5 grid h-5 w-5 place-items-center rounded-full border-2 border-panel bg-slate-200 font-mono text-[8px] font-bold text-muted">
+          +{overflow}
+        </span>
+      )}
+    </div>
+  )
+}
+
 export function WorkspaceParentTaskCard({
   parent,
   subtasks,
@@ -44,13 +79,13 @@ export function WorkspaceParentTaskCard({
     (total, task) => total + getWorkedSeconds(task),
     0,
   )
-  const assigneeNames = Array.from(
-    new Set(
+  const assignees = Array.from(
+    new Map(
       subtasks
         .map(task => members.find(m => m.userId === task.assignedTo))
         .filter((m): m is WorkspaceMember => Boolean(m))
-        .map(m => m.fullName || m.email || 'Someone'),
-    ),
+        .map(m => [m.userId, m] as const),
+    ).values(),
   )
 
   return (
@@ -72,12 +107,12 @@ export function WorkspaceParentTaskCard({
             {completed} completed
             {skipped > 0 ? ` · ${skipped} skipped` : ''} · {remaining} remaining
             · {Math.round(focusedSeconds / 60)}m focused
-            {assigneeNames.length > 0 && ` · ${assigneeNames.join(', ')}`}
           </p>
         </div>
+        {assignees.length > 0 && <AssigneeStack members={assignees} />}
         <button
           onClick={onAddSubtask}
-          className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] font-semibold text-forest transition hover:text-coral"
+          className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] font-semibold text-[var(--ws-accent,#375b4b)] transition hover:text-coral"
         >
           <CirclePlus size={13} /> Add subtask
         </button>
