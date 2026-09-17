@@ -4,16 +4,15 @@ import {
   createServerClient as createSupabaseClient,
   type CookieOptions,
 } from '@supabase/ssr'
-import { cookies, type UnsafeUnwrappedCookies } from 'next/headers'
+import { cookies } from 'next/headers'
 
 // Server Component client - safe to call per request
 export async function createClient() {
-  const rawCookies = await cookies()
-  const cookieStore = rawCookies as UnsafeUnwrappedCookies
+  const cookieStore = await cookies()
 
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       auth: {
         persistSession: true,

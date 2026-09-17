@@ -41,6 +41,9 @@ async function clearBrowserStorage(): Promise<void> {
 export async function clientSignout() {
   try {
     await clearBrowserStorage()
+    // Prevent Google One Tap from silently re-selecting the same account on
+    // the next page load right after an explicit sign-out.
+    window.google?.accounts.id.disableAutoSelect()
     const { createClient } = await import('@/lib/supabase/client')
     const supabase = createClient()
     const { error } = await supabase.auth.signOut()

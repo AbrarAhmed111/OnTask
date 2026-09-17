@@ -16,9 +16,13 @@ import { GoalModal } from '@/components/tasks/GoalModal'
 import { CompletionModal } from '@/components/tasks/CompletionModal'
 import { SettingsModal } from '@/components/settings/SettingsModal'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { AuthModal, AuthStep } from '@/components/auth/AuthModal'
+import { GoogleOneTap } from '@/components/auth/GoogleOneTap'
 import { useSettings } from '@/hooks/useSettings'
+import { useAuth } from '@/hooks/useAuth'
 import { clearStoredData } from '@/lib/storage'
 import { requestNotificationPermission } from '@/lib/notifications'
+import { clientSignout } from '@/lib/auth/signout'
 
 const emptyForm: TaskFormValues = {
   name: '',
@@ -33,6 +37,12 @@ type Confirmation = { type: 'delete'; taskId: string } | { type: 'reset' }
 
 export function Dashboard() {
   const { settings, ready: settingsReady, updateSettings } = useSettings()
+  const {
+    user,
+    ready: authReady,
+    passwordRecovery,
+    clearPasswordRecovery,
+  } = useAuth()
   const [completionTask, setCompletionTask] = useState<Task | null>(null)
   const {
     tasks,
@@ -52,7 +62,10 @@ export function Dashboard() {
     settings,
     task => settings.soundEnabled && setCompletionTask(task),
   )
-  const [modal, setModal] = useState<'add' | 'edit' | 'goal' | null>(null)
+  const [modal, setModal] = useState<'add' | 'edit' | 'goal' | 'auth' | null>(
+    null,
+  )
+  const [authStep, setAuthStep] = useState<AuthStep>('login')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<TaskFormValues>(emptyForm)
   const [goalProgress, setGoalProgress] = useState('0')
@@ -66,6 +79,35 @@ export function Dashboard() {
     const timeout = window.setTimeout(() => setNotice(''), 5000)
     return () => window.clearTimeout(timeout)
   }, [notice])
+
+  const openAuth = (step: AuthStep = 'login') => {
+    setAuthStep(step)
+    setModal('auth')
+  }
+
+  useEffect(() => {
+    if (!passwordRecovery) return
+    openAuth('reset')
+    clearPasswordRecovery()
+  }, [passwordRecovery, clearPasswordRecovery])
+
+  const handleAuthenticated = () => {
+    closeModal()
+    setNotice('Signed in to OnTask.')
+  }
+
+  const handleOpenWorkspaces = () => {
+    if (!user) {
+      openAuth('login')
+      return
+    }
+    setNotice('Shared Workspaces is coming soon.')
+  }
+
+  const handleLogout = async () => {
+    const result = await clientSignout()
+    setNotice(result.success ? "You're signed out." : 'Sign out failed.')
+  }
 
   const closeModal = () => {
     setModal(null)
@@ -167,7 +209,14 @@ export function Dashboard() {
   )
   return (
     <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_80%_0%,#e4f0e6_0,transparent_30%),linear-gradient(135deg,#f8faf7_0%,#eff3ee_100%)] text-ink">
-      <Header onSettings={() => setSettingsOpen(true)} />
+      <Header
+        onSettings={() => setSettingsOpen(true)}
+        user={user}
+        authReady={authReady}
+        onOpenAuth={() => openAuth('login')}
+        onOpenWorkspaces={handleOpenWorkspaces}
+        onLogout={handleLogout}
+      />
       <div className="mx-auto w-[min(1120px,calc(100%-32px))]">
         <section className="grid gap-9 py-12 sm:py-16 lg:grid-cols-[0.85fr_1.15fr] lg:items-end lg:gap-16">
           <div>
@@ -321,6 +370,19 @@ export function Dashboard() {
           setProgress={setGoalProgress}
           onSave={handleGoal}
           onClose={closeModal}
+        />
+      )}
+      {modal === 'auth' && (
+        <AuthModal
+          initialStep={authStep}
+          onClose={closeModal}
+          onAuthenticated={handleAuthenticated}
+        />
+      )}
+      {authReady && !user && (
+        <GoogleOneTap
+          enabled={modal !== 'auth'}
+          onSignedIn={handleAuthenticated}
         />
       )}
       {settingsOpen && (

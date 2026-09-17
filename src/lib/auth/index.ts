@@ -1,9 +1,10 @@
 'use server'
 
-import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
-// Helper to get current user (Server Components)
+// Helper to get the current user (Server Components / Route Handlers).
+// Returns null when signed out — callers gate UI on the result rather than
+// redirecting, since OnTask has no dedicated auth/protected routes.
 export async function getCurrentUser() {
   const supabase = await createClient()
   const {
@@ -11,14 +12,5 @@ export async function getCurrentUser() {
     error,
   } = await supabase.auth.getUser()
   if (error || !user) return null
-  return user
-}
-
-// Require authentication (Server Components)
-export async function requireAuth() {
-  const user = await getCurrentUser()
-  if (!user) {
-    redirect('/signin')
-  }
   return user
 }
