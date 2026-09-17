@@ -7,7 +7,7 @@ import { Footer } from '@/components/layout/Footer'
 import { DailyProgress } from '@/components/dashboard/DailyProgress'
 import { EmptyState } from '@/components/dashboard/EmptyState'
 import { TaskList } from '@/components/dashboard/TaskList'
-import { useTasks } from '@/hooks/useTasks'
+import { usePersonalTasks } from '@/hooks/usePersonalTasks'
 import { Task, TaskFormValues } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -58,7 +58,9 @@ export function Dashboard() {
     restartTask,
     reorderTasks,
     getLiveSeconds: liveSeconds,
-  } = useTasks(
+    error: dataError,
+  } = usePersonalTasks(
+    user,
     settings,
     task => settings.soundEnabled && setCompletionTask(task),
   )
@@ -79,6 +81,10 @@ export function Dashboard() {
     const timeout = window.setTimeout(() => setNotice(''), 5000)
     return () => window.clearTimeout(timeout)
   }, [notice])
+
+  useEffect(() => {
+    if (dataError) setNotice(dataError)
+  }, [dataError])
 
   const openAuth = (step: AuthStep = 'login') => {
     setAuthStep(step)
@@ -198,7 +204,7 @@ export function Dashboard() {
     window.location.reload()
   }
 
-  if (!ready || !settingsReady)
+  if (!authReady || !ready || !settingsReady)
     return <main className="min-h-screen bg-paper" />
 
   const completedTasks = tasks.filter(
