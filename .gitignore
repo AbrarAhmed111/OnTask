@@ -36,3 +36,4 @@ yarn-error.log*
 next-env.d.ts
 /project_document
 /supabase/migrations
+/supabase/.temp
