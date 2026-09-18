@@ -6,6 +6,7 @@ import { TaskFormValues } from '@/types'
 import { getWorkspaceLiveSeconds } from '@/lib/tasks/workspaceMappers'
 import { canControlTimer, canEmergencyStop } from '@/lib/tasks/timerPermissions'
 import { shouldReopenOnExtend } from '@/lib/tasks/reopen'
+import { useTaskBlockerActions } from '@/hooks/useTaskBlockerActions'
 
 function memberDisplayName(member?: WorkspaceMember) {
   return member?.fullName || member?.email || 'Someone'
@@ -60,6 +61,21 @@ export function useWorkspaceTaskActions({
     setTasks(current =>
       current.map(task => snapshot.find(s => s.id === task.id) ?? task),
     )
+
+  // Block / edit / resolve. Kept in their own hook (and returned as one object)
+  // so this file doesn't grow a third concern; it lives here only because it
+  // needs the same tasks, setTasks and rollback as the timer actions above.
+  const blockerActions = useTaskBlockerActions({
+    workspaceId,
+    userId,
+    members,
+    tasks,
+    setTasks,
+    setError,
+    now,
+    isPersonal,
+    restoreTasks,
+  })
 
   const logEvent = (
     taskId: string,
@@ -236,7 +252,14 @@ export function useWorkspaceTaskActions({
   const startTask = (id: string) => {
     if (!userId) return
     const target = tasks.find(task => task.id === id)
-    if (!target || !canControlTimer(target, timerActor)) return
+    // A blocked task is started again only after its blocker is resolved (the
+    // server refuses it too); don't flash it as working in the meantime.
+    if (
+      !target ||
+      target.status === 'blocked' ||
+      !canControlTimer(target, timerActor)
+    )
+      return
     const isParent = tasks.some(task => task.parentTaskId === id)
     if (isParent) return
     // Starting a task only ever ends the caller's OWN running timer in this
@@ -315,6 +338,8 @@ export function useWorkspaceTaskActions({
 
   const finishTask = (task: WorkspaceTask, early = false) => {
     if (!userId) return
+    // Same as starting: a blocked task has to be unblocked before it can end.
+    if (task.status === 'blocked') return
     // Finishing a task whose timer is running stops that timer, so it takes
     // the same permission as pausing it. A task that isn't running can be
     // finished by anyone, as before.
@@ -464,7 +489,14 @@ export function useWorkspaceTaskActions({
       .then(({ error: updateError }) => {
         if (updateError) {
           if (task) restoreTasks([task])
-          setError("Couldn't reassign the task.")
+          // 55000: the server said why (e.g. a blocked task can't be
+          // unassigned) in words meant to be read.
+          setError(
+            updateError.code === '55000' && updateError.message
+              ? updateError.message.charAt(0).toUpperCase() +
+                  updateError.message.slice(1)
+              : "Couldn't reassign the task.",
+          )
           return
         }
         const parentTitle = task?.parentTaskId
@@ -504,5 +536,6 @@ export function useWorkspaceTaskActions({
     deleteTask,
     moveTask,
     reassignTask,
+    blockerActions,
   }
 }

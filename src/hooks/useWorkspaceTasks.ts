@@ -135,6 +135,7 @@ export function useWorkspaceTasks(
     finishTask,
     deleteTask,
     reassignTask,
+    blockerActions,
   } = useWorkspaceTaskActions({
     workspaceId,
     userId,
@@ -245,6 +246,7 @@ export function useWorkspaceTasks(
     deleteTask,
     reassignTask,
     reorderTasks,
+    blockerActions,
     getLiveSeconds: (task: WorkspaceTask) => getWorkspaceLiveSeconds(task, now),
   }
 }

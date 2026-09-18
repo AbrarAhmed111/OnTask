@@ -251,6 +251,7 @@ export function useGoalDetail(
     deleteTask,
     moveTask,
     reassignTask,
+    blockerActions,
   } = useWorkspaceTaskActions({
     workspaceId,
     userId,
@@ -328,6 +329,7 @@ export function useGoalDetail(
     deleteTask,
     moveTask,
     reassignTask,
+    blockerActions,
     getLiveSeconds: (task: WorkspaceTask) => getWorkspaceLiveSeconds(task, now),
     dependencies,
     dependenciesReady,
