@@ -41,6 +41,7 @@ const BADGE_TONE: Record<TaskCardTone, string> = {
 // one it falls back to the app's forest green, so the guest page renders the
 // same card without knowing anything about workspaces.
 export function TaskCardShell({
+  id,
   title,
   index,
   tone,
@@ -59,6 +60,8 @@ export function TaskCardShell({
   actions,
   children,
 }: {
+  // Lets something outside the card (a notification's deep link) find it.
+  id?: string
   title: string
   // Present only for root-level cards in a list — drives the numbered badge
   // and drag-to-reorder. Subtask rows omit it and get a plain dot.
@@ -94,6 +97,7 @@ export function TaskCardShell({
 
   return (
     <article
+      id={id}
       draggable={draggable}
       onDragStart={drag?.onDragStart}
       onDragOver={drag?.onDragOver}
