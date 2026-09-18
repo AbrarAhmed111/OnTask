@@ -8,6 +8,7 @@ import { BlockerDisplay } from '@/components/blockers/BlockerDisplay'
 import { ResolveBlockerDialog } from '@/components/blockers/ResolveBlockerDialog'
 import { TaskBlockerActionsContext } from '@/components/blockers/TaskBlockerActionsContext'
 import { MemberMentionPicker } from '@/components/mentions/MemberMentionPicker'
+import { MentionTextarea } from '@/components/mentions/MentionTextarea'
 import { StaticBlockersProvider } from '@/components/workspaces/WorkspaceBlockersContext'
 import {
   WorkspaceDetailContext,
@@ -422,6 +423,31 @@ describe('BlockerDialog', () => {
     expect(html).toContain('Waiting for API credentials from @Araysh Khan.')
     expect(html).toContain('aria-label="Mentioned members"')
     expect(html).toContain('Remove mention of Araysh Khan')
+  })
+
+  it('visually emphasizes an anchored mention in the input', () => {
+    const text = 'Waiting for @Araysh Khan.'
+    const html = renderToStaticMarkup(
+      <MentionTextarea
+        value={{
+          text,
+          mentions: [
+            {
+              userId: araysh.userId,
+              label: 'Araysh Khan',
+              start: text.indexOf('@Araysh Khan'),
+              end: text.indexOf('@Araysh Khan') + '@Araysh Khan'.length,
+            },
+          ],
+        }}
+        onChange={noop}
+        members={MEMBERS}
+        ariaLabel="Blocker reason"
+      />,
+    )
+    expect(html).toContain('<mark')
+    expect(html).toContain('font-bold')
+    expect(html).toContain('@Araysh Khan')
   })
 })
 

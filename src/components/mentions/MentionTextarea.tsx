@@ -25,6 +25,36 @@ import {
 } from '@/lib/mentions'
 import type { WorkspaceMember } from '@/types/workspace'
 
+function renderMentionText(text: string, mentions: readonly MentionRange[]) {
+  const anchored = mentions
+    .filter(
+      mention =>
+        mention.start >= 0 &&
+        mention.end > mention.start &&
+        mention.end <= text.length &&
+        text.slice(mention.start, mention.end) === `@${mention.label}`,
+    )
+    .sort((a, b) => a.start - b.start)
+
+  const parts: React.ReactNode[] = []
+  let cursor = 0
+  anchored.forEach((mention, index) => {
+    if (mention.start < cursor) return
+    if (mention.start > cursor) parts.push(text.slice(cursor, mention.start))
+    parts.push(
+      <mark
+        key={`${mention.userId}-${mention.start}-${index}`}
+        className="rounded bg-sage/20 font-bold text-[var(--ws-accent,#375b4b)]"
+      >
+        {text.slice(mention.start, mention.end)}
+      </mark>,
+    )
+    cursor = mention.end
+  })
+  if (cursor < text.length) parts.push(text.slice(cursor))
+  return parts
+}
+
 export type MentionValue = { text: string; mentions: MentionRange[] }
 
 // A textarea where typing "@" offers the workspace's members. Choosing one puts
@@ -65,6 +95,7 @@ export function MentionTextarea({
   const listId = useId()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [caret, setCaret] = useState<number | null>(null)
+  const [scrollTop, setScrollTop] = useState(0)
   const [activeIndex, setActiveIndex] = useState(0)
   // The "@" offset of a list the user dismissed with Escape, so it stays shut
   // for that mention instead of reopening on the next keystroke.
@@ -167,6 +198,15 @@ export function MentionTextarea({
   return (
     <div>
       <div className="relative">
+        {value.text && (
+          <div
+            aria-hidden
+            style={{ transform: `translateY(-${scrollTop}px)` }}
+            className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded-lg px-3 py-2.5 text-sm leading-6 text-ink"
+          >
+            {renderMentionText(value.text, value.mentions)}
+          </div>
+        )}
         <textarea
           ref={textareaRef}
           id={id}
@@ -176,6 +216,7 @@ export function MentionTextarea({
           onKeyUp={syncCaret}
           onClick={syncCaret}
           onSelect={syncCaret}
+          onScroll={event => setScrollTop(event.currentTarget.scrollTop)}
           onBlur={() => setCaret(null)}
           placeholder={placeholder}
           maxLength={maxLength}
@@ -190,7 +231,7 @@ export function MentionTextarea({
           aria-activedescendant={
             open ? mentionOptionId(listId, active) : undefined
           }
-          className="w-full resize-none rounded-lg border border-line bg-white px-3 py-2.5 text-sm leading-6 text-ink outline-none transition placeholder:text-muted/60 focus:border-sage focus:ring-4 focus:ring-sage/15"
+          className="relative z-10 w-full resize-none rounded-lg border border-line bg-transparent px-3 py-2.5 text-sm leading-6 text-transparent caret-ink outline-none transition selection:bg-sage/20 selection:text-transparent placeholder:text-muted/60 focus:border-sage focus:ring-4 focus:ring-sage/15"
         />
         {open && (
           <MemberMentionPicker
