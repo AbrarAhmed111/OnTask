@@ -4,7 +4,7 @@ import { WorkspaceLayoutClient } from '@/components/workspaces/WorkspaceLayoutCl
 // Server wrapper only to resolve Next 15's async `params` — this project is
 // on React 18, so the client-side `use()` unwrapping pattern isn't
 // available here. All real logic lives in the client component below. This
-// layout is shared across /workspaces/[workspaceId] (overview),
+// layout is shared across /workspaces/[workspaceSlug] (overview),
 // /members and /settings, so the workspace/member/invitation data it fetches
 // survives navigating between those pages instead of being re-fetched on
 // every tab switch.
@@ -13,11 +13,11 @@ export default async function WorkspaceLayout({
   params,
 }: {
   children: ReactNode
-  params: Promise<{ workspaceId: string }>
+  params: Promise<{ workspaceSlug: string }>
 }) {
-  const { workspaceId } = await params
+  const { workspaceSlug } = await params
   return (
-    <WorkspaceLayoutClient workspaceId={workspaceId}>
+    <WorkspaceLayoutClient workspaceSlug={workspaceSlug}>
       {children}
     </WorkspaceLayoutClient>
   )

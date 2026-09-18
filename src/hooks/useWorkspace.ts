@@ -9,6 +9,7 @@ import { upsertWorkspaceIdentity } from '@/lib/redux/workspaceCacheSlice'
 
 type WorkspaceRow = {
   id: string
+  slug: string
   name: string
   description: string | null
   owner_id: string
@@ -35,6 +36,7 @@ type WorkspaceMemberRow = {
 function rowToWorkspace(row: WorkspaceRow): Workspace {
   return {
     id: row.id,
+    slug: row.slug,
     name: row.name,
     description: row.description,
     ownerId: row.owner_id,
@@ -62,7 +64,13 @@ function rowToMember(row: WorkspaceMemberRow): WorkspaceMember {
 // Single-workspace detail: the workspace row, its member list (with profile
 // info embedded via the profiles FK — see 0004's migration comment), and the
 // caller's own role, so pages can show owner-only controls contextually.
-export function useWorkspace(workspaceId: string, user: AuthUser | null) {
+//
+// `workspaceSlug` is the URL-facing identifier (0019) -- resolved to the
+// workspace's real uuid below before anything else (members, invitations,
+// presence, tasks, the Daily Report) queries by workspace_id, since every
+// other table's FK -- and every realtime filter -- is keyed by that uuid,
+// never the slug.
+export function useWorkspace(workspaceSlug: string, user: AuthUser | null) {
   const userId = user?.id
   const dispatch = useAppDispatch()
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
@@ -71,14 +79,17 @@ export function useWorkspace(workspaceId: string, user: AuthUser | null) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!userId || !workspaceId) {
+    if (!userId || !workspaceSlug) {
       setReady(true)
       return
     }
     let cancelled = false
     const supabase = createClient()
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    let handleReconnect: (() => void) | null = null
+    let handleVisibility: (() => void) | null = null
 
-    const fetchMembers = () =>
+    const fetchMembers = (workspaceId: string) =>
       supabase
         .from('workspace_members')
         .select('*, profiles(full_name, email, avatar_url)')
@@ -91,64 +102,72 @@ export function useWorkspace(workspaceId: string, user: AuthUser | null) {
 
     setReady(false)
     setError(null)
-    Promise.all([
-      supabase.from('workspaces').select('*').eq('id', workspaceId).single(),
-      fetchMembers(),
-    ]).then(([workspaceResult]) => {
-      if (cancelled) return
-      if (workspaceResult.error || !workspaceResult.data) {
-        setError(
-          "Couldn't load this workspace — it may not exist, or you may not be a member.",
+    supabase
+      .from('workspaces')
+      .select('*')
+      .eq('slug', workspaceSlug)
+      .single()
+      .then(async workspaceResult => {
+        if (cancelled) return
+        if (workspaceResult.error || !workspaceResult.data) {
+          setError(
+            "Couldn't load this workspace — it may not exist, or you may not be a member.",
+          )
+          setReady(true)
+          return
+        }
+        const loaded = rowToWorkspace(workspaceResult.data as WorkspaceRow)
+        setWorkspace(loaded)
+        dispatch(
+          upsertWorkspaceIdentity({
+            id: loaded.id,
+            slug: loaded.slug,
+            name: loaded.name,
+            accent: loaded.accent,
+            timezone: loaded.timezone,
+          }),
         )
+
+        await fetchMembers(loaded.id)
+        if (cancelled) return
         setReady(true)
-        return
-      }
-      const loaded = rowToWorkspace(workspaceResult.data as WorkspaceRow)
-      setWorkspace(loaded)
-      setReady(true)
-      dispatch(
-        upsertWorkspaceIdentity({
-          id: loaded.id,
-          name: loaded.name,
-          accent: loaded.accent,
-          timezone: loaded.timezone,
-        }),
-      )
-    })
 
-    // Realtime payloads carry only the raw row (no embedded profiles join),
-    // so a member-joined/removed event just triggers a fresh fetch of the
-    // full list rather than trying to merge a partial row.
-    const channel = supabase
-      .channel(`workspace-members-${workspaceId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'workspace_members',
-          filter: `workspace_id=eq.${workspaceId}`,
-        },
-        () => {
-          if (!cancelled) fetchMembers()
-        },
-      )
-      .subscribe()
+        // Realtime payloads carry only the raw row (no embedded profiles
+        // join), so a member-joined/removed event just triggers a fresh
+        // fetch of the full list rather than trying to merge a partial row.
+        channel = supabase
+          .channel(`workspace-members-${loaded.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'workspace_members',
+              filter: `workspace_id=eq.${loaded.id}`,
+            },
+            () => {
+              if (!cancelled) fetchMembers(loaded.id)
+            },
+          )
+          .subscribe()
 
-    const handleReconnect = () => fetchMembers()
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') handleReconnect()
-    }
-    window.addEventListener('online', handleReconnect)
-    document.addEventListener('visibilitychange', handleVisibility)
+        handleReconnect = () => fetchMembers(loaded.id)
+        handleVisibility = () => {
+          if (document.visibilityState === 'visible' && handleReconnect)
+            handleReconnect()
+        }
+        window.addEventListener('online', handleReconnect)
+        document.addEventListener('visibilitychange', handleVisibility)
+      })
 
     return () => {
       cancelled = true
-      window.removeEventListener('online', handleReconnect)
-      document.removeEventListener('visibilitychange', handleVisibility)
-      supabase.removeChannel(channel)
+      if (handleReconnect) window.removeEventListener('online', handleReconnect)
+      if (handleVisibility)
+        document.removeEventListener('visibilitychange', handleVisibility)
+      if (channel) supabase.removeChannel(channel)
     }
-  }, [userId, workspaceId, dispatch])
+  }, [userId, workspaceSlug, dispatch])
 
   const role = members.find(member => member.userId === userId)?.role ?? null
 
@@ -180,6 +199,7 @@ export function useWorkspace(workspaceId: string, user: AuthUser | null) {
     dispatch(
       upsertWorkspaceIdentity({
         id: updated.id,
+        slug: updated.slug,
         name: updated.name,
         accent: updated.accent,
         timezone: updated.timezone,

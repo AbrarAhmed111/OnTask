@@ -112,6 +112,7 @@ function MemberChip({
 // breakpoint — this avoids that by never centering the shell itself).
 export function WorkspaceShell({
   workspaceId,
+  workspaceSlug,
   workspace,
   members,
   role,
@@ -125,6 +126,7 @@ export function WorkspaceShell({
   children,
 }: {
   workspaceId: string
+  workspaceSlug: string
   workspace: Workspace | null
   members: WorkspaceMember[]
   role: WorkspaceRole | null
@@ -143,7 +145,11 @@ export function WorkspaceShell({
   // name/color/timezone immediately on refresh instead of a skeleton and a
   // green-then-real-color flash, while `ready` (and everything gated on it,
   // like members) still waits for the actual network fetch.
-  const cached = useAppSelector(state => state.workspaceCache.byId[workspaceId])
+  const cached = useAppSelector(state => {
+    const cache = state.workspaceCache
+    const cachedId = workspaceId || cache.bySlug[workspaceSlug]
+    return cachedId ? cache.byId[cachedId] : undefined
+  })
 
   useEffect(() => {
     setNow(new Date())

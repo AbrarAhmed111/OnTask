@@ -2,6 +2,7 @@ export type WorkspaceRole = 'owner' | 'member'
 
 export type Workspace = {
   id: string
+  slug: string
   name: string
   description: string | null
   ownerId: string

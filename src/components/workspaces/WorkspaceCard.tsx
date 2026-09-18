@@ -15,7 +15,7 @@ export function WorkspaceCard({
 
   return (
     <Link
-      href={`/workspaces/${workspace.id}`}
+      href={`/workspaces/${workspace.slug}`}
       style={{ '--card-accent': theme.strong } as CSSProperties}
       className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-line bg-panel shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md"
     >

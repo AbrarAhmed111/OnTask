@@ -19,8 +19,8 @@ import {
 } from '@/components/workspaces/WorkspaceDetailContext'
 import type { AuthUser } from '@/hooks/useAuth'
 
-// The section a pathname like /workspaces/[id], /workspaces/[id]/members or
-// /workspaces/[id]/settings maps to — derived from the URL (instead of
+// The section a pathname like /workspaces/[slug], /workspaces/[slug]/members
+// or /workspaces/[slug]/settings maps to — derived from the URL (instead of
 // component state) so the sidebar, the URL bar, and a page refresh all agree
 // on which page is open.
 function sectionFromPathname(pathname: string): WorkspaceSection {
@@ -30,10 +30,10 @@ function sectionFromPathname(pathname: string): WorkspaceSection {
 }
 
 export function WorkspaceLayoutClient({
-  workspaceId,
+  workspaceSlug,
   children,
 }: {
-  workspaceId: string
+  workspaceSlug: string
   children: ReactNode
 }) {
   const { user, ready: authReady, handleLogout } = useAuthGuard()
@@ -44,7 +44,7 @@ export function WorkspaceLayoutClient({
 
   return (
     <WorkspaceLayout
-      workspaceId={workspaceId}
+      workspaceSlug={workspaceSlug}
       user={user}
       onLogout={handleLogout}
     >
@@ -54,12 +54,12 @@ export function WorkspaceLayoutClient({
 }
 
 function WorkspaceLayout({
-  workspaceId,
+  workspaceSlug,
   user,
   onLogout,
   children,
 }: {
-  workspaceId: string
+  workspaceSlug: string
   user: AuthUser
   onLogout: () => void
   children: ReactNode
@@ -75,7 +75,11 @@ function WorkspaceLayout({
     error,
     updateWorkspace,
     removeMember,
-  } = useWorkspace(workspaceId, user)
+  } = useWorkspace(workspaceSlug, user)
+  // The real workspace uuid, once resolved -- every downstream hook below
+  // (and everything handed down via context) keys off this, never the URL
+  // slug, since that's what workspace_id FKs and realtime filters expect.
+  const workspaceId = workspace?.id ?? ''
   const {
     invitations,
     ready: invitationsReady,
@@ -109,7 +113,7 @@ function WorkspaceLayout({
   const isOwner = role === 'owner'
 
   const handleSectionChange = (next: WorkspaceSection) => {
-    const base = `/workspaces/${workspaceId}`
+    const base = `/workspaces/${workspace?.slug ?? workspaceSlug}`
     router.push(next === 'overview' ? base : `${base}/${next}`)
   }
 
@@ -138,6 +142,7 @@ function WorkspaceLayout({
     <WorkspaceDetailContext.Provider value={contextValue}>
       <WorkspaceShell
         workspaceId={workspaceId}
+        workspaceSlug={workspace?.slug ?? workspaceSlug}
         workspace={workspace}
         members={members}
         role={role}

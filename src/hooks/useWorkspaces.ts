@@ -7,6 +7,7 @@ import { Workspace } from '@/types/workspace'
 
 type WorkspaceRow = {
   id: string
+  slug: string
   name: string
   description: string | null
   owner_id: string
@@ -20,6 +21,7 @@ type WorkspaceRow = {
 function rowToWorkspace(row: WorkspaceRow): Workspace {
   return {
     id: row.id,
+    slug: row.slug,
     name: row.name,
     description: row.description,
     ownerId: row.owner_id,

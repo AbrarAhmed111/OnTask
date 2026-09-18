@@ -8,14 +8,14 @@ import { useWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailConte
 
 export function WorkspaceSettingsClient() {
   const router = useRouter()
-  const { workspaceId, workspace, ready, isOwner, updateWorkspace } =
-    useWorkspaceDetail()
+  const { workspace, ready, isOwner, updateWorkspace } = useWorkspaceDetail()
   const [editing, setEditing] = useState(false)
   const [settingsError, setSettingsError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (ready && !isOwner) router.replace(`/workspaces/${workspaceId}`)
-  }, [ready, isOwner, router, workspaceId])
+    if (ready && !isOwner && workspace)
+      router.replace(`/workspaces/${workspace.slug}`)
+  }, [ready, isOwner, router, workspace])
 
   if (!isOwner) return null
 
