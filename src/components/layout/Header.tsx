@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import fullLogo from '@/assets/img/Full-logo.png'
-import { Home, LogOut, Settings2, Users } from 'lucide-react'
+import { Home, Settings2, Users } from 'lucide-react'
+import { AccountMenu } from '@/components/layout/AccountMenu'
+import { Avatar } from '@/components/ui/Avatar'
 import type { AuthUser } from '@/hooks/useAuth'
 
 export function Header({
@@ -40,11 +41,6 @@ export function Header({
   homeHref?: string
   homeLabel?: string
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const initials = (user?.fullName || user?.email || '?')
-    .charAt(0)
-    .toUpperCase()
-
   return (
     <header className="mx-auto flex h-[76px] w-[min(1120px,calc(100%-32px))] items-center justify-between border-b border-line">
       <Link href={homeHref} aria-label={homeLabel}>
@@ -95,56 +91,19 @@ export function Header({
           )}
         </button>
         {authReady && user ? (
-          <div className="relative">
-            <button
-              aria-label="Account menu"
-              onClick={() => setMenuOpen(open => !open)}
-              className="grid h-9 w-9 place-items-center overflow-hidden rounded-full border border-line bg-forest text-xs font-bold text-white transition hover:border-forest"
-            >
-              {user.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={user.avatarUrl}
-                  alt=""
-                  referrerPolicy="no-referrer"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                initials
-              )}
-            </button>
-            {menuOpen && (
-              <>
-                <button
-                  aria-hidden
-                  tabIndex={-1}
-                  className="fixed inset-0 z-40 cursor-default"
-                  onClick={() => setMenuOpen(false)}
-                />
-                <div className="absolute right-0 z-50 mt-2 w-52 rounded-xl border border-line bg-panel p-2 shadow-xl animate-[fadeIn_150ms_ease-out]">
-                  <div className="border-b border-line/70 px-2.5 py-2">
-                    <p className="truncate text-xs font-bold text-ink">
-                      {user.fullName || 'Your account'}
-                    </p>
-                    {user.email && (
-                      <p className="truncate text-[10px] text-muted">
-                        {user.email}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false)
-                      onLogout()
-                    }}
-                    className="mt-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-coral transition hover:bg-coral/10"
-                  >
-                    <LogOut size={14} /> Log out
-                  </button>
-                </div>
-              </>
+          <AccountMenu
+            user={user}
+            onLogout={onLogout}
+            renderTrigger={({ toggle }) => (
+              <button
+                aria-label="Account menu"
+                onClick={toggle}
+                className="h-9 w-9 overflow-hidden rounded-full border border-line transition hover:border-forest"
+              >
+                <Avatar person={user} className="h-full w-full text-xs" />
+              </button>
             )}
-          </div>
+          />
         ) : (
           <button
             onClick={onOpenAuth}
