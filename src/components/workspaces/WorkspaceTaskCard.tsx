@@ -237,7 +237,9 @@ export function WorkspaceTaskCard({
           >
             <MessageSquare size={13} /> Notes
             {noteCount > 0 && (
-              <span aria-label={`${noteCount} note${noteCount === 1 ? '' : 's'}`}>
+              <span
+                aria-label={`${noteCount} note${noteCount === 1 ? '' : 's'}`}
+              >
                 ({noteCount})
               </span>
             )}
