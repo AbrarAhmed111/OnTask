@@ -51,16 +51,107 @@ export type WorkspaceTask = {
   id: string
   workspaceId: string
   parentTaskId: string | null
+  // The workspace Goal this task belongs to, if any. Only tasks with a
+  // goalId may have a parentTaskId (subtasks exist only inside Goals) — see
+  // supabase/migrations/0021_workspace_goals.sql.
+  goalId: string | null
   createdBy: string
   assignedTo: string | null
   name: string
   plannedMinutes: number
   workedSeconds: number
   status: WorkspaceTaskStatus
-  goalName?: string
-  goalProgress?: number
+  // A free-text label + manual percent a member can track on any task —
+  // unrelated to the real `Goal` entity below. Named distinctly to avoid
+  // confusion between "set a progress label on this task" and "create a
+  // workspace Goal".
+  progressLabel?: string
+  progressPercentage?: number
   startedAt: number | null
   completedAt: number | null
+}
+
+export type GoalStatus = 'active' | 'completed' | 'archived'
+
+export type Goal = {
+  id: string
+  workspaceId: string
+  name: string
+  description: string | null
+  status: GoalStatus
+  createdBy: string
+  targetDate: string | null
+  position: number
+  createdAt: string
+  updatedAt: string
+  completedAt: string | null
+  archivedAt: string | null
+}
+
+export type TaskDependency = {
+  id: string
+  workspaceId: string
+  goalId: string
+  blockingTaskId: string
+  blockedTaskId: string
+  createdBy: string
+  createdAt: string
+}
+
+export type TaskNote = {
+  id: string
+  taskId: string
+  authorId: string
+  content: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type NotificationType =
+  | 'assigned'
+  | 'reassigned'
+  | 'completed'
+  | 'reopened'
+  | 'task_unblocked'
+  | 'note_added'
+  | 'goal_completed'
+  | 'invitation_accepted'
+  | 'invitation_rejected'
+  | 'member_joined'
+  | 'member_removed'
+  | 'daily_report_ready'
+
+export type NotificationEntityType =
+  'task' | 'goal' | 'resource' | 'note' | 'workspace'
+
+export type WorkspaceNotification = {
+  id: string
+  userId: string
+  workspaceId: string
+  eventId: string | null
+  goalId: string | null
+  notificationType: NotificationType
+  entityType: NotificationEntityType
+  entityId: string | null
+  title: string
+  body: string | null
+  actorId: string | null
+  readAt: string | null
+  createdAt: string
+}
+
+export type WorkspaceResource = {
+  id: string
+  workspaceId: string
+  goalId: string | null
+  uploadedBy: string
+  fileName: string
+  fileType: string
+  fileSize: number
+  storagePath: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 // ── Phase 11: Automatic Daily Report (rolling 24h, workspace-timezone noon) ─
@@ -92,6 +183,11 @@ export type StructuredSnapshotTaskActivity = {
   title: string
   parent_task_id: string | null
   parent_title: string | null
+  // The workspace Goal this task belongs to, if any — never inferred, only
+  // ever the real goals.name at report time (see
+  // supabase/migrations/0027_daily_report_goal_awareness.sql).
+  goal_id: string | null
+  goal_name: string | null
   focused_seconds: number
   // Only set when a progress_changed event occurred that day — never
   // inferred from the task's current value.

@@ -23,8 +23,8 @@ export async function migrateGuestTasks(
       planned_seconds: task.plannedMinutes * 60,
       actual_seconds: Math.round(getLiveSeconds(task, now)),
       status: taskStatusToRow(status),
-      goal_name: task.goalName ?? null,
-      goal_percentage: task.goalProgress ?? null,
+      progress_label: task.progressLabel ?? null,
+      progress_percentage: task.progressPercentage ?? null,
     }
   })
 

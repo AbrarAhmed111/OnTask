@@ -7,8 +7,12 @@ export type Task = {
   plannedMinutes: number
   workedSeconds: number
   status: TaskStatus
-  goalName?: string
-  goalProgress?: number
+  // A free-text label + manual percent a member can track on any task —
+  // unrelated to workspace Goals (src/types/workspace.ts's `Goal`), which is
+  // a real hierarchical entity. Named distinctly to avoid confusion between
+  // "set a progress label on this task" and "create a workspace Goal".
+  progressLabel?: string
+  progressPercentage?: number
   startedAt: number | null
   parentTaskId: string | null
 }

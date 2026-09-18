@@ -9,8 +9,8 @@ export type PersonalTaskRow = {
   planned_seconds: number
   actual_seconds: number
   status: 'pending' | 'working' | 'paused' | 'completed' | 'skipped'
-  goal_name: string | null
-  goal_percentage: number | null
+  progress_label: string | null
+  progress_percentage: number | null
   position: number
   started_at: string | null
   completed_at: string | null
@@ -41,8 +41,8 @@ export function rowToTask(row: PersonalTaskRow): Task {
     plannedMinutes: Math.round(row.planned_seconds / 60),
     workedSeconds: row.actual_seconds,
     status: DB_TO_UI_STATUS[row.status],
-    goalName: row.goal_name ?? undefined,
-    goalProgress: row.goal_percentage ?? undefined,
+    progressLabel: row.progress_label ?? undefined,
+    progressPercentage: row.progress_percentage ?? undefined,
     startedAt: row.started_at ? new Date(row.started_at).getTime() : null,
     parentTaskId: row.parent_task_id,
   }
@@ -56,8 +56,8 @@ type PatchableRowFields = Pick<
   PersonalTaskRow,
   | 'title'
   | 'planned_seconds'
-  | 'goal_name'
-  | 'goal_percentage'
+  | 'progress_label'
+  | 'progress_percentage'
   | 'parent_task_id'
 >
 
@@ -72,9 +72,10 @@ export function taskPatchToRow(
   if (patch.name !== undefined) row.title = patch.name
   if (patch.plannedMinutes !== undefined)
     row.planned_seconds = patch.plannedMinutes * 60
-  if (patch.goalName !== undefined) row.goal_name = patch.goalName ?? null
-  if (patch.goalProgress !== undefined)
-    row.goal_percentage = patch.goalProgress ?? null
+  if (patch.progressLabel !== undefined)
+    row.progress_label = patch.progressLabel ?? null
+  if (patch.progressPercentage !== undefined)
+    row.progress_percentage = patch.progressPercentage ?? null
   if (patch.parentTaskId !== undefined) row.parent_task_id = patch.parentTaskId
   return row
 }

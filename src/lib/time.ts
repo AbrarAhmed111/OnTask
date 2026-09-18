@@ -21,6 +21,19 @@ export function formatTime(seconds: number, short = false) {
   return `${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m${short ? '' : ` ${String(secs).padStart(2, '0')}s`}`
 }
 
+// Shared relative-time label for realtime feeds (activity, notes,
+// notifications) -- one canonical implementation so "how recent" always
+// reads the same way everywhere.
+export function timeAgo(iso: string): string {
+  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
 export function formatPlanned(minutes: number) {
   const hours = Math.floor(minutes / 60)
   const remainder = minutes % 60
