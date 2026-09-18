@@ -1,7 +1,8 @@
 'use client'
 
 import { CSSProperties, FormEvent, useState } from 'react'
-import { AlertTriangle, Check, Loader2 } from 'lucide-react'
+import { Check, Loader2 } from 'lucide-react'
+import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { TimeOfDaySelect } from '@/components/workspaces/TimeOfDaySelect'
@@ -116,12 +117,7 @@ export function EditWorkspaceModal({
         }
         className="space-y-4"
       >
-        {error && (
-          <div className="flex items-start gap-2 rounded-xl border border-coral/20 bg-coral/5 p-3 text-xs leading-5 text-coral">
-            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <ErrorBanner>{error}</ErrorBanner>}
         {!isPersonal && (
           <>
             <label className="block text-xs font-semibold text-muted">

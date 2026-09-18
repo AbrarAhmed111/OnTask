@@ -1,7 +1,8 @@
 'use client'
 
 import { FormEvent, useState } from 'react'
-import { AlertTriangle, Loader2, X } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
+import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 
@@ -40,12 +41,7 @@ export function RejectInvitationModal({
       onClose={onClose}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="flex items-start gap-2 rounded-xl border border-coral/20 bg-coral/5 p-3 text-xs leading-5 text-coral">
-            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <ErrorBanner>{error}</ErrorBanner>}
         <label className="block text-xs font-semibold text-muted">
           Reason (optional, shown to the workspace owner)
           <textarea
