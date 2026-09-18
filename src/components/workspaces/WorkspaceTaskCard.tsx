@@ -12,6 +12,7 @@ import { formatPlanned, formatTime } from '@/lib/time'
 import { Button } from '@/components/ui/Button'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { AssigneePicker } from '@/components/workspaces/AssigneePicker'
+import { GoalProgress } from '@/components/goals/GoalProgress'
 
 export function WorkspaceTaskCard({
   task,
@@ -115,24 +116,37 @@ export function WorkspaceTaskCard({
         </button>
       </div>
 
-      <div className="px-4 pb-5 sm:px-5 sm:pl-[68px]">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-muted">
-              Focused time
+      <div className="space-y-4 px-4 pb-5 sm:px-5 sm:pl-[68px]">
+        <div>
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-muted">
+                Focused time
+              </span>
+              <strong className="mt-1.5 block text-2xl font-bold tracking-tight text-ink">
+                {formatTime(workedSeconds)}{' '}
+                <small className="text-xs font-medium text-muted">
+                  / {formatPlanned(task.plannedMinutes)}
+                </small>
+              </strong>
+            </div>
+            <span className="shrink-0 rounded-full bg-[var(--ws-accent-soft,#e9f0ec)] px-2.5 py-1 font-mono text-[11px] font-bold text-[var(--ws-accent,#375b4b)]">
+              {Math.round(taskProgress)}%
             </span>
-            <strong className="mt-1.5 block text-2xl font-bold tracking-tight text-ink">
-              {formatTime(workedSeconds)}{' '}
-              <small className="text-xs font-medium text-muted">
-                / {formatPlanned(task.plannedMinutes)}
-              </small>
-            </strong>
           </div>
-          <span className="shrink-0 rounded-full bg-[var(--ws-accent-soft,#e9f0ec)] px-2.5 py-1 font-mono text-[11px] font-bold text-[var(--ws-accent,#375b4b)]">
-            {Math.round(taskProgress)}%
-          </span>
+          <ProgressBar
+            value={taskProgress}
+            tone="coral"
+            className="mt-3 h-1.5"
+          />
         </div>
-        <ProgressBar value={taskProgress} tone="coral" className="mt-3 h-1.5" />
+
+        {task.goalName && (
+          <GoalProgress
+            name={task.goalName}
+            progress={task.goalProgress || 0}
+          />
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/70 px-4 py-3 sm:px-5 sm:pl-[68px]">
