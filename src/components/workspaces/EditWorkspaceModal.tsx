@@ -4,7 +4,9 @@ import { CSSProperties, FormEvent, useState } from 'react'
 import { AlertTriangle, Check, Loader2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { TimeOfDaySelect } from '@/components/workspaces/TimeOfDaySelect'
 import { showSuccessToast } from '@/lib/toast'
+import { roundToQuarterHour } from '@/lib/dailyReportWindow'
 import {
   getWorkspaceTheme,
   WORKSPACE_THEMES,
@@ -46,6 +48,7 @@ export function EditWorkspaceModal({
     name: string
     description: string
     timezone: string
+    reportTime: string
     accent: string
   }) => Promise<{ success: boolean; error?: string }>
   onClose: () => void
@@ -53,6 +56,9 @@ export function EditWorkspaceModal({
   const [name, setName] = useState(workspace.name)
   const [description, setDescription] = useState(workspace.description ?? '')
   const [timezone, setTimezone] = useState(workspace.timezone)
+  const [reportTime, setReportTime] = useState(
+    roundToQuarterHour(workspace.reportTime),
+  )
   const [accent, setAccent] = useState<WorkspaceThemeId>(
     (workspace.accent as WorkspaceThemeId) || 'forest',
   )
@@ -78,6 +84,7 @@ export function EditWorkspaceModal({
       name: name.trim(),
       description: description.trim(),
       timezone,
+      reportTime: `${reportTime}:00`,
       accent,
     })
     setLoading(false)
@@ -123,7 +130,7 @@ export function EditWorkspaceModal({
             value={description}
             onChange={event => setDescription(event.target.value)}
             rows={2}
-            className="mt-2 w-full resize-none rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-sage focus:ring-4 focus:ring-sage/15"
+            className="mt-2 w-full font-light resize-none rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-sage focus:ring-4 focus:ring-sage/15"
           />
         </label>
         <label className="block text-xs font-semibold text-muted">
@@ -139,6 +146,14 @@ export function EditWorkspaceModal({
               </option>
             ))}
           </select>
+        </label>
+        <label className="block text-xs font-semibold text-muted">
+          Daily Report time
+          <TimeOfDaySelect value={reportTime} onChange={setReportTime} />
+          <span className="mt-1.5 block text-[10px] font-normal text-muted">
+            OnTask automatically generates a Daily Report at this time, in the
+            timezone above, covering the previous 24 hours.
+          </span>
         </label>
         <div>
           <p className="text-xs font-semibold text-muted">Accent theme</p>

@@ -4,6 +4,7 @@ import { FormEvent, useState } from 'react'
 import { AlertTriangle, Check, Loader2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { TimeOfDaySelect } from '@/components/workspaces/TimeOfDaySelect'
 
 const COMMON_TIMEZONES = [
   'UTC',
@@ -45,12 +46,14 @@ export function CreateWorkspaceModal({
     name: string,
     description: string,
     timezone: string,
+    reportTime: string,
   ) => Promise<{ success: boolean; error?: string }>
   onClose: () => void
 }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [timezone, setTimezone] = useState(detectTimezone)
+  const [reportTime, setReportTime] = useState('12:00')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -64,7 +67,12 @@ export function CreateWorkspaceModal({
     if (!name.trim()) return
     setLoading(true)
     setError('')
-    const result = await onCreate(name.trim(), description, timezone)
+    const result = await onCreate(
+      name.trim(),
+      description,
+      timezone,
+      `${reportTime}:00`,
+    )
     setLoading(false)
     if (!result.success) {
       setError(result.error || 'Failed to create workspace.')
@@ -121,8 +129,16 @@ export function CreateWorkspaceModal({
             ))}
           </select>
           <span className="mt-1.5 block text-[10px] font-normal text-muted">
-            Anchors daily boundaries for this workspace (e.g. shared daily
-            summaries) — not each member&apos;s own browser timezone.
+            Anchors daily boundaries for this workspace (e.g. the automatic
+            Daily Report) — not each member&apos;s own browser timezone.
+          </span>
+        </label>
+        <label className="block text-xs font-semibold text-muted">
+          Daily Report time
+          <TimeOfDaySelect value={reportTime} onChange={setReportTime} />
+          <span className="mt-1.5 block text-[10px] font-normal text-muted">
+            OnTask automatically generates a Daily Report at this time, in the
+            timezone above, covering the previous 24 hours.
           </span>
         </label>
         <Button type="submit" className="w-full" disabled={loading}>

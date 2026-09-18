@@ -1,6 +1,7 @@
 import { AlertTriangle, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { formatTimeOfDay } from '@/lib/dailyReportWindow'
 import { Workspace } from '@/types/workspace'
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -56,6 +57,10 @@ export function WorkspaceSettingsSection({
               value={workspace.description || 'No description yet.'}
             />
             <DetailRow label="Timezone" value={workspace.timezone} />
+            <DetailRow
+              label="Daily Report time"
+              value={formatTimeOfDay(workspace.reportTime ?? '12:00:00')}
+            />
           </div>
         )}
       </div>

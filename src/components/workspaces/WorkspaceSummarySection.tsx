@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  Clock,
   Loader2,
   RefreshCw,
   Sparkles,
@@ -13,6 +14,7 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { formatMemberEvent } from '@/lib/workspaceSummaryEvents'
+import { formatBoundary } from '@/lib/dailyReportWindow'
 import {
   StructuredSnapshotMember,
   StructuredSnapshotTaskActivity,
@@ -28,17 +30,20 @@ function formatHM(totalSeconds: number): string {
   return `${hours}h ${minutes}m`
 }
 
-function formatDate(isoDate: string): string {
-  const [year, month, day] = isoDate.split('-').map(Number)
-  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(
-    undefined,
-    {
-      weekday: 'long',
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    },
+// The report's own frozen report_timezone is used here (never the
+// workspace's current timezone) so a historical report keeps displaying the
+// window it was actually generated for, even after the workspace's timezone
+// setting is later changed.
+function formatWindow(summary: WorkspaceDailySummary): string {
+  const start = formatBoundary(
+    new Date(summary.reportStart),
+    summary.reportTimezone,
   )
+  const end = formatBoundary(
+    new Date(summary.reportEnd),
+    summary.reportTimezone,
+  )
+  return `${start} → ${end}`
 }
 
 function formatTimestamp(iso: string): string {
@@ -244,29 +249,32 @@ export function WorkspaceSummarySection({
   error,
   summary,
   members,
-  summaryDate,
+  nextReportLabel,
+  reportTimeLabel,
   generating,
-  onGenerate,
   onRegenerate,
 }: {
   ready: boolean
   error?: string | null
   summary: WorkspaceDailySummary | null
   members: WorkspaceMember[]
-  summaryDate: string | null
+  nextReportLabel: string | null
+  reportTimeLabel: string
   generating: boolean
-  onGenerate: () => void
   onRegenerate: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const isPending = summary?.generationStatus === 'pending'
+  const isFailed = summary?.generationStatus === 'failed'
+  const isCompleted = summary?.generationStatus === 'completed'
   const hasNoRecordedActivity =
-    !!summary && summary.structuredSnapshot.members.length === 0
+    isCompleted && summary.structuredSnapshot.members.length === 0
 
-  const generatedByMember = summary
-    ? members.find(m => m.userId === summary.generatedBy)
+  const regeneratedByMember = summary?.regeneratedBy
+    ? members.find(m => m.userId === summary.regeneratedBy)
     : null
-  const generatedByName =
-    generatedByMember?.fullName || generatedByMember?.email || 'A member'
+  const regeneratedByName =
+    regeneratedByMember?.fullName || regeneratedByMember?.email || 'A member'
 
   const byStatus = (status: SummaryTaskStatus) =>
     summary
@@ -285,21 +293,26 @@ export function WorkspaceSummarySection({
       <div className="flex items-center justify-between gap-3 border-b border-line/70 px-5 py-4">
         <div>
           <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight text-ink">
-            <Sparkles size={15} /> Yesterday&apos;s Work
+            <Sparkles size={15} /> Daily Report
           </h2>
-          {!summary && !hasNoRecordedActivity && (
+          {summary ? (
+            <p className="mt-1 flex items-center gap-1 text-[11px] leading-4 text-muted">
+              <Clock size={11} className="shrink-0" />
+              Previous 24 hours · {formatWindow(summary)}
+            </p>
+          ) : (
             <p className="mt-1 text-[11px] leading-4 text-muted">
-              See what your workspace worked on, changed, completed, and
-              assigned yesterday.
+              Automatically generated every day at {reportTimeLabel}, covering
+              your workspace&apos;s previous 24 hours.
             </p>
           )}
         </div>
-        {summary && !hasNoRecordedActivity && (
+        {isCompleted && !hasNoRecordedActivity && (
           <button
             onClick={() => setExpanded(current => !current)}
             className="flex items-center gap-1 text-[11px] font-semibold text-[var(--ws-accent,#375b4b)] transition hover:text-coral"
           >
-            {expanded ? 'Hide' : 'View Summary'}
+            {expanded ? 'Hide' : 'View Report'}
             {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
         )}
@@ -310,42 +323,37 @@ export function WorkspaceSummarySection({
           <Skeleton className="h-3 w-1/3" />
           <Skeleton className="h-8 w-40" />
         </div>
-      ) : !summary && error ? (
-        <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
-          <ErrorBanner message={error} />
+      ) : !summary ? (
+        <div className="px-5 py-8 text-center">
           <p className="text-xs leading-5 text-muted">
-            Couldn&apos;t generate yesterday&apos;s summary.
+            {nextReportLabel
+              ? `Next report: ${nextReportLabel}`
+              : 'The Daily Report is generated automatically once your workspace has activity to cover.'}
           </p>
-          <Button onClick={onGenerate} disabled={generating}>
+        </div>
+      ) : isPending ? (
+        <div className="flex items-center justify-center gap-2 px-5 py-8 text-center">
+          <Loader2 size={14} className="animate-spin text-muted" />
+          <p className="text-xs leading-5 text-muted">
+            Generating your workspace&apos;s Daily Report…
+          </p>
+        </div>
+      ) : isFailed ? (
+        <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
+          <ErrorBanner message="Daily Report couldn't be generated yet." />
+          <Button onClick={onRegenerate} disabled={generating}>
             {generating ? (
               <Loader2 size={14} className="animate-spin" />
             ) : (
-              <Sparkles size={14} />
+              <RefreshCw size={14} />
             )}
             Retry
-          </Button>
-        </div>
-      ) : !summary ? (
-        <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
-          <p className="text-xs leading-5 text-muted">
-            {summaryDate
-              ? `No AI summary yet for ${formatDate(summaryDate)}.`
-              : 'No activity to summarize yet.'}
-          </p>
-          <Button onClick={onGenerate} disabled={generating}>
-            {generating ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Sparkles size={14} />
-            )}
-            Generate AI Summary
           </Button>
         </div>
       ) : hasNoRecordedActivity ? (
         <div className="px-5 py-8 text-center">
           <p className="text-xs leading-5 text-muted">
-            No workspace activity was recorded on{' '}
-            {formatDate(summary.summaryDate)}.
+            {summary.narrative.overall_summary}
           </p>
         </div>
       ) : (
@@ -355,8 +363,7 @@ export function WorkspaceSummarySection({
               <span className="font-mono text-sm font-bold text-ink">
                 {formatHM(summary.structuredSnapshot.total_focused_seconds)}
               </span>{' '}
-              recorded on {formatDate(summary.summaryDate)} ·{' '}
-              {summary.structuredSnapshot.members.length}{' '}
+              recorded · {summary.structuredSnapshot.members.length}{' '}
               {summary.structuredSnapshot.members.length === 1
                 ? 'member'
                 : 'members'}
@@ -429,14 +436,15 @@ export function WorkspaceSummarySection({
 
               {summary.meta.used_fallback_template && (
                 <p className="text-[10px] leading-4 text-muted">
-                  AI narration wasn&apos;t available for this summary — the
+                  AI narration wasn&apos;t available for this report — the
                   totals above are computed directly from tracked time.
                 </p>
               )}
 
               <p className="text-[10px] text-muted">
-                {summary.version > 1 ? 'Last regenerated' : 'Generated'} by{' '}
-                {generatedByName} · {formatTimestamp(summary.generatedAt)}
+                {summary.regeneratedAt
+                  ? `Last regenerated by ${regeneratedByName} · ${formatTimestamp(summary.regeneratedAt)}`
+                  : `Automatically generated at ${formatTimestamp(summary.generatedAt)}`}
               </p>
             </div>
           )}
