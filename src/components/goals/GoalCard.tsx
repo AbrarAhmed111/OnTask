@@ -181,6 +181,7 @@ export function GoalCard({
       !isDone(task) &&
       (task.status === 'blocked' || blockingTasksFor(task.id).length > 0),
   ).length
+  const hasWorkingTask = tasks.some(task => task.status === 'working')
 
   const closeTaskModal = () => {
     setTaskModal(null)
@@ -329,11 +330,13 @@ export function GoalCard({
             <h3 className="min-w-0 truncate text-sm font-bold tracking-tight text-ink">
               {goal.name}
             </h3>
-            <span
-              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase ${STATUS_STYLES[goal.status]}`}
-            >
-              <StatusIcon size={10} /> {STATUS_LABEL[goal.status]}
-            </span>
+            {(goal.status !== 'active' || hasWorkingTask) && (
+              <span
+                className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase ${STATUS_STYLES[goal.status]}`}
+              >
+                <StatusIcon size={10} /> {STATUS_LABEL[goal.status]}
+              </span>
+            )}
           </div>
           {!expanded && goal.description && (
             <p className="mt-1 line-clamp-1 text-xs text-muted">
