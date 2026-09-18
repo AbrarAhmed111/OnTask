@@ -3,6 +3,9 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { showErrorToast, showSuccessToast } from '@/lib/toast'
 import { WorkspaceTasksSection } from '@/components/workspaces/WorkspaceTasksSection'
+import { useOptionalWorkspaceBlockers } from '@/components/workspaces/WorkspaceBlockersContext'
+import { TaskBlockerActionsContext } from '@/components/blockers/TaskBlockerActionsContext'
+import type { BlockedNowItem } from '@/components/blockers/BlockedNowPanel'
 import { WorkspaceGoalsSection } from '@/components/workspaces/WorkspaceGoalsSection'
 import { WorkspaceResourcesSection } from '@/components/workspaces/WorkspaceResourcesSection'
 import { WorkspaceActivitySection } from '@/components/workspaces/WorkspaceActivitySection'
@@ -70,6 +73,7 @@ export function WorkspaceOverviewClient() {
     deleteTask,
     reassignTask,
     reorderTasks,
+    blockerActions,
     getLiveSeconds,
   } = useWorkspaceTasks(
     workspaceId,
@@ -132,6 +136,10 @@ export function WorkspaceOverviewClient() {
   const [goalWorkingTasks, setGoalWorkingTasks] = useState<
     Record<string, GoalWorkingTask[]>
   >({})
+  const [goalBlockedTasks, setGoalBlockedTasks] = useState<
+    Record<string, GoalWorkingTask[]>
+  >({})
+  const blockers = useOptionalWorkspaceBlockers()
 
   useEffect(() => {
     if (tasksError) showErrorToast(tasksError)
@@ -164,6 +172,29 @@ export function WorkspaceOverviewClient() {
     },
     [goals],
   )
+  const handleBlockedTasksChange = useCallback(
+    (goalId: string, blockedTasks: WorkspaceTask[]) => {
+      setGoalBlockedTasks(current => ({
+        ...current,
+        [goalId]: blockedTasks.map(task => ({
+          task,
+          goalName: goals.find(goal => goal.id === goalId)?.name ?? 'Goal',
+        })),
+      }))
+    },
+    [goals],
+  )
+  // Every blocked task, flat and Goal alike, with its active blocker. A blocked
+  // task whose blocker hasn't arrived yet (or was just resolved) is left out.
+  const blockedItems: BlockedNowItem[] = [
+    ...tasks
+      .filter(task => task.status === 'blocked')
+      .map(task => ({ task, goalName: undefined as string | undefined })),
+    ...Object.values(goalBlockedTasks).flat(),
+  ].flatMap(({ task, goalName }) => {
+    const blocker = blockers?.blockerForTask(task.id)
+    return blocker ? [{ task, goalName, blocker }] : []
+  })
 
   const startOfToday = new Date()
   startOfToday.setHours(0, 0, 0, 0)
@@ -277,29 +308,32 @@ export function WorkspaceOverviewClient() {
 
   return (
     <div className="space-y-8">
-      <WorkspaceTasksSection
-        ready={ready && tasksReady}
-        error={tasksError}
-        isPersonal={isPersonal}
-        stats={stats}
-        workingNow={workingNow}
-        workingGoalTasks={workingGoalTasks}
-        tasks={tasks}
-        members={members}
-        user={user}
-        queueTasks={queueTasks}
-        completedTasks={completedTasks}
-        getLiveSeconds={getLiveSeconds}
-        onAddTask={openAddTask}
-        onStart={startTask}
-        onPause={pauseTask}
-        onEmergencyStop={emergencyStopTask}
-        onFinish={handleFinishTask}
-        onEdit={openEditTask}
-        onDelete={handleDeleteTask}
-        onReassign={reassignTask}
-        onReorder={reorderTasks}
-      />
+      <TaskBlockerActionsContext.Provider value={blockerActions}>
+        <WorkspaceTasksSection
+          ready={ready && tasksReady}
+          error={tasksError}
+          isPersonal={isPersonal}
+          stats={stats}
+          workingNow={workingNow}
+          workingGoalTasks={workingGoalTasks}
+          blockedItems={blockedItems}
+          tasks={tasks}
+          members={members}
+          user={user}
+          queueTasks={queueTasks}
+          completedTasks={completedTasks}
+          getLiveSeconds={getLiveSeconds}
+          onAddTask={openAddTask}
+          onStart={startTask}
+          onPause={pauseTask}
+          onEmergencyStop={emergencyStopTask}
+          onFinish={handleFinishTask}
+          onEdit={openEditTask}
+          onDelete={handleDeleteTask}
+          onReassign={reassignTask}
+          onReorder={reorderTasks}
+        />
+      </TaskBlockerActionsContext.Provider>
 
       <WorkspaceGoalsSection
         ready={ready && goalsReady}
@@ -313,6 +347,7 @@ export function WorkspaceOverviewClient() {
         updateGoal={updateGoal}
         setGoalStatus={setGoalStatus}
         onWorkingTasksChange={handleWorkingTasksChange}
+        onBlockedTasksChange={handleBlockedTasksChange}
         onAddGoal={openAddGoal}
       />
 
