@@ -27,8 +27,8 @@ export function VisitorWelcomeModal({
       <div className="mt-5 rounded-xl border border-sage/40 bg-sage/10 p-3.5">
         <p className="text-xs font-semibold text-ink">Want more?</p>
         <p className="mt-1 text-xs leading-5 text-muted">
-          Create an account to unlock Shared Workspaces, realtime
-          collaboration, notifications, synced data, and more.
+          Create an account to unlock Shared Workspaces, realtime collaboration,
+          notifications, synced data, and more.
         </p>
       </div>
       <div className="mt-6 flex flex-col gap-2">

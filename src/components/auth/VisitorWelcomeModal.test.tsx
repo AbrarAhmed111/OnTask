@@ -4,13 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { VisitorWelcomeModal } from '@/components/auth/VisitorWelcomeModal'
 
 vi.mock('@/components/ui/Modal', () => ({
-  Modal: ({
-    title,
-    children,
-  }: {
-    title: string
-    children: ReactNode
-  }) => (
+  Modal: ({ title, children }: { title: string; children: ReactNode }) => (
     <section role="dialog" aria-label={title}>
       <h1>{title}</h1>
       {children}
