@@ -3,6 +3,7 @@ import {
   NotificationRow,
   groupNotificationsByWorkspace,
   isInScope,
+  notificationHref,
   notificationScopeFor,
   rowToNotification,
   rowsToNotifications,
@@ -124,6 +125,46 @@ describe('rowToNotification', () => {
     })
   })
 
+  it('carries a blocker mention through with its task, the person who asked and its workspace', () => {
+    const result = rowToNotification(
+      row({
+        notification_type: 'blocker_mention',
+        entity_type: 'task',
+        entity_id: 'task-7',
+        title: 'Abrar Ahmed mentioned you in a blocker',
+        body: 'Student API\nWaiting for API credentials from @Araysh.',
+        actor_id: 'user-abrar',
+        user_id: 'user-araysh',
+      }),
+    )
+    expect(result).toMatchObject({
+      notificationType: 'blocker_mention',
+      entityType: 'task',
+      entityId: 'task-7',
+      actorId: 'user-abrar',
+      userId: 'user-araysh',
+      workspaceId: 'ws-alpha',
+      workspaceName: 'Team Alpha',
+      workspaceSlug: 'team-alpha',
+      readAt: null,
+    })
+  })
+
+  it('carries a blocker resolution through the same way', () => {
+    expect(
+      rowToNotification(
+        row({
+          notification_type: 'blocker_resolved',
+          entity_id: 'task-7',
+          title: 'Araysh resolved a blocker on your task',
+        }),
+      ),
+    ).toMatchObject({
+      notificationType: 'blocker_resolved',
+      entityId: 'task-7',
+    })
+  })
+
   it('drops a notification whose workspace did not resolve, rather than showing it unlabelled', () => {
     expect(rowToNotification(row({ workspaces: null }))).toBeNull()
     expect(
@@ -132,6 +173,52 @@ describe('rowToNotification', () => {
         row({ id: 'gone', workspaces: null }),
       ]).map(n => n.id),
     ).toEqual(['kept'])
+  })
+})
+
+describe('notificationHref', () => {
+  it('opens the workspace and the task a task notification is about', () => {
+    expect(
+      notificationHref(
+        notification({ entityType: 'task', entityId: 'task-7' }),
+      ),
+    ).toBe('/workspaces/team-alpha?task=task-7')
+  })
+
+  it('opens just the workspace when the notification is not about a task', () => {
+    expect(
+      notificationHref(
+        notification({ entityType: 'workspace', entityId: null }),
+      ),
+    ).toBe('/workspaces/team-alpha')
+    expect(
+      notificationHref(notification({ entityType: 'task', entityId: null })),
+    ).toBe('/workspaces/team-alpha')
+  })
+
+  it('uses the personal alias for a notification that belongs to the personal workspace', () => {
+    const personal = rowToNotification(
+      row({
+        entity_id: 'task-3',
+        workspaces: {
+          slug: 'stored-slug-123',
+          type: 'personal',
+          name: 'stored name',
+          accent: 'forest',
+        },
+      }),
+    )!
+    expect(notificationHref(personal)).toBe(
+      '/workspaces/personal-workspace?task=task-3',
+    )
+  })
+
+  it('encodes the id so it cannot break out of the query', () => {
+    expect(
+      notificationHref(
+        notification({ entityType: 'task', entityId: 'a&b=c#d' }),
+      ),
+    ).toBe('/workspaces/team-alpha?task=a%26b%3Dc%23d')
   })
 })
 

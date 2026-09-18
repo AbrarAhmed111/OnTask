@@ -36,6 +36,22 @@ export type NotificationRow = {
   workspaces: EmbeddedWorkspace | EmbeddedWorkspace[] | null
 }
 
+// Where a notification leads. Always its workspace; for one about a task, also
+// that task, so the page can bring it into view (and open the Goal it's in).
+// Routing is slug-based -- the notification's workspaceSlug is already the
+// personal alias for a personal workspace.
+export function notificationHref(
+  notification: Pick<
+    NotificationWithWorkspace,
+    'workspaceSlug' | 'entityType' | 'entityId'
+  >,
+): string {
+  const base = `/workspaces/${notification.workspaceSlug}`
+  return notification.entityType === 'task' && notification.entityId
+    ? `${base}?task=${encodeURIComponent(notification.entityId)}`
+    : base
+}
+
 // null when the embed didn't resolve. The notifications policy requires
 // current membership of the workspace (0034), and so does the workspaces
 // policy the embed goes through -- so an unresolved workspace means the user

@@ -2,7 +2,10 @@ import Link from 'next/link'
 import { Bell, CheckCheck, Lock, Users } from 'lucide-react'
 import { timeAgo } from '@/lib/time'
 import { getWorkspaceTheme } from '@/lib/workspaceThemes'
-import { groupNotificationsByWorkspace } from '@/lib/workspaceNotifications'
+import {
+  groupNotificationsByWorkspace,
+  notificationHref,
+} from '@/lib/workspaceNotifications'
 import { NotificationWithWorkspace, WorkspaceType } from '@/types/workspace'
 
 function WorkspaceIcon({ type, size }: { type: WorkspaceType; size: number }) {
@@ -44,7 +47,7 @@ function NotificationItem({
   return (
     <li className="animate-[slideInFade_260ms_ease-out]">
       <Link
-        href={`/workspaces/${notification.workspaceSlug}`}
+        href={notificationHref(notification)}
         onClick={() => {
           if (unread) onMarkRead(notification.id)
           onNavigate()
@@ -59,8 +62,9 @@ function NotificationItem({
             <p className="text-xs font-semibold text-ink">
               {notification.title}
             </p>
+            {/* A blocker's body is the task, then its reason, one per line. */}
             {notification.body && (
-              <p className="mt-0.5 truncate text-[11px] text-muted">
+              <p className="mt-0.5 line-clamp-2 whitespace-pre-line break-words text-[11px] text-muted">
                 {notification.body}
               </p>
             )}
