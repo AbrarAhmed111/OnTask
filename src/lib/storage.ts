@@ -35,6 +35,7 @@ import { Settings, Task } from '@/types'
 
 const TASKS_KEY = 'ontask-tasks-v2'
 const SETTINGS_KEY = 'ontask-settings-v1'
+const VISITOR_WELCOME_KEY = 'ontask_welcome_seen'
 // Legacy (pre-Personal-Workspace) flag: a single "the guest -> account prompt
 // was answered on this device" boolean. Superseded by RESOLVED_TASKS_KEY
 // below; only read once, to honour an answer given before the upgrade.
@@ -77,6 +78,17 @@ export function loadSettings(): Settings {
 export function saveSettings(settings: Settings) {
   if (typeof window !== 'undefined') {
     window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+  }
+}
+
+export function hasVisitorWelcomeSeen() {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem(VISITOR_WELCOME_KEY) === 'true'
+}
+
+export function markVisitorWelcomeSeen() {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(VISITOR_WELCOME_KEY, 'true')
   }
 }
 
