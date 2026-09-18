@@ -33,4 +33,52 @@
   body {
     @apply bg-paper font-sans text-ink antialiased;
   }
+
+  /* Scrollbars: thin, low-contrast, tinted from the app's `muted` ink so they
+     read as part of the page rather than as OS chrome. They are defined as
+     variables so a future dark theme only has to override these two. (The app
+     has no dark mode today; "theme" is the per-workspace accent, which is
+     deliberately not used here -- the page scrollbar lives on <html>, outside
+     the workspace shell, and should look the same everywhere.) */
+  :root {
+    --scrollbar-thumb: theme('colors.muted / 32%');
+    --scrollbar-thumb-hover: theme('colors.muted / 60%');
+  }
+
+  /* Standard properties: Firefox, Chromium 121+ and Safari 18.2+. They apply
+     to the page and to every scroll container (modals, lists, textareas). */
+  @supports (scrollbar-width: thin) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar-thumb) transparent;
+    }
+    /* The standard properties can't style the thumb's own :hover, so a
+       scroll container's thumb firms up while the pointer is over it. Not
+       applied to <html>, or the page scrollbar would always look "hovered". */
+    :not(html):hover {
+      scrollbar-color: var(--scrollbar-thumb-hover) transparent;
+    }
+  }
+
+  /* Older Safari, which only understands the -webkit- pseudo-elements
+     (newer engines ignore them once scrollbar-width is set). */
+  @supports not (scrollbar-width: thin) {
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border: 3px solid transparent;
+      border-radius: 9999px;
+      background-clip: content-box;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-thumb-hover);
+      background-clip: content-box;
+    }
+  }
 }

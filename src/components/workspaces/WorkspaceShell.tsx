@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Avatar } from '@/components/ui/Avatar'
+import { ThemeScope } from '@/components/ui/PortalTheme'
 import { AccountMenu } from '@/components/layout/AccountMenu'
 import { PresenceDot } from '@/components/workspaces/PresenceDot'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
@@ -196,8 +197,8 @@ export function WorkspaceShell({
       : null
 
   return (
-    <div
-      style={
+    <ThemeScope
+      vars={
         {
           '--ws-accent': theme.strong,
           '--ws-accent-soft': theme.soft,
@@ -413,6 +414,6 @@ export function WorkspaceShell({
           </div>
         </div>
       </div>
-    </div>
+    </ThemeScope>
   )
 }

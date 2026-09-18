@@ -1,28 +1,115 @@
 'use client'
 
-import { ReactNode, useEffect, useLayoutEffect, useRef } from 'react'
+import {
+  CSSProperties,
+  ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useSyncExternalStore,
+} from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
+import { usePortalTheme } from '@/components/ui/PortalTheme'
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 const SIZE_CLASSES = { md: 'max-w-md', lg: 'max-w-4xl' }
 
-export function Modal({
-  title,
-  eyebrow,
-  children,
-  onClose,
-  size = 'md',
-}: {
+// `fill`: the dialog is capped to the viewport and lays its children out as a
+// column, so a child can pin a header/toolbar and scroll only its own list
+// (see ResourcesModal). Without it the dialog is exactly the plain block it
+// always was -- modals that host absolutely-positioned popovers (assignee
+// picker, dropdowns) must not get an overflow container that would clip them.
+// `100dvh` follows mobile browser chrome; plain `100vh` is the fallback.
+const FILL_CLASSES =
+  'flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden pb-0 supports-[height:100dvh]:max-h-[calc(100dvh-2rem)]'
+
+// Open modals, oldest first. Only the topmost answers Escape and Tab, so a
+// confirmation opened over another dialog closes by itself instead of taking
+// the dialog underneath with it, and two focus traps never fight.
+const openModals: symbol[] = []
+
+// While any modal is open the page behind it must not scroll. Reference
+// counted so stacked modals share one lock; the scrollbar's width is added
+// back as padding so the page doesn't jump sideways when it disappears.
+let scrollLocks = 0
+let restoreScroll: (() => void) | null = null
+
+function lockBodyScroll(): () => void {
+  if (scrollLocks++ === 0) {
+    const { body, documentElement } = document
+    const previousOverflow = body.style.overflow
+    const previousPadding = body.style.paddingRight
+    const scrollbarWidth = window.innerWidth - documentElement.clientWidth
+    body.style.overflow = 'hidden'
+    if (scrollbarWidth > 0) body.style.paddingRight = `${scrollbarWidth}px`
+    restoreScroll = () => {
+      body.style.overflow = previousOverflow
+      body.style.paddingRight = previousPadding
+    }
+  }
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    if (--scrollLocks === 0) {
+      restoreScroll?.()
+      restoreScroll = null
+    }
+  }
+}
+
+type ModalProps = {
   title: string
   eyebrow?: string
   children: ReactNode
   onClose: () => void
   size?: 'md' | 'lg'
-}) {
+  fill?: boolean
+}
+
+// <body> exists only in the browser: on the server (and for the hydration
+// pass) there is nowhere to portal to, so nothing is rendered until then.
+const subscribeToNothing = () => () => {}
+const getPortalHost = () => document.body
+const getServerPortalHost = () => null
+
+// The dialog is rendered through a portal into <body> rather than in place.
+// Rendered in place it lived inside the page layout, so where it stacked was
+// decided by every ancestor between it and the root -- the workspace content
+// wrapper animates opacity (which makes a stacking context while it runs),
+// and any transform/filter/isolation added there later would either trap the
+// modal beneath the sticky z-30 header or re-anchor its `fixed inset-0`
+// backdrop to that ancestor instead of the viewport. As a direct child of
+// <body> its z-50 competes only with the root-level layers.
+export function Modal(props: ModalProps) {
+  const host = useSyncExternalStore(
+    subscribeToNothing,
+    getPortalHost,
+    getServerPortalHost,
+  )
+  const theme = usePortalTheme()
+  if (!host) return null
+  return createPortal(<ModalDialog {...props} theme={theme} />, host)
+}
+
+function ModalDialog({
+  title,
+  eyebrow,
+  children,
+  onClose,
+  size = 'md',
+  fill = false,
+  theme,
+}: ModalProps & { theme?: CSSProperties }) {
   const dialogRef = useRef<HTMLElement>(null)
   const previouslyFocusedRef = useRef<HTMLElement | null>(null)
+  // Unique per open modal: a confirmation over another dialog would
+  // otherwise share one `modal-title` id and be labelled by the wrong title.
+  const titleId = useId()
 
   // Keep the latest onClose reachable without making it an effect
   // dependency — callers pass an inline function that gets a new identity
@@ -35,6 +122,9 @@ export function Modal({
   })
 
   useLayoutEffect(() => {
+    const id = Symbol('modal')
+    openModals.push(id)
+    const releaseScroll = lockBodyScroll()
     previouslyFocusedRef.current = document.activeElement as HTMLElement | null
 
     // Don't steal focus from a field that already autofocused itself (React
@@ -48,6 +138,7 @@ export function Modal({
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (openModals[openModals.length - 1] !== id) return
       if (event.key === 'Escape') {
         onCloseRef.current()
         return
@@ -79,6 +170,8 @@ export function Modal({
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
+      openModals.splice(openModals.indexOf(id), 1)
+      releaseScroll()
       const previouslyFocused = previouslyFocusedRef.current
       if (previouslyFocused && document.body.contains(previouslyFocused)) {
         previouslyFocused.focus()
@@ -90,6 +183,7 @@ export function Modal({
 
   return (
     <div
+      style={theme}
       className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 backdrop-blur-sm animate-[fadeIn_180ms_ease-out]"
       onMouseDown={event => event.target === event.currentTarget && onClose()}
     >
@@ -97,19 +191,19 @@ export function Modal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
+        aria-labelledby={titleId}
         tabIndex={-1}
-        className={`w-full ${SIZE_CLASSES[size]} rounded-2xl border border-line bg-panel p-6 shadow-2xl outline-none animate-[modalIn_220ms_ease-out]`}
+        className={`w-full ${SIZE_CLASSES[size]} rounded-2xl border border-line bg-panel p-6 shadow-2xl outline-none animate-[modalIn_220ms_ease-out] ${fill ? FILL_CLASSES : ''}`}
       >
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
+        <div className="mb-6 flex shrink-0 items-start justify-between gap-4">
+          <div className="min-w-0">
             {eyebrow && (
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-coral">
                 {eyebrow}
               </p>
             )}
             <h2
-              id="modal-title"
+              id={titleId}
               className="text-xl font-bold tracking-tight text-ink"
             >
               {title}
@@ -118,12 +212,16 @@ export function Modal({
           <button
             aria-label="Close dialog"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-muted transition hover:bg-slate-100 hover:text-ink"
+            className="shrink-0 rounded-lg p-1.5 text-muted transition hover:bg-slate-100 hover:text-ink"
           >
             <X size={18} />
           </button>
         </div>
-        {children}
+        {fill ? (
+          <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        ) : (
+          children
+        )}
       </section>
     </div>
   )

@@ -21,6 +21,7 @@ import { useWorkspaceResources } from '@/hooks/useWorkspaceResources'
 import { useWorkspaceActivity } from '@/hooks/useWorkspaceActivity'
 import { useWorkspaceSummary } from '@/hooks/useWorkspaceSummary'
 import { formatTimeOfDay } from '@/lib/dailyReportWindow'
+import { describeUploadOutcome } from '@/lib/resourceUploads'
 import { WorkspaceTask } from '@/types/workspace'
 import { TaskFormValues } from '@/types'
 
@@ -87,8 +88,9 @@ export function WorkspaceOverviewClient() {
     resources,
     ready: resourcesReady,
     error: resourcesError,
-    uploading: resourceUploading,
-    upload: uploadResource,
+    uploads: resourceUploads,
+    uploadMany: uploadResources,
+    dismissUploads: dismissResourceUploads,
     remove: removeResource,
     getSignedUrl,
   } = useWorkspaceResources(workspaceId, user)
@@ -251,12 +253,17 @@ export function WorkspaceOverviewClient() {
     }
   }
 
-  const handleUploadResource = async (file: File) => {
-    if (await uploadResource(file)) showSuccessToast('Resource uploaded.')
+  const handleUploadResources = async (files: File[]) => {
+    const outcome = describeUploadOutcome(await uploadResources(files))
+    if (!outcome) return
+    if (outcome.tone === 'success') showSuccessToast(outcome.message)
+    else showErrorToast(outcome.message)
   }
-  const handleDeleteResource = (id: string) => {
-    removeResource(id)
-    showSuccessToast('Resource removed.')
+  const handleDeleteResource = async (id: string) => {
+    // Report what the server actually did, not what we hoped for.
+    const result = await removeResource(id)
+    if (result.ok) showSuccessToast('Resource removed.')
+    else showErrorToast(result.message)
   }
 
   return (
@@ -388,8 +395,10 @@ export function WorkspaceOverviewClient() {
           members={members}
           userId={user?.id}
           isOwner={isOwner}
-          uploading={resourceUploading}
-          onUpload={handleUploadResource}
+          loading={!(ready && resourcesReady)}
+          uploads={resourceUploads}
+          onUpload={handleUploadResources}
+          onDismissUploads={dismissResourceUploads}
           onDelete={handleDeleteResource}
           getSignedUrl={getSignedUrl}
           onClose={() => setResourcesModalOpen(false)}

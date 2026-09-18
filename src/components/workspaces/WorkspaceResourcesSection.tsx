@@ -1,31 +1,19 @@
-import {
-  ArrowRight,
-  CirclePlus,
-  File,
-  FileImage,
-  FileSpreadsheet,
-  FileText,
-  FolderOpen,
-} from 'lucide-react'
+import { ArrowRight, CirclePlus, FolderOpen } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { categorize } from '@/lib/resources'
+import { KIND_STYLES } from '@/components/resources/resourceKinds'
+import { getPreviewKind } from '@/lib/resources'
 import { tourAnchor } from '@/lib/tourAnchors'
 import { WorkspaceResource } from '@/types/workspace'
-
-const ICONS = {
-  pdfs: FileText,
-  images: FileImage,
-  documents: FileSpreadsheet,
-  other: File,
-}
 
 const PREVIEW_COUNT = 3
 
 function TypeChip({ resource }: { resource: WorkspaceResource }) {
-  const Icon = ICONS[categorize(resource.fileType)]
+  // Same icon per file type as the cards in the Resources modal.
+  const Icon =
+    KIND_STYLES[getPreviewKind(resource.fileName, resource.fileType)].icon
   return (
     <span
       title={resource.fileName}

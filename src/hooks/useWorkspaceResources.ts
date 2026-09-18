@@ -1,6 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { AuthUser } from '@/hooks/useAuth'
+import { mergeById } from '@/lib/realtime/mergeById'
+import {
+  buildStoragePath,
+  classifyDeleteError,
+  SignedUrlGetter,
+} from '@/lib/resources'
+import {
+  classifyUploadError,
+  isCleanFinish,
+  runWithConcurrency,
+  uploadQueueReducer,
+} from '@/lib/resourceUploads'
 import { WorkspaceResource } from '@/types/workspace'
 
 type WorkspaceResourceRow = {
@@ -34,13 +46,36 @@ function rowToResource(row: WorkspaceResourceRow): WorkspaceResource {
 }
 
 const BUCKET = 'workspace-resources'
+// A few files at a time: quick for a batch, without opening a connection per
+// file. Each file is independent, so one failing never stops the others.
+const UPLOAD_CONCURRENCY = 3
+// How long a finished, fully successful batch stays on screen.
+const UPLOAD_CLEAR_DELAY_MS = 2500
+const SIGNED_URL_TTL_SECONDS = 60 * 5
+// A signed URL is reused for a while (thumbnails re-mount as the list is
+// filtered or scrolled) but retired well before it expires.
+const SIGNED_URL_REUSE_MS = (SIGNED_URL_TTL_SECONDS - 90) * 1000
+
+const createdAtMs = (resource: WorkspaceResource) =>
+  new Date(resource.createdAt).getTime()
+
+// Insert-or-replace by id, newest first. Every path that adds a row -- our
+// own add right after an upload and the realtime INSERT/UPDATE event that
+// follows it -- goes through this, so the same resource arriving twice can
+// never render twice (nor replay its entrance animation: same id, same key).
+const upsertResource = (
+  current: WorkspaceResource[],
+  incoming: WorkspaceResource,
+) => mergeById(current, [incoming], createdAtMs)
 
 // Files belong to the workspace (Supabase Storage holds the bytes, this
 // table holds metadata) -- same postgres_changes realtime pattern as
 // everything else. Upload is a two-step client flow (storage object, then
 // metadata row) mirroring how a couple of other event types in this app are
 // already client-logged rather than RPC-atomic; a failed second step is
-// cleaned up best-effort rather than left to leak indefinitely.
+// cleaned up best-effort rather than left to leak indefinitely. Several files
+// can be uploaded at once: each runs that flow on its own and reports into an
+// upload queue, so a failure is per file and never rolls back the others.
 export function useWorkspaceResources(
   workspaceId: string,
   user: AuthUser | null,
@@ -49,7 +84,10 @@ export function useWorkspaceResources(
   const [resources, setResources] = useState<WorkspaceResource[]>([])
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
+  const [uploads, dispatchUploads] = useReducer(uploadQueueReducer, [])
+  const signedUrls = useRef(
+    new Map<string, { url: string; reuseUntil: number }>(),
+  )
 
   useEffect(() => {
     if (!userId || !workspaceId) {
@@ -109,12 +147,7 @@ export function useWorkspaceResources(
             return
           }
           const incoming = rowToResource(payload.new as WorkspaceResourceRow)
-          setResources(current => {
-            const exists = current.some(r => r.id === incoming.id)
-            return exists
-              ? current.map(r => (r.id === incoming.id ? incoming : r))
-              : [incoming, ...current]
-          })
+          setResources(current => upsertResource(current, incoming))
         },
       )
       .subscribe()
@@ -127,63 +160,169 @@ export function useWorkspaceResources(
     }
   }, [userId, workspaceId])
 
-  const upload = async (file: File, goalId: string | null = null) => {
-    if (!userId) return false
-    setUploading(true)
-    const storagePath = `${workspaceId}/${crypto.randomUUID()}-${file.name}`
+  // Uploads one file: storage object, then its metadata row. Never throws --
+  // the outcome goes to the queue -- so it is safe to run several at once.
+  const uploadOne = async (id: string, file: File, goalId: string | null) => {
     const supabase = createClient()
+    const storagePath = buildStoragePath(workspaceId, id, file.name)
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from(BUCKET)
+        .upload(storagePath, file)
+      if (uploadError) {
+        dispatchUploads({
+          type: 'finished',
+          id,
+          error: classifyUploadError(uploadError),
+        })
+        return false
+      }
 
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(storagePath, file)
-    if (uploadError) {
-      setError("Couldn't upload the file.")
-      setUploading(false)
-      return false
-    }
+      const { data, error: insertError } = await supabase
+        .from('workspace_resources')
+        .insert({
+          workspace_id: workspaceId,
+          goal_id: goalId,
+          uploaded_by: userId,
+          file_name: file.name,
+          file_type: file.type || 'application/octet-stream',
+          file_size: file.size,
+          storage_path: storagePath,
+        })
+        .select('*')
+        .single()
+      if (insertError || !data) {
+        void supabase.storage.from(BUCKET).remove([storagePath])
+        dispatchUploads({ type: 'finished', id, error: "Couldn't save" })
+        return false
+      }
 
-    const { error: insertError } = await supabase
-      .from('workspace_resources')
-      .insert({
-        workspace_id: workspaceId,
-        goal_id: goalId,
-        uploaded_by: userId,
-        file_name: file.name,
-        file_type: file.type || 'application/octet-stream',
-        file_size: file.size,
-        storage_path: storagePath,
-      })
-    setUploading(false)
-    if (insertError) {
-      setError("Couldn't save the resource.")
+      // Show it right away rather than waiting for the realtime event;
+      // upsertResource makes that event (which still arrives) a no-op.
+      setResources(current =>
+        upsertResource(current, rowToResource(data as WorkspaceResourceRow)),
+      )
+      dispatchUploads({ type: 'finished', id })
+      return true
+    } catch {
       void supabase.storage.from(BUCKET).remove([storagePath])
+      dispatchUploads({ type: 'finished', id, error: 'Upload failed' })
       return false
     }
-    return true
   }
 
-  const remove = (id: string) => {
+  const uploadMany = async (files: File[], goalId: string | null = null) => {
+    if (!userId || files.length === 0) return { succeeded: 0, failed: 0 }
+    const jobs = files.map(file => ({ id: crypto.randomUUID(), file }))
+    dispatchUploads({
+      type: 'queued',
+      items: jobs.map(({ id, file }) => ({
+        id,
+        fileName: file.name,
+        fileSize: file.size,
+        status: 'uploading' as const,
+      })),
+    })
+    let succeeded = 0
+    await runWithConcurrency(jobs, UPLOAD_CONCURRENCY, async ({ id, file }) => {
+      if (await uploadOne(id, file, goalId)) succeeded++
+    })
+    return { succeeded, failed: jobs.length - succeeded }
+  }
+
+  const dismissUploads = useCallback(
+    () => dispatchUploads({ type: 'dismissed' }),
+    [],
+  )
+
+  // A batch with nothing to report clears itself; one with a failure stays
+  // until dismissed.
+  useEffect(() => {
+    if (!isCleanFinish(uploads)) return
+    const timer = window.setTimeout(dismissUploads, UPLOAD_CLEAR_DELAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [uploads, dismissUploads])
+
+  // Removes the card at once (optimistic) and puts it back if the server
+  // refuses. Two server steps, in this order: the RPC authorises the caller
+  // and deletes the metadata row; then the file itself is removed through the
+  // Storage API (SQL deletes from storage.objects are blocked by Supabase and
+  // would leave the bytes behind anyway -- see migration 0038). The outcome is
+  // returned rather than parked in `error`, so the caller reports exactly this
+  // delete: a shared error string would never re-toast a repeated failure.
+  const remove = async (
+    id: string,
+  ): Promise<{ ok: true } | { ok: false; message: string }> => {
     const removed = resources.find(r => r.id === id)
     setResources(current => current.filter(r => r.id !== id))
     const supabase = createClient()
-    void supabase
-      .rpc('delete_workspace_resource', { p_resource_id: id })
-      .then(({ error: rpcError }) => {
-        if (rpcError) {
-          setError("Couldn't delete the resource.")
-          if (removed) setResources(current => [...current, removed])
-        }
-      })
+
+    const { error: rpcError } = await supabase.rpc(
+      'delete_workspace_resource',
+      { p_resource_id: id },
+    )
+    if (rpcError) {
+      console.error('delete_workspace_resource failed:', rpcError)
+      const failure = classifyDeleteError(rpcError)
+      if (failure.alreadyGone) return { ok: true }
+      if (removed) setResources(current => upsertResource(current, removed))
+      return { ok: false, message: failure.message }
+    }
+
+    if (removed) {
+      signedUrls.current.delete(removed.storagePath)
+      // The resource is already gone from the user's point of view, so a
+      // storage hiccup is logged rather than reported: at worst an
+      // unreachable file is left behind.
+      const { data, error: storageError } = await supabase.storage
+        .from(BUCKET)
+        .remove([removed.storagePath])
+      if (storageError || !data || data.length === 0) {
+        console.warn(
+          'Resource deleted, but its file was not removed from storage:',
+          storageError ?? 'no matching object (missing storage delete policy?)',
+        )
+      }
+    }
+    return { ok: true }
   }
 
-  const getSignedUrl = async (storagePath: string) => {
-    const supabase = createClient()
-    const { data, error: signError } = await supabase.storage
-      .from(BUCKET)
-      .createSignedUrl(storagePath, 60 * 5)
-    if (signError || !data) return null
-    return data.signedUrl
-  }
+  const getSignedUrl: SignedUrlGetter = useCallback(
+    async (storagePath, options) => {
+      // Download URLs carry a filename, so they aren't shared with previews.
+      const reusable = !options?.download
+      const cached = signedUrls.current.get(storagePath)
+      if (reusable && cached && cached.reuseUntil > Date.now())
+        return cached.url
 
-  return { resources, ready, error, uploading, upload, remove, getSignedUrl }
+      const supabase = createClient()
+      const { data, error: signError } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrl(
+          storagePath,
+          SIGNED_URL_TTL_SECONDS,
+          options?.download ? { download: options.download } : undefined,
+        )
+      if (signError || !data) return null
+      if (reusable) {
+        signedUrls.current.set(storagePath, {
+          url: data.signedUrl,
+          reuseUntil: Date.now() + SIGNED_URL_REUSE_MS,
+        })
+      }
+      return data.signedUrl
+    },
+    [],
+  )
+
+  return {
+    resources,
+    ready,
+    error,
+    uploads,
+    uploadMany,
+    dismissUploads,
+    remove,
+    getSignedUrl,
+  }
 }
