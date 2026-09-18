@@ -13,6 +13,7 @@ type WorkspaceRow = {
   description: string | null
   owner_id: string
   timezone: string
+  report_time: string
   accent: string
   created_at: string
   updated_at: string
@@ -38,6 +39,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
     description: row.description,
     ownerId: row.owner_id,
     timezone: row.timezone,
+    reportTime: row.report_time,
     accent: row.accent,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -152,7 +154,10 @@ export function useWorkspace(workspaceId: string, user: AuthUser | null) {
 
   const updateWorkspace = async (
     patch: Partial<
-      Pick<Workspace, 'name' | 'description' | 'timezone' | 'accent'>
+      Pick<
+        Workspace,
+        'name' | 'description' | 'timezone' | 'reportTime' | 'accent'
+      >
     >,
   ) => {
     if (!workspace) return { success: false as const, error: 'Not loaded.' }
@@ -161,6 +166,7 @@ export function useWorkspace(workspaceId: string, user: AuthUser | null) {
     if (patch.name !== undefined) row.name = patch.name
     if (patch.description !== undefined) row.description = patch.description
     if (patch.timezone !== undefined) row.timezone = patch.timezone
+    if (patch.reportTime !== undefined) row.report_time = patch.reportTime
     if (patch.accent !== undefined) row.accent = patch.accent
     const { error: updateError } = await supabase
       .from('workspaces')

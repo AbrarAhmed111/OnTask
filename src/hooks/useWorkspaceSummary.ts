@@ -2,19 +2,31 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import {
+  formatTimeOfDay,
+  isLocalToday,
+  nextReportTime,
+  parseTimeOfDay,
+} from '@/lib/dailyReportWindow'
 import type { AuthUser } from '@/hooks/useAuth'
 import { WorkspaceDailySummary } from '@/types/workspace'
 
 type SummaryRow = {
   id: string
   workspace_id: string
-  summary_date: string
+  report_start: string
+  report_end: string
+  report_timezone: string
   version: number
   structured_snapshot: WorkspaceDailySummary['structuredSnapshot']
   narrative: WorkspaceDailySummary['narrative']
   meta: WorkspaceDailySummary['meta']
-  generated_by: string
+  generation_type: WorkspaceDailySummary['generationType']
+  generation_status: WorkspaceDailySummary['generationStatus']
+  generated_by: string | null
   generated_at: string
+  regenerated_by: string | null
+  regenerated_at: string | null
   created_at: string
 }
 
@@ -22,53 +34,42 @@ function rowToSummary(row: SummaryRow): WorkspaceDailySummary {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
-    summaryDate: row.summary_date,
+    reportStart: row.report_start,
+    reportEnd: row.report_end,
+    reportTimezone: row.report_timezone,
     version: row.version,
     structuredSnapshot: row.structured_snapshot,
     narrative: row.narrative,
     meta: row.meta,
+    generationType: row.generation_type,
+    generationStatus: row.generation_status,
     generatedBy: row.generated_by,
     generatedAt: row.generated_at,
+    regeneratedBy: row.regenerated_by,
+    regeneratedAt: row.regenerated_at,
     createdAt: row.created_at,
   }
 }
 
 const HISTORY_LIMIT = 14
 
-// "Yesterday" computed in the WORKSPACE's timezone, not the browser's — two
-// members in different timezones must generate/see the same summary_date.
-function yesterdayInTimezone(timezone: string): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date())
-  const year = Number(parts.find(p => p.type === 'year')?.value)
-  const month = Number(parts.find(p => p.type === 'month')?.value)
-  const day = Number(parts.find(p => p.type === 'day')?.value)
-  const todayUtc = new Date(Date.UTC(year, month - 1, day))
-  todayUtc.setUTCDate(todayUtc.getUTCDate() - 1)
-  return todayUtc.toISOString().slice(0, 10)
-}
-
-// Fetches the workspace's daily AI summaries (most recent first), live-synced
-// via postgres_changes, and exposes generate/regenerate which POST to the API
-// route that talks to the ontask-llm service — a direct Supabase call can't
-// reach that external service, so this is the one mutation here that isn't a
-// plain `.from(...).insert/update` like the rest of this app's hooks.
+// Fetches the workspace's Daily Reports (most recent first), live-synced via
+// postgres_changes. Reports are created server-side by the automatic
+// scheduler (supabase/migrations/0018_automatic_daily_reports.sql's
+// daily-reports-tick cron job, via src/app/api/cron/daily-reports) -- this
+// hook never creates one, it only displays what already exists and exposes
+// `regenerate` as a secondary action on the current report.
 export function useWorkspaceSummary(
   workspaceId: string,
   user: AuthUser | null,
   timezone: string,
+  reportTime: string,
 ) {
   const userId = user?.id
   const [history, setHistory] = useState<WorkspaceDailySummary[]>([])
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
-
-  const summaryDate = timezone ? yesterdayInTimezone(timezone) : null
 
   useEffect(() => {
     if (!userId || !workspaceId) {
@@ -83,7 +84,7 @@ export function useWorkspaceSummary(
       .from('workspace_daily_summaries')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .order('summary_date', { ascending: false })
+      .order('report_end', { ascending: false })
       .limit(HISTORY_LIMIT)
       .then(({ data }) => {
         if (cancelled) return
@@ -109,7 +110,7 @@ export function useWorkspaceSummary(
               incoming,
               ...current.filter(s => s.id !== incoming.id),
             ]
-            next.sort((a, b) => (a.summaryDate < b.summaryDate ? 1 : -1))
+            next.sort((a, b) => (a.reportEnd < b.reportEnd ? 1 : -1))
             return next.slice(0, HISTORY_LIMIT)
           })
         },
@@ -122,45 +123,63 @@ export function useWorkspaceSummary(
     }
   }, [userId, workspaceId])
 
-  const generate = useCallback(
-    async (mode: 'generate' | 'regenerate' = 'generate') => {
-      if (!workspaceId || !summaryDate) {
-        return { success: false as const, error: 'Workspace not ready yet.' }
-      }
-      setGenerating(true)
-      setError(null)
-      try {
-        const response = await fetch('/api/workspace-summaries/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ workspaceId, summaryDate, mode }),
-        })
-        const data = await response.json().catch(() => null)
-        if (!response.ok) {
-          const message = data?.error || 'Failed to generate the summary.'
-          setError(message)
-          return { success: false as const, error: message }
-        }
-        const summary = rowToSummary(data.summary as SummaryRow)
-        setHistory(current => [
-          summary,
-          ...current.filter(s => s.id !== summary.id),
-        ])
-        return { success: true as const }
-      } catch {
-        const message = 'Could not reach the AI summary service.'
+  // The most recently due/created report -- automatic generation always
+  // produces (at most) one row per rolling window, ordered newest-first.
+  const summary = history[0] ?? null
+
+  const regenerate = useCallback(async () => {
+    if (!workspaceId || !summary) {
+      return { success: false as const, error: 'No report to regenerate yet.' }
+    }
+    setGenerating(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/workspace-summaries/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, reportEnd: summary.reportEnd }),
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        const message = data?.error || 'Failed to regenerate the report.'
         setError(message)
         return { success: false as const, error: message }
-      } finally {
-        setGenerating(false)
       }
-    },
-    [workspaceId, summaryDate],
-  )
+      const updated = rowToSummary(data.summary as SummaryRow)
+      setHistory(current => [
+        updated,
+        ...current.filter(s => s.id !== updated.id),
+      ])
+      return { success: true as const }
+    } catch {
+      const message = 'Could not reach the AI summary service.'
+      setError(message)
+      return { success: false as const, error: message }
+    } finally {
+      setGenerating(false)
+    }
+  }, [workspaceId, summary])
 
-  const summary = summaryDate
-    ? (history.find(s => s.summaryDate === summaryDate) ?? null)
+  // Purely a display aid ("Next report: Today/Tomorrow at 12:00 PM") -- the
+  // actual window is always computed server-side by the scheduler, never
+  // here. Uses the workspace's own configured report_time, not a hardcoded
+  // noon.
+  const nextReportLabel = timezone
+    ? (() => {
+        const target = parseTimeOfDay(reportTime)
+        const next = nextReportTime(timezone, target)
+        const day = isLocalToday(next, timezone) ? 'Today' : 'Tomorrow'
+        return `${day} at ${formatTimeOfDay(reportTime)}`
+      })()
     : null
 
-  return { summary, history, ready, error, generating, generate, summaryDate }
+  return {
+    summary,
+    history,
+    ready,
+    error,
+    generating,
+    regenerate,
+    nextReportLabel,
+  }
 }

@@ -6,6 +6,9 @@ export type Workspace = {
   description: string | null
   ownerId: string
   timezone: string
+  // The workspace-local time of day (e.g. "12:00:00") the automatic Daily
+  // Report is generated at -- owner-configurable, defaults to noon.
+  reportTime: string
   accent: string
   createdAt: string
   updatedAt: string
@@ -59,13 +62,13 @@ export type WorkspaceTask = {
   completedAt: number | null
 }
 
-// ── Phase 10: Shared AI "Yesterday's Work" Summary ──────────────────────────
+// ── Phase 11: Automatic Daily Report (rolling 24h, workspace-timezone noon) ─
 // structured_snapshot/narrative/meta are stored (and returned by ontask-llm)
 // as-is, snake_case, matching that service's Pydantic schema field names
 // exactly — only the outer row columns get the usual camelCase treatment.
 // See ontask-llm/src/app/schemas/summary.py for the authoritative shape, and
-// supabase/migrations/0016_phase10_richer_ai_activity_snapshot.sql for how
-// it's actually assembled.
+// supabase/migrations/0018_automatic_daily_reports.sql for how it's actually
+// assembled and scheduled.
 
 export type SummaryTaskStatus = 'completed' | 'in_progress' | 'skipped'
 
@@ -130,7 +133,8 @@ export type StructuredSnapshotWorkspaceChanges = {
 export type WorkspaceStructuredSnapshot = {
   workspace_id: string
   workspace_name: string
-  summary_date: string
+  report_start: string
+  report_end: string
   timezone: string
   total_focused_seconds: number
   members: StructuredSnapshotMember[]
@@ -170,15 +174,24 @@ export type SummaryGenerationMeta = {
   validation_warnings: string[]
 }
 
+export type DailyReportGenerationType = 'automatic' | 'manual'
+export type DailyReportGenerationStatus = 'pending' | 'completed' | 'failed'
+
 export type WorkspaceDailySummary = {
   id: string
   workspaceId: string
-  summaryDate: string
+  reportStart: string
+  reportEnd: string
+  reportTimezone: string
   version: number
   structuredSnapshot: WorkspaceStructuredSnapshot
   narrative: SummaryNarrative
   meta: SummaryGenerationMeta
-  generatedBy: string
+  generationType: DailyReportGenerationType
+  generationStatus: DailyReportGenerationStatus
+  generatedBy: string | null
   generatedAt: string
+  regeneratedBy: string | null
+  regeneratedAt: string | null
   createdAt: string
 }

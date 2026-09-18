@@ -11,6 +11,7 @@ type WorkspaceRow = {
   description: string | null
   owner_id: string
   timezone: string
+  report_time: string
   accent: string
   created_at: string
   updated_at: string
@@ -23,6 +24,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
     description: row.description,
     ownerId: row.owner_id,
     timezone: row.timezone,
+    reportTime: row.report_time,
     accent: row.accent,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -88,6 +90,7 @@ export function useWorkspaces(user: AuthUser | null) {
     name: string,
     description: string,
     timezone: string,
+    reportTime: string = '12:00:00',
   ) => {
     if (!userId) return { success: false as const, error: 'Not signed in.' }
     const supabase = createClient()
@@ -95,6 +98,7 @@ export function useWorkspaces(user: AuthUser | null) {
       p_name: name,
       p_description: description.trim() || null,
       p_timezone: timezone,
+      p_report_time: reportTime,
     })
     if (rpcError || !data) {
       return {
