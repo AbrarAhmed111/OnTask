@@ -165,8 +165,10 @@ export function useCloudTasks(
 
     const id = crypto.randomUUID()
     const name = form.name.trim()
-    const goalName = form.trackGoal ? form.goal.trim() || undefined : undefined
-    const goalProgress = form.trackGoal
+    const progressLabel = form.trackGoal
+      ? form.goal.trim() || undefined
+      : undefined
+    const progressPercentage = form.trackGoal
       ? Math.min(100, Math.max(0, Number(form.progress) || 0))
       : undefined
 
@@ -180,8 +182,8 @@ export function useCloudTasks(
         status: 'pending',
         startedAt: null,
         parentTaskId,
-        goalName,
-        goalProgress,
+        progressLabel,
+        progressPercentage,
       },
     ])
 
@@ -194,8 +196,8 @@ export function useCloudTasks(
         parent_task_id: parentTaskId,
         title: name,
         planned_seconds: plannedMinutes * 60,
-        goal_name: goalName ?? null,
-        goal_percentage: goalProgress ?? null,
+        progress_label: progressLabel ?? null,
+        progress_percentage: progressPercentage ?? null,
       })
       .select('position')
       .single()
@@ -245,8 +247,8 @@ export function useCloudTasks(
         parent_task_id: task.parentTaskId,
         title: task.name,
         planned_seconds: task.plannedMinutes * 60,
-        goal_name: task.goalName ?? null,
-        goal_percentage: task.goalProgress ?? null,
+        progress_label: task.progressLabel ?? null,
+        progress_percentage: task.progressPercentage ?? null,
       })
       .select('position')
       .single()

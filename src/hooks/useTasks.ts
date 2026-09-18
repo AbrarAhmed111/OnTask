@@ -127,8 +127,10 @@ export function useTasks(
         status: 'pending',
         startedAt: null,
         parentTaskId,
-        goalName: form.trackGoal ? form.goal.trim() || undefined : undefined,
-        goalProgress: form.trackGoal
+        progressLabel: form.trackGoal
+          ? form.goal.trim() || undefined
+          : undefined,
+        progressPercentage: form.trackGoal
           ? Math.min(100, Math.max(0, Number(form.progress) || 0))
           : undefined,
       },
