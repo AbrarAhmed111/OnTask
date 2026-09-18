@@ -14,12 +14,14 @@ export function makeStore() {
     },
     // Default each field independently rather than trusting the persisted
     // shape outright -- a cache written by an older build (e.g. before
-    // `bySlug` existed) would otherwise leave that key undefined.
+    // `bySlug` or `personalByOwner` existed) would otherwise leave that key
+    // undefined.
     preloadedState: persistedWorkspaceCache
       ? {
           workspaceCache: {
             byId: persistedWorkspaceCache.byId ?? {},
             bySlug: persistedWorkspaceCache.bySlug ?? {},
+            personalByOwner: persistedWorkspaceCache.personalByOwner ?? {},
           },
         }
       : undefined,
