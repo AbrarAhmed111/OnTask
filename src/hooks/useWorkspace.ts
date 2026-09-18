@@ -1,11 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { AuthUser } from '@/hooks/useAuth'
 import { Workspace, WorkspaceMember, WorkspaceRole } from '@/types/workspace'
 import { useAppDispatch } from '@/lib/redux/hooks'
-import { upsertWorkspaceIdentity } from '@/lib/redux/workspaceCacheSlice'
+import {
+  upsertPersonalWorkspaceIdentity,
+  upsertWorkspaceIdentity,
+} from '@/lib/redux/workspaceCacheSlice'
 import {
   PERSONAL_WORKSPACE_SLUG,
   WorkspaceRow,
@@ -59,6 +62,28 @@ export function useWorkspace(workspaceSlug: string, user: AuthUser | null) {
   const [members, setMembers] = useState<WorkspaceMember[]>([])
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Remember the workspace's near-static identity (name, accent, timezone) so
+  // the next visit — a refresh, or coming back to it — paints its real
+  // accent immediately instead of flashing the default until the network
+  // answers. A personal workspace is cached under its owner, not its slug: its
+  // URL alias is identical for every user, so a slug key would let one
+  // account's accent paint for the next account on this browser.
+  const cacheIdentity = useCallback(
+    (ws: Workspace) => {
+      const identity = {
+        id: ws.id,
+        slug: ws.slug,
+        name: ws.name,
+        accent: ws.accent,
+        timezone: ws.timezone,
+      }
+      if (ws.type !== 'personal') dispatch(upsertWorkspaceIdentity(identity))
+      else if (userId)
+        dispatch(upsertPersonalWorkspaceIdentity({ ownerId: userId, identity }))
+    },
+    [dispatch, userId],
+  )
 
   useEffect(() => {
     if (!userId || !workspaceSlug) {
@@ -116,22 +141,7 @@ export function useWorkspace(workspaceSlug: string, user: AuthUser | null) {
       }
       const loaded = rowToWorkspace(workspaceResult.data as WorkspaceRow)
       setWorkspace(loaded)
-      // The identity cache is keyed by slug, and a personal workspace's
-      // slug is the SAME string for every user -- caching it would let one
-      // account's name/theme/timezone paint for the next account that
-      // signs in on this browser. Personal workspaces don't need it (their
-      // header is static), so they're simply never cached.
-      if (loaded.type !== 'personal') {
-        dispatch(
-          upsertWorkspaceIdentity({
-            id: loaded.id,
-            slug: loaded.slug,
-            name: loaded.name,
-            accent: loaded.accent,
-            timezone: loaded.timezone,
-          }),
-        )
-      }
+      cacheIdentity(loaded)
 
       await fetchMembers(loaded.id)
       if (cancelled) return
@@ -172,7 +182,7 @@ export function useWorkspace(workspaceSlug: string, user: AuthUser | null) {
         document.removeEventListener('visibilitychange', handleVisibility)
       if (channel) supabase.removeChannel(channel)
     }
-  }, [userId, workspaceSlug, dispatch])
+  }, [userId, workspaceSlug, cacheIdentity])
 
   const role = members.find(member => member.userId === userId)?.role ?? null
 
@@ -201,15 +211,7 @@ export function useWorkspace(workspaceSlug: string, user: AuthUser | null) {
     }
     const updated = { ...workspace, ...patch }
     setWorkspace(updated)
-    dispatch(
-      upsertWorkspaceIdentity({
-        id: updated.id,
-        slug: updated.slug,
-        name: updated.name,
-        accent: updated.accent,
-        timezone: updated.timezone,
-      }),
-    )
+    cacheIdentity(updated)
     return { success: true as const }
   }
 

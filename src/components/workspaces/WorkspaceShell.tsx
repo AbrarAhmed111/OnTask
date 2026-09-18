@@ -9,17 +9,19 @@ import {
   LayoutDashboard,
   LayoutGrid,
   Lock,
-  LogOut,
   Settings2,
   UserPlus,
   Users,
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { Avatar } from '@/components/ui/Avatar'
+import { AccountMenu } from '@/components/layout/AccountMenu'
 import { PresenceDot } from '@/components/workspaces/PresenceDot'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { getWorkspaceTheme } from '@/lib/workspaceThemes'
-import { PERSONAL_WORKSPACE_SLUG } from '@/lib/workspaces'
+import { TourAnchor, tourAnchor } from '@/lib/tourAnchors'
 import { useAppSelector } from '@/lib/redux/hooks'
+import { selectCachedWorkspaceIdentity } from '@/lib/redux/workspaceCacheSlice'
 import type { AuthUser } from '@/hooks/useAuth'
 import { Workspace, WorkspaceMember, WorkspaceRole } from '@/types/workspace'
 
@@ -29,13 +31,25 @@ const NAV_ITEMS: {
   id: WorkspaceSection
   label: string
   icon: typeof LayoutDashboard
-  ownerOnly?: boolean
   // A personal workspace has no members to list, so it has no Members page.
   sharedOnly?: boolean
+  // What an onboarding tour points at for this entry. It is rendered twice —
+  // a sidebar icon from `sm:` up and a tab below it — and only one is ever
+  // displayed (see lib/tourAnchors).
+  tour?: TourAnchor
 }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'members', label: 'Members', icon: Users, sharedOnly: true },
-  { id: 'settings', label: 'Settings', icon: Settings2, ownerOnly: true },
+  {
+    id: 'members',
+    label: 'Members',
+    icon: Users,
+    sharedOnly: true,
+    tour: 'workspace-members',
+  },
+  // Every member gets Settings: their own preferences are always there, and
+  // the workspace's details are editable only by its owner (the page itself
+  // gates that).
+  { id: 'settings', label: 'Settings', icon: Settings2, tour: 'settings' },
 ]
 
 const HEADER_PREVIEW_COUNT = 5
@@ -64,19 +78,7 @@ function MemberAvatar({
       title={member.fullName || member.email || 'Member'}
       className={`relative shrink-0 ${className}`}
     >
-      <div className="grid h-full w-full place-items-center overflow-hidden rounded-full border-2 border-paper bg-[var(--ws-accent,#375b4b)] font-bold text-white">
-        {member.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={member.avatarUrl}
-            alt=""
-            referrerPolicy="no-referrer"
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          (member.fullName || member.email || '?').charAt(0).toUpperCase()
-        )}
-      </div>
+      <Avatar person={member} className="h-full w-full border-2 border-paper" />
       <PresenceDot online={online} />
     </div>
   )
@@ -150,21 +152,21 @@ export function WorkspaceShell({
   onLogout: () => void
   children: ReactNode
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
   const [now, setNow] = useState<Date | null>(null)
   // Cached identity from a previous visit — lets the header paint the real
   // name/color/timezone immediately on refresh instead of a skeleton and a
   // green-then-real-color flash, while `ready` (and everything gated on it,
   // like members) still waits for the actual network fetch.
-  const cached = useAppSelector(state => {
-    const cache = state.workspaceCache
-    // The personal alias is the same string for every user, so it's never a
-    // valid cache key (see useWorkspace) — a personal header doesn't need
-    // the cache anyway.
-    if (workspaceSlug === PERSONAL_WORKSPACE_SLUG) return undefined
-    const cachedId = workspaceId || cache.bySlug[workspaceSlug]
-    return cachedId ? cache.byId[cachedId] : undefined
-  })
+  // A personal workspace is found by who is signed in rather than by its URL
+  // alias (see selectCachedWorkspaceIdentity), so its accent survives a
+  // refresh without ever painting another account's.
+  const cached = useAppSelector(state =>
+    selectCachedWorkspaceIdentity(state.workspaceCache, {
+      workspaceId,
+      workspaceSlug,
+      userId: user.id,
+    }),
+  )
 
   useEffect(() => {
     setNow(new Date())
@@ -177,9 +179,7 @@ export function WorkspaceShell({
   const displayTimezone = workspace?.timezone ?? cached?.timezone
   const theme = getWorkspaceTheme(workspace?.accent ?? cached?.accent)
   const showHeaderSkeleton = !isPersonal && !ready && !cached
-  const items = NAV_ITEMS.filter(
-    item => (!item.ownerOnly || isOwner) && (!item.sharedOnly || !isPersonal),
-  )
+  const items = NAV_ITEMS.filter(item => !item.sharedOnly || !isPersonal)
   const showMembers = !isPersonal && ready && members.length > 0
   const headerPreview = members.slice(0, HEADER_PREVIEW_COUNT)
   const headerOverflow = members.length - headerPreview.length
@@ -249,6 +249,7 @@ export function WorkspaceShell({
 
             {showMembers && (
               <button
+                {...tourAnchor('workspace-members')}
                 onClick={() => onSectionChange('members')}
                 aria-label="View all members"
                 className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-1 rounded-full border border-line bg-white/60 px-2 py-1.5 shadow-sm transition hover:border-[var(--ws-accent,#375b4b)] hover:bg-white/90 lg:flex"
@@ -271,6 +272,7 @@ export function WorkspaceShell({
             <div className="ml-auto flex shrink-0 items-center gap-2.5">
               {showMembers && (
                 <button
+                  {...tourAnchor('workspace-members')}
                   onClick={() => onSectionChange('members')}
                   aria-label="View all members"
                   className="hidden items-center rounded-full transition hover:opacity-80 sm:flex lg:hidden"
@@ -320,74 +322,35 @@ export function WorkspaceShell({
                 isPersonal={isPersonal}
                 className="border-line bg-white/60 text-[var(--ws-accent,#375b4b)] hover:border-[var(--ws-accent,#375b4b)]"
               />
-              <div className="relative">
-                <button
-                  aria-label="Account menu"
-                  onClick={() => setMenuOpen(open => !open)}
-                  className="flex items-center gap-1.5 rounded-full border border-line bg-white/70 py-1 pl-1 pr-2 transition hover:border-[var(--ws-accent,#375b4b)]"
-                >
-                  <span className="grid h-7 w-7 place-items-center overflow-hidden rounded-full bg-[var(--ws-accent,#375b4b)] text-[10px] font-bold text-white">
-                    {user.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={user.avatarUrl}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      (user.fullName || user.email || '?')
-                        .charAt(0)
-                        .toUpperCase()
-                    )}
-                  </span>
-                  <span className="hidden max-w-[100px] truncate text-xs font-semibold text-ink md:inline">
-                    {(user.fullName || user.email || 'Account').split(' ')[0]}
-                  </span>
-                  <ChevronDown
-                    size={14}
-                    className={`text-muted transition-transform ${menuOpen ? 'rotate-180' : ''}`}
-                  />
-                </button>
-                {menuOpen && (
-                  <>
-                    <button
-                      aria-hidden
-                      tabIndex={-1}
-                      className="fixed inset-0 z-40 cursor-default"
-                      onClick={() => setMenuOpen(false)}
+              <AccountMenu
+                user={user}
+                onLogout={onLogout}
+                renderTrigger={({ open, toggle }) => (
+                  <button
+                    aria-label="Account menu"
+                    onClick={toggle}
+                    className="flex items-center gap-1.5 rounded-full border border-line bg-white/70 py-1 pl-1 pr-2 transition hover:border-[var(--ws-accent,#375b4b)]"
+                  >
+                    <Avatar person={user} className="h-7 w-7 text-[10px]" />
+                    <span className="hidden max-w-[100px] truncate text-xs font-semibold text-ink md:inline">
+                      {(user.fullName || user.email || 'Account').split(' ')[0]}
+                    </span>
+                    <ChevronDown
+                      size={14}
+                      className={`text-muted transition-transform ${open ? 'rotate-180' : ''}`}
                     />
-                    <div className="absolute right-0 z-50 mt-2 w-52 rounded-xl border border-line bg-panel p-2 shadow-xl animate-[fadeIn_150ms_ease-out]">
-                      <div className="border-b border-line/70 px-2.5 py-2">
-                        <p className="truncate text-xs font-bold text-ink">
-                          {user.fullName || 'Your account'}
-                        </p>
-                        {user.email && (
-                          <p className="truncate text-[10px] text-muted">
-                            {user.email}
-                          </p>
-                        )}
-                      </div>
-                      <Link
-                        href="/workspaces"
-                        onClick={() => setMenuOpen(false)}
-                        className="mt-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-ink transition hover:bg-slate-100"
-                      >
-                        <LayoutGrid size={14} /> All workspaces
-                      </Link>
-                      <button
-                        onClick={() => {
-                          setMenuOpen(false)
-                          onLogout()
-                        }}
-                        className="mt-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-coral transition hover:bg-coral/10"
-                      >
-                        <LogOut size={14} /> Log out
-                      </button>
-                    </div>
-                  </>
+                  </button>
                 )}
-              </div>
+                extraItems={close => (
+                  <Link
+                    href="/workspaces"
+                    onClick={close}
+                    className="mt-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-ink transition hover:bg-slate-100"
+                  >
+                    <LayoutGrid size={14} /> All workspaces
+                  </Link>
+                )}
+              />
             </div>
           </div>
         </div>
@@ -399,6 +362,7 @@ export function WorkspaceShell({
               return (
                 <button
                   key={item.id}
+                  {...(item.tour && tourAnchor(item.tour))}
                   onClick={() => onSectionChange(item.id)}
                   className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
                     active
@@ -425,6 +389,7 @@ export function WorkspaceShell({
               return (
                 <button
                   key={item.id}
+                  {...(item.tour && tourAnchor(item.tour))}
                   onClick={() => onSectionChange(item.id)}
                   title={item.label}
                   className={`flex items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition ${
