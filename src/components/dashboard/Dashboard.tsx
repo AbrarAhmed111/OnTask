@@ -1,14 +1,22 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, CirclePlus, Pause, Play, Plus, Target } from 'lucide-react'
+import {
+  Check,
+  CirclePlus,
+  LogIn,
+  Pause,
+  Play,
+  Plus,
+  Target,
+} from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { DailyProgress } from '@/components/dashboard/DailyProgress'
 import { EmptyState } from '@/components/dashboard/EmptyState'
 import { TaskList } from '@/components/dashboard/TaskList'
-import { usePersonalTasks } from '@/hooks/usePersonalTasks'
+import { useTasks } from '@/hooks/useTasks'
 import { Task, TaskFormValues } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -20,20 +28,15 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { DeleteParentModal } from '@/components/tasks/DeleteParentModal'
 import { AuthModal, AuthStep } from '@/components/auth/AuthModal'
 import { GoogleOneTap } from '@/components/auth/GoogleOneTap'
-import { MigrationModal } from '@/components/auth/MigrationModal'
 import { useSettings } from '@/hooks/useSettings'
 import { useAuth } from '@/hooks/useAuth'
-import { useMyInvitations } from '@/hooks/useMyInvitations'
-import {
-  clearStoredData,
-  isMigrationResolved,
-  loadTasks,
-  markMigrationResolved,
-  saveTasks,
-} from '@/lib/storage'
+import { clearStoredData } from '@/lib/storage'
 import { requestNotificationPermission } from '@/lib/notifications'
 import { clientSignout } from '@/lib/auth/signout'
-import { migrateGuestTasks } from '@/lib/tasks/migration'
+import { resolvePostLoginDestination } from '@/lib/auth/postLogin'
+
+const WORKSPACES_LOGIN_PROMPT =
+  'Log in to open your Personal Workspace and your shared workspaces.'
 
 const emptyForm: TaskFormValues = {
   name: '',
@@ -49,6 +52,10 @@ type Confirmation =
   | { type: 'reset' }
   | { type: 'delete-parent'; task: Task; childCount: number }
 
+// The guest experience at `/`. Signed-in users never stay here: the
+// middleware sends them straight to their Personal Workspace, and anyone who
+// signs in while on this page is redirected (see the effect below) — so this
+// component only ever renders the local-first, no-account dashboard.
 export function Dashboard() {
   const router = useRouter()
   const { settings, ready: settingsReady, updateSettings } = useSettings()
@@ -58,7 +65,6 @@ export function Dashboard() {
     passwordRecovery,
     clearPasswordRecovery,
   } = useAuth()
-  const { invitations: myInvitations } = useMyInvitations(user)
   const [completionTask, setCompletionTask] = useState<Task | null>(null)
   const {
     tasks,
@@ -75,17 +81,14 @@ export function Dashboard() {
     moveTask,
     reorderTasks,
     getLiveSeconds: liveSeconds,
-    error: dataError,
-  } = usePersonalTasks(
-    user,
+  } = useTasks(
     settings,
     task => settings.soundEnabled && setCompletionTask(task),
   )
-  const [modal, setModal] = useState<
-    'add' | 'edit' | 'goal' | 'auth' | 'migration' | null
-  >(null)
+  const [modal, setModal] = useState<'add' | 'edit' | 'goal' | 'auth' | null>(
+    null,
+  )
   const [authStep, setAuthStep] = useState<AuthStep>('login')
-  const [migrationTaskCount, setMigrationTaskCount] = useState(0)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [pendingParentId, setPendingParentId] = useState<string | null>(null)
   const [form, setForm] = useState<TaskFormValues>(emptyForm)
@@ -99,6 +102,18 @@ export function Dashboard() {
     invitedEmail: string | null
   } | null>(null)
   const [authSubtitle, setAuthSubtitle] = useState<string | undefined>()
+  // The invitation the visitor arrived through, kept in a ref as well as
+  // state: the sign-in redirect below runs when `user` changes, which can be
+  // a render before or after closeModal() clears the state copy.
+  const inviteRef = useRef<typeof inviteContext>(null)
+  const redirectingRef = useRef(false)
+  // True from the moment Supabase reports a password-recovery link until its
+  // "choose a new password" dialog is closed. A ref (not just the state
+  // below) because the recovery event can land AFTER the session itself has
+  // already triggered the redirect lookup — the lookup checks this again
+  // when it finishes.
+  const resetActiveRef = useRef(false)
+  const resetFlowActive = modal === 'auth' && authStep === 'reset'
 
   useEffect(() => {
     if (!notice) return
@@ -107,100 +122,99 @@ export function Dashboard() {
     return () => window.clearTimeout(timeout)
   }, [notice])
 
-  useEffect(() => {
-    if (dataError) setNotice(dataError)
-  }, [dataError])
-
   const openAuth = (step: AuthStep = 'login', subtitle?: string) => {
     setAuthStep(step)
     setAuthSubtitle(subtitle)
     setModal('auth')
   }
 
-  // A workspace invitation email link lands here as /?invite=&workspace=
-  // (guests bounced off /workspaces by useAuthGuard keep these params too —
-  // see useAuthGuard.ts). Already-signed-in visitors skip the modal
-  // entirely and go straight to the invitation; guests get a contextual
-  // login/signup prompt instead of the generic one.
+  // A workspace invitation link lands here as /?invite=&workspace=&email=
+  // (guests bounced off /workspaces by the middleware keep these params too).
+  // A guest gets a contextual login/signup prompt instead of the generic one;
+  // a signed-in visitor never reaches this branch — see the redirect below.
   useEffect(() => {
-    if (!authReady) return
+    if (!authReady || user) return
     const params = new URLSearchParams(window.location.search)
     const invite = params.get('invite')
     if (!invite) return
     window.history.replaceState(null, '', window.location.pathname)
-    if (user) {
-      router.push(`/workspaces?invite=${encodeURIComponent(invite)}`)
-      return
-    }
-    setInviteContext({
+    const context = {
       id: invite,
       workspaceName: params.get('workspace') || 'the workspace',
       invitedEmail: params.get('email'),
-    })
+    }
+    inviteRef.current = context
+    setInviteContext(context)
     openAuth('login')
-  }, [authReady, user, router])
+  }, [authReady, user])
 
-  // A guest bounced off /workspaces (or a specific workspace) by
-  // useAuthGuard lands here as /?authIntent=workspaces — show a contextual
-  // sign-in prompt instead of the bare landing page. Skipped when an
-  // invitation link is also present, since that flow's own copy (above)
-  // already covers it.
+  // A guest bounced off /workspaces by the middleware lands here as
+  // /?authIntent=workspaces — show a contextual sign-in prompt instead of the
+  // bare landing page. Skipped when an invitation link is also present, since
+  // that flow's own copy (above) already covers it.
   useEffect(() => {
     if (!authReady || user) return
     const params = new URLSearchParams(window.location.search)
     if (params.get('invite') || params.get('authIntent') !== 'workspaces')
       return
     window.history.replaceState(null, '', window.location.pathname)
-    openAuth('login', 'Log in to create and join workspaces.')
+    openAuth('login', WORKSPACES_LOGIN_PROMPT)
   }, [authReady, user])
 
   useEffect(() => {
     if (!passwordRecovery) return
+    resetActiveRef.current = true
     openAuth('reset')
     clearPasswordRecovery()
   }, [passwordRecovery, clearPasswordRecovery])
 
+  // Once someone is signed in this page is no longer theirs: send them where
+  // they belong. An invitation they arrived through always wins (it must be
+  // answered on /workspaces); otherwise the database decides — first login
+  // without invitations opens the Personal Workspace (with its welcome),
+  // everyone else lands on their /workspaces hub. Held back while a password
+  // reset is still in progress (a recovery link signs the user in first).
   useEffect(() => {
-    if (!user || !ready || isMigrationResolved()) return
-    const localTasks = loadTasks()
-    if (localTasks.length === 0) return
-    setMigrationTaskCount(localTasks.length)
-    setModal('migration')
-  }, [user, ready])
+    if (
+      !authReady ||
+      !user ||
+      passwordRecovery ||
+      resetFlowActive ||
+      redirectingRef.current
+    )
+      return
+    redirectingRef.current = true
+
+    const params = new URLSearchParams(window.location.search)
+    const invite = inviteRef.current
+    const inviteId = params.get('invite') ?? invite?.id
+    if (inviteId) {
+      const next = new URLSearchParams({ invite: inviteId })
+      const workspaceName = params.get('workspace') ?? invite?.workspaceName
+      const invitedEmail = params.get('email') ?? invite?.invitedEmail
+      if (workspaceName) next.set('workspace', workspaceName)
+      if (invitedEmail) next.set('email', invitedEmail)
+      router.replace(`/workspaces?${next.toString()}`)
+      return
+    }
+    void resolvePostLoginDestination().then(destination => {
+      if (resetActiveRef.current) {
+        // A password reset began while this lookup was in flight. Stay put;
+        // this effect runs again once the reset dialog closes.
+        redirectingRef.current = false
+        return
+      }
+      router.replace(destination)
+    })
+  }, [authReady, user, passwordRecovery, resetFlowActive, router])
 
   const handleAuthenticated = () => {
+    // Routing happens in the redirect effect above, which reacts to the
+    // session that was just established.
     closeModal()
-    if (inviteContext) {
-      router.push(`/workspaces?invite=${encodeURIComponent(inviteContext.id)}`)
-      setInviteContext(null)
-      return
-    }
-    setNotice('Signed in to OnTask.')
   }
 
-  const handleMigrate = async () => {
-    const result = await migrateGuestTasks(loadTasks())
-    if (result.success) {
-      saveTasks([])
-      markMigrationResolved()
-      window.location.reload()
-    }
-    return result
-  }
-
-  const handleKeepLocal = () => {
-    markMigrationResolved()
-    closeModal()
-    setNotice('Your local tasks will stay on this device.')
-  }
-
-  const handleOpenWorkspaces = () => {
-    if (!user) {
-      openAuth('login', 'Log in to create and join workspaces.')
-      return
-    }
-    router.push('/workspaces')
-  }
+  const handleOpenWorkspaces = () => openAuth('login', WORKSPACES_LOGIN_PROMPT)
 
   const handleLogout = async () => {
     const result = await clientSignout()
@@ -208,6 +222,7 @@ export function Dashboard() {
   }
 
   const closeModal = () => {
+    resetActiveRef.current = false
     setModal(null)
     setEditingId(null)
     setPendingParentId(null)
@@ -341,7 +356,11 @@ export function Dashboard() {
     closeConfirmation()
   }
 
-  if (!authReady || !ready || !settingsReady)
+  // Also blank while a signed-in user is being redirected away, so the guest
+  // page never flashes for someone who's already logged in. The one exception
+  // is the password-reset dialog: a recovery link signs the user in first, and
+  // the dialog lives on this page, so it must stay rendered until it closes.
+  if (!authReady || !ready || !settingsReady || (user && !resetFlowActive))
     return <main className="min-h-screen bg-paper" />
 
   const completedTasks = tasks.filter(
@@ -362,7 +381,6 @@ export function Dashboard() {
         onOpenAuth={() => openAuth('login')}
         onOpenWorkspaces={handleOpenWorkspaces}
         onLogout={handleLogout}
-        pendingInvitationCount={myInvitations.length}
       />
       <div className="mx-auto w-[min(1120px,calc(100%-32px))]">
         <section className="grid gap-9 py-12 sm:py-16 lg:grid-cols-[0.85fr_1.15fr] lg:items-end lg:gap-16">
@@ -467,6 +485,24 @@ export function Dashboard() {
             </div>
           )}
         </section>
+        <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-sage/40 bg-sage/10 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div>
+            <p className="text-xs font-bold text-forest">
+              Want to keep your progress?
+            </p>
+            <p className="mt-1 max-w-xl text-[11px] leading-5 text-muted">
+              Log in to get your own Personal Workspace where you can save your
+              work, track goals and progress, access your history, use
+              AI-powered features, and more.
+            </p>
+          </div>
+          <Button
+            className="shrink-0 self-start sm:self-auto"
+            onClick={() => openAuth('login')}
+          >
+            <LogIn size={15} /> Log in
+          </Button>
+        </div>
         <div className="mb-10 rounded-2xl border border-[#e5dbc8] bg-[#f4ecdf] p-5 sm:p-6">
           <div className="flex items-start gap-3">
             <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/70 text-[#ae714d]">
@@ -531,14 +567,6 @@ export function Dashboard() {
           subtitle={authSubtitle}
           onClose={closeModal}
           onAuthenticated={handleAuthenticated}
-        />
-      )}
-      {modal === 'migration' && (
-        <MigrationModal
-          taskCount={migrationTaskCount}
-          onMigrate={handleMigrate}
-          onKeepLocal={handleKeepLocal}
-          onClose={closeModal}
         />
       )}
       {authReady && !user && (

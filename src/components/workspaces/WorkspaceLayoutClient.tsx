@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useState } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -8,7 +8,10 @@ import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useWorkspaceInvitations } from '@/hooks/useWorkspaceInvitations'
 import { useWorkspacePresence } from '@/hooks/useWorkspacePresence'
+import { usePersonalWelcome } from '@/hooks/usePersonalWelcome'
 import { InviteMemberModal } from '@/components/workspaces/InviteMemberModal'
+import { PersonalWelcomeModal } from '@/components/workspaces/PersonalWelcomeModal'
+import { GuestWorkPrompt } from '@/components/auth/GuestWorkPrompt'
 import {
   WorkspaceShell,
   WorkspaceSection,
@@ -18,6 +21,7 @@ import {
   WorkspaceDetailContextValue,
 } from '@/components/workspaces/WorkspaceDetailContext'
 import type { AuthUser } from '@/hooks/useAuth'
+import { PERSONAL_WORKSPACE_SLUG } from '@/lib/workspaces'
 
 // The section a pathname like /workspaces/[slug], /workspaces/[slug]/members
 // or /workspaces/[slug]/settings maps to — derived from the URL (instead of
@@ -80,15 +84,37 @@ function WorkspaceLayout({
   // (and everything handed down via context) keys off this, never the URL
   // slug, since that's what workspace_id FKs and realtime filters expect.
   const workspaceId = workspace?.id ?? ''
+  // Known from the URL alone before the workspace row has loaded, so the
+  // shell can render the personal header (and skip collaboration-only work)
+  // from the very first paint.
+  const isPersonal = workspace
+    ? workspace.type === 'personal'
+    : workspaceSlug === PERSONAL_WORKSPACE_SLUG
+  // A personal workspace has no invitations and only ever one member (you),
+  // so its invitation list and presence channel are never even opened.
+  const collaborationWorkspaceId = isPersonal ? '' : workspaceId
   const {
     invitations,
     ready: invitationsReady,
     inviteByEmail,
     cancelInvitation,
     deleteInvitation,
-  } = useWorkspaceInvitations(workspaceId, user)
-  const onlineUserIds = useWorkspacePresence(workspaceId, user)
+  } = useWorkspaceInvitations(collaborationWorkspaceId, user)
+  const onlineUserIds = useWorkspacePresence(collaborationWorkspaceId, user)
   const [inviting, setInviting] = useState(false)
+  const welcome = usePersonalWelcome({ user, workspace, updateWorkspace })
+
+  // A personal workspace has exactly one URL. Reaching it through its stored
+  // slug (an old link, a notification) or through the members page — which a
+  // personal workspace doesn't have — lands back on the canonical page.
+  useEffect(() => {
+    if (!workspace || workspace.type !== 'personal') return
+    if (workspaceSlug !== PERSONAL_WORKSPACE_SLUG) {
+      router.replace(`/workspaces/${PERSONAL_WORKSPACE_SLUG}`)
+    } else if (section === 'members') {
+      router.replace(`/workspaces/${PERSONAL_WORKSPACE_SLUG}`)
+    }
+  }, [workspace, workspaceSlug, section, router])
 
   if (ready && (error || !workspace)) {
     return (
@@ -102,7 +128,7 @@ function WorkspaceLayout({
               href="/workspaces"
               className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-forest hover:text-coral"
             >
-              <ArrowLeft size={14} /> Back to Shared Workspaces
+              <ArrowLeft size={14} /> Back to Workspaces
             </Link>
           </div>
         </div>
@@ -124,6 +150,7 @@ function WorkspaceLayout({
     members,
     role,
     isOwner,
+    isPersonal,
     ready,
     error,
     updateWorkspace,
@@ -151,17 +178,24 @@ function WorkspaceLayout({
         onlineUserIds={onlineUserIds}
         section={section}
         onSectionChange={handleSectionChange}
-        onInvite={isOwner ? () => setInviting(true) : undefined}
+        isPersonal={isPersonal}
+        onInvite={isOwner && !isPersonal ? () => setInviting(true) : undefined}
         onLogout={onLogout}
       >
         {children}
       </WorkspaceShell>
 
-      {inviting && (
+      {inviting && !isPersonal && (
         <InviteMemberModal
           onInvite={inviteByEmail}
           onClose={() => setInviting(false)}
         />
+      )}
+      {isPersonal && welcome.open && (
+        <PersonalWelcomeModal onClose={welcome.close} />
+      )}
+      {isPersonal && ready && (
+        <GuestWorkPrompt suppressed={!welcome.checked || welcome.open} />
       )}
     </WorkspaceDetailContext.Provider>
   )

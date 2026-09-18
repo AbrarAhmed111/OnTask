@@ -18,6 +18,7 @@ export function WorkspaceMembersClient() {
     members,
     ready,
     isOwner,
+    isPersonal,
     onlineUserIds,
     removeMember,
     invitations,
@@ -81,6 +82,10 @@ export function WorkspaceMembersClient() {
       showErrorToast(result.error || 'Failed to delete invitation record.')
     }
   }
+
+  // A personal workspace has no members page (the layout also redirects away
+  // from it) — never render member/invitation controls for one.
+  if (isPersonal) return null
 
   return (
     <>

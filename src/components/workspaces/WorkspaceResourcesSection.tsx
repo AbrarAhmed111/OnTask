@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { useOptionalWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailContext'
 import { categorize } from '@/lib/resources'
 import { WorkspaceResource } from '@/types/workspace'
 
@@ -48,6 +49,7 @@ export function WorkspaceResourcesSection({
   onAddResource: () => void
 }) {
   const preview = resources.slice(0, PREVIEW_COUNT)
+  const isPersonal = useOptionalWorkspaceDetail()?.isPersonal ?? false
 
   return (
     <div className="rounded-2xl border border-line bg-panel p-5 shadow-sm sm:p-6">
@@ -82,7 +84,9 @@ export function WorkspaceResourcesSection({
             No resources yet
           </p>
           <p className="mx-auto mt-1 max-w-xs text-[11px] leading-5 text-muted">
-            Add documents, images and other files the team needs.
+            {isPersonal
+              ? 'Add documents, images and other files you need.'
+              : 'Add documents, images and other files the team needs.'}
           </p>
           <Button onClick={onAddResource} className="mx-auto mt-4">
             <CirclePlus size={14} /> Add Resource

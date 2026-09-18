@@ -2,7 +2,11 @@ import { Settings, Task } from '@/types'
 
 const TASKS_KEY = 'ontask-tasks-v2'
 const SETTINGS_KEY = 'ontask-settings-v1'
-const MIGRATION_KEY = 'ontask-migration-status-v1'
+// Legacy (pre-Personal-Workspace) flag: a single "the guest -> account prompt
+// was answered on this device" boolean. Superseded by RESOLVED_TASKS_KEY
+// below; only read once, to honour an answer given before the upgrade.
+const LEGACY_MIGRATION_KEY = 'ontask-migration-status-v1'
+const RESOLVED_TASKS_KEY = 'ontask-guest-work-resolved-v2'
 const DEFAULT_SETTINGS: Settings = {
   dailyTargetMinutes: 480,
   soundEnabled: true,
@@ -47,22 +51,63 @@ export function clearStoredData() {
   if (typeof window !== 'undefined') {
     window.localStorage.removeItem(TASKS_KEY)
     window.localStorage.removeItem(SETTINGS_KEY)
+    window.localStorage.removeItem(RESOLVED_TASKS_KEY)
   }
 }
 
-// Tracks whether the guest→account migration prompt has already been
-// answered on this device, so it doesn't reappear on every page load once
-// the user has made a choice (moved their tasks, or chosen to keep them
-// local). Dismissing/cancelling the prompt does NOT call this — only an
-// explicit "keep local" or a successful migration does — so an undecided
-// user keeps seeing it until they actually choose.
-export function isMigrationResolved(): boolean {
-  if (typeof window === 'undefined') return true
-  return window.localStorage.getItem(MIGRATION_KEY) === 'resolved'
+// ── guest work -> Personal Workspace prompt ────────────────────────────────
+// When a guest signs in, the app offers to save their local tasks into their
+// Personal Workspace. Which tasks have already been dealt with is tracked per
+// TASK ID (not as one on/off flag), so choosing "Start Fresh" for today's
+// tasks doesn't silence the prompt forever: tasks added later, as a guest,
+// still get offered next time. Dismissing the prompt with its close button
+// records nothing — an undecided user keeps seeing it.
+
+export function filterUnresolvedTasks(
+  tasks: Task[],
+  resolvedIds: ReadonlySet<string>,
+): Task[] {
+  return tasks.filter(task => !resolvedIds.has(task.id))
 }
 
-export function markMigrationResolved() {
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(MIGRATION_KEY, 'resolved')
+function loadResolvedTaskIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const value = window.localStorage.getItem(RESOLVED_TASKS_KEY)
+    const parsed = value ? (JSON.parse(value) as unknown) : []
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((id): id is string => typeof id === 'string')
+        : [],
+    )
+  } catch {
+    return new Set()
   }
+}
+
+// Marks these tasks as answered ("saved" or "start fresh") so the prompt
+// doesn't offer them again.
+export function markGuestTasksResolved(taskIds: string[]) {
+  if (typeof window === 'undefined') return
+  const resolved = loadResolvedTaskIds()
+  taskIds.forEach(id => resolved.add(id))
+  window.localStorage.setItem(RESOLVED_TASKS_KEY, JSON.stringify([...resolved]))
+}
+
+// The local tasks the guest -> Personal Workspace prompt should still offer.
+export function loadUnresolvedGuestTasks(): Task[] {
+  const tasks = loadTasks()
+  if (tasks.length === 0 || typeof window === 'undefined') return []
+
+  // An answer recorded under the old single-flag scheme covers whatever was
+  // on this device at the time of the upgrade.
+  if (
+    window.localStorage.getItem(LEGACY_MIGRATION_KEY) === 'resolved' &&
+    window.localStorage.getItem(RESOLVED_TASKS_KEY) === null
+  ) {
+    markGuestTasksResolved(tasks.map(task => task.id))
+    return []
+  }
+
+  return filterUnresolvedTasks(tasks, loadResolvedTaskIds())
 }

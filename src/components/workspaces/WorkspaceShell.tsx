@@ -7,6 +7,8 @@ import {
   ChevronDown,
   Clock,
   LayoutDashboard,
+  LayoutGrid,
+  Lock,
   LogOut,
   Settings2,
   UserPlus,
@@ -16,6 +18,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { PresenceDot } from '@/components/workspaces/PresenceDot'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { getWorkspaceTheme } from '@/lib/workspaceThemes'
+import { PERSONAL_WORKSPACE_SLUG } from '@/lib/workspaces'
 import { useAppSelector } from '@/lib/redux/hooks'
 import type { AuthUser } from '@/hooks/useAuth'
 import { Workspace, WorkspaceMember, WorkspaceRole } from '@/types/workspace'
@@ -27,9 +30,11 @@ const NAV_ITEMS: {
   label: string
   icon: typeof LayoutDashboard
   ownerOnly?: boolean
+  // A personal workspace has no members to list, so it has no Members page.
+  sharedOnly?: boolean
 }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'members', label: 'Members', icon: Users },
+  { id: 'members', label: 'Members', icon: Users, sharedOnly: true },
   { id: 'settings', label: 'Settings', icon: Settings2, ownerOnly: true },
 ]
 
@@ -37,10 +42,13 @@ const HEADER_PREVIEW_COUNT = 5
 const COMPACT_PREVIEW_COUNT = 3
 
 // The sidebar itself only exists from `sm:` up (mobile gets a horizontal tab
-// bar instead), so below that breakpoint the header's back-button column
-// only ever needs to be as wide as the button — reserving the full rail
-// width there would waste most of the header on empty space.
+// bar instead), so below that breakpoint the rail column doesn't exist.
 const RAIL_WIDTH = 'w-14 sm:w-[68px]'
+
+// The "WORKSPACES" link back to the hub. A grid icon + an uppercase label (not
+// a bare "Back") so it reads as "take me to my workspace hub".
+const BACK_LINK_CLASS =
+  'inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-white/60 px-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted transition hover:border-[var(--ws-accent,#375b4b)] hover:text-[var(--ws-accent,#375b4b)] sm:px-3'
 
 function MemberAvatar({
   member,
@@ -103,14 +111,14 @@ function MemberChip({
 }
 
 // Full-bleed app-style shell for a single workspace: a workspace-context top
-// bar (greeting, workspace detail line, member preview, quick invite,
-// account menu) plus a collapsible icon rail for Overview/Settings — this is
-// meant to feel like a dedicated collaborative workspace, not another page
-// of the app. The rail and the header's back-button column share the exact
-// same fixed width so they always line up as one visual column, regardless
-// of viewport width or browser zoom (a max-width/mx-auto wrapper around
-// both would drift out of alignment whenever the viewport crosses that
-// breakpoint — this avoids that by never centering the shell itself).
+// bar (WORKSPACES link back to the hub, greeting, workspace detail line,
+// member preview, quick invite, account menu) plus a collapsible icon rail
+// for Overview/Members/Settings — this is meant to feel like a dedicated
+// workspace, not another page of the app. It's used for both shared
+// workspaces and the user's Personal Workspace; `isPersonal` swaps the
+// collaboration-only parts (members, invite, avatars) for a "Private • Only
+// you" header. The shell itself is never centered in a max-width wrapper, so
+// it stays aligned at any viewport width or browser zoom.
 export function WorkspaceShell({
   workspaceId,
   workspaceSlug,
@@ -122,6 +130,7 @@ export function WorkspaceShell({
   onlineUserIds,
   section,
   onSectionChange,
+  isPersonal = false,
   onInvite,
   onLogout,
   children,
@@ -136,6 +145,7 @@ export function WorkspaceShell({
   onlineUserIds: Set<string>
   section: WorkspaceSection
   onSectionChange: (section: WorkspaceSection) => void
+  isPersonal?: boolean
   onInvite?: () => void
   onLogout: () => void
   children: ReactNode
@@ -148,6 +158,10 @@ export function WorkspaceShell({
   // like members) still waits for the actual network fetch.
   const cached = useAppSelector(state => {
     const cache = state.workspaceCache
+    // The personal alias is the same string for every user, so it's never a
+    // valid cache key (see useWorkspace) — a personal header doesn't need
+    // the cache anyway.
+    if (workspaceSlug === PERSONAL_WORKSPACE_SLUG) return undefined
     const cachedId = workspaceId || cache.bySlug[workspaceSlug]
     return cachedId ? cache.byId[cachedId] : undefined
   })
@@ -162,8 +176,11 @@ export function WorkspaceShell({
   const displayName = workspace?.name ?? cached?.name
   const displayTimezone = workspace?.timezone ?? cached?.timezone
   const theme = getWorkspaceTheme(workspace?.accent ?? cached?.accent)
-  const showHeaderSkeleton = !ready && !cached
-  const items = NAV_ITEMS.filter(item => !item.ownerOnly || isOwner)
+  const showHeaderSkeleton = !isPersonal && !ready && !cached
+  const items = NAV_ITEMS.filter(
+    item => (!item.ownerOnly || isOwner) && (!item.sharedOnly || !isPersonal),
+  )
+  const showMembers = !isPersonal && ready && members.length > 0
   const headerPreview = members.slice(0, HEADER_PREVIEW_COUNT)
   const headerOverflow = members.length - headerPreview.length
   const compactPreview = members.slice(0, COMPACT_PREVIEW_COUNT)
@@ -189,20 +206,23 @@ export function WorkspaceShell({
       className="min-h-screen bg-[radial-gradient(circle_at_80%_0%,#e4f0e6_0,transparent_30%),linear-gradient(135deg,#f8faf7_0%,#eff3ee_100%)] text-ink"
     >
       <header className="sticky top-0 z-30 border-b border-line bg-paper/85 backdrop-blur">
+        <div className="px-3 pt-2 sm:hidden">
+          <Link href="/workspaces" className={BACK_LINK_CLASS}>
+            <ArrowLeft size={13} />
+            <LayoutGrid size={14} />
+            Workspaces
+          </Link>
+        </div>
         <div className="relative flex h-20 items-stretch">
-          <div
-            className={`flex shrink-0 items-center justify-center ${RAIL_WIDTH}`}
-          >
-            <Link
-              href="/workspaces"
-              aria-label="Back to Shared Workspaces"
-              className="grid h-9 w-9 place-items-center rounded-lg text-muted transition hover:bg-slate-100 hover:text-ink"
-            >
-              <ArrowLeft size={17} />
+          <div className="hidden shrink-0 items-center pl-4 pr-3 sm:flex">
+            <Link href="/workspaces" className={BACK_LINK_CLASS}>
+              <ArrowLeft size={13} />
+              <LayoutGrid size={14} />
+              Workspaces
             </Link>
           </div>
-          <div className="flex min-w-0 flex-1 items-center gap-3 pr-4 sm:pr-6">
-            <div className="min-w-0 max-w-[48%] shrink-0 sm:max-w-[44%]">
+          <div className="flex min-w-0 flex-1 items-center gap-3 pl-4 pr-4 sm:pl-0 sm:pr-6">
+            <div className="min-w-0 max-w-[62%] shrink-0 sm:max-w-[44%]">
               {showHeaderSkeleton ? (
                 <>
                   <Skeleton className="h-2.5 w-32" />
@@ -210,17 +230,24 @@ export function WorkspaceShell({
                 </>
               ) : (
                 <>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-coral">
-                    Let&apos;s start working in
+                  <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-coral">
+                    {isPersonal ? (
+                      <>
+                        <Lock size={11} className="shrink-0" /> Private &bull;
+                        Only you
+                      </>
+                    ) : (
+                      <>Let&apos;s start working in</>
+                    )}
                   </p>
-                  <h1 className="truncate text-3xl font-extrabold capitalize tracking-tight text-ink">
-                    {displayName}
+                  <h1 className="truncate text-xl font-extrabold capitalize tracking-tight text-ink sm:text-3xl">
+                    {isPersonal ? 'Personal Workspace' : displayName}
                   </h1>
                 </>
               )}
             </div>
 
-            {ready && members.length > 0 && (
+            {showMembers && (
               <button
                 onClick={() => onSectionChange('members')}
                 aria-label="View all members"
@@ -242,7 +269,7 @@ export function WorkspaceShell({
             )}
 
             <div className="ml-auto flex shrink-0 items-center gap-2.5">
-              {ready && members.length > 0 && (
+              {showMembers && (
                 <button
                   onClick={() => onSectionChange('members')}
                   aria-label="View all members"
@@ -279,7 +306,7 @@ export function WorkspaceShell({
                   <span className="tabular-nums">{workspaceTime}</span>
                 </div>
               )}
-              {isOwner && onInvite && (
+              {isOwner && !isPersonal && onInvite && (
                 <button
                   onClick={onInvite}
                   className="hidden items-center gap-1.5 rounded-full border border-line bg-white/60 px-3 py-1.5 text-[11px] font-semibold text-[var(--ws-accent,#375b4b)] transition hover:border-[var(--ws-accent,#375b4b)] sm:flex"
@@ -287,7 +314,12 @@ export function WorkspaceShell({
                   <UserPlus size={13} /> Invite
                 </button>
               )}
-              <NotificationBell className="border-line bg-white/60 text-[var(--ws-accent,#375b4b)] hover:border-[var(--ws-accent,#375b4b)]" />
+              <NotificationBell
+                user={user}
+                workspaceId={workspaceId}
+                isPersonal={isPersonal}
+                className="border-line bg-white/60 text-[var(--ws-accent,#375b4b)] hover:border-[var(--ws-accent,#375b4b)]"
+              />
               <div className="relative">
                 <button
                   aria-label="Account menu"
@@ -341,7 +373,7 @@ export function WorkspaceShell({
                         onClick={() => setMenuOpen(false)}
                         className="mt-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-ink transition hover:bg-slate-100"
                       >
-                        <Users size={14} /> All workspaces
+                        <LayoutGrid size={14} /> All workspaces
                       </Link>
                       <button
                         onClick={() => {

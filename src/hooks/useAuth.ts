@@ -38,12 +38,17 @@ export function useAuth() {
       setReady(true)
 
       // Clean up OAuth/recovery params left in the URL after Supabase's
-      // browser client auto-exchanges them for a session on load.
+      // browser client auto-exchanges them for a session on load. Only the
+      // auth handshake's own params are removed — anything else the page was
+      // opened with (e.g. an invitation link's ?invite=&workspace=) must
+      // survive so the page can still act on it.
+      const url = new URL(window.location.href)
       if (
-        window.location.search.includes('code=') ||
+        url.searchParams.has('code') ||
         window.location.hash.includes('access_token')
       ) {
-        window.history.replaceState(null, '', window.location.pathname)
+        url.searchParams.delete('code')
+        window.history.replaceState(null, '', `${url.pathname}${url.search}`)
       }
     })
 

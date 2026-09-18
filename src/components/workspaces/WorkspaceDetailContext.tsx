@@ -20,6 +20,11 @@ export type WorkspaceDetailContextValue = {
   members: WorkspaceMember[]
   role: WorkspaceRole | null
   isOwner: boolean
+  // True for the user's Personal Workspace: private, owner-only, no members
+  // or invitations, no assigning tasks to anyone else. Components that only
+  // make sense with collaborators check this instead of guessing from the
+  // member count (a shared workspace can also have just one member).
+  isPersonal: boolean
   ready: boolean
   error: string | null
   updateWorkspace: ReturnType<typeof useWorkspace>['updateWorkspace']
@@ -40,6 +45,12 @@ export type WorkspaceDetailContextValue = {
 
 export const WorkspaceDetailContext =
   createContext<WorkspaceDetailContextValue | null>(null)
+
+// For components that render both inside a workspace layout and, in principle,
+// outside one — returns null instead of throwing.
+export function useOptionalWorkspaceDetail() {
+  return useContext(WorkspaceDetailContext)
+}
 
 export function useWorkspaceDetail() {
   const ctx = useContext(WorkspaceDetailContext)

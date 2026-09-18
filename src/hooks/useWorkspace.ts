@@ -6,19 +6,11 @@ import type { AuthUser } from '@/hooks/useAuth'
 import { Workspace, WorkspaceMember, WorkspaceRole } from '@/types/workspace'
 import { useAppDispatch } from '@/lib/redux/hooks'
 import { upsertWorkspaceIdentity } from '@/lib/redux/workspaceCacheSlice'
-
-type WorkspaceRow = {
-  id: string
-  slug: string
-  name: string
-  description: string | null
-  owner_id: string
-  timezone: string
-  report_time: string
-  accent: string
-  created_at: string
-  updated_at: string
-}
+import {
+  PERSONAL_WORKSPACE_SLUG,
+  WorkspaceRow,
+  rowToWorkspace,
+} from '@/lib/workspaces'
 
 type WorkspaceMemberRow = {
   id: string
@@ -31,21 +23,6 @@ type WorkspaceMemberRow = {
     email: string | null
     avatar_url: string | null
   } | null
-}
-
-function rowToWorkspace(row: WorkspaceRow): Workspace {
-  return {
-    id: row.id,
-    slug: row.slug,
-    name: row.name,
-    description: row.description,
-    ownerId: row.owner_id,
-    timezone: row.timezone,
-    reportTime: row.report_time,
-    accent: row.accent,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
 }
 
 function rowToMember(row: WorkspaceMemberRow): WorkspaceMember {
@@ -70,6 +47,11 @@ function rowToMember(row: WorkspaceMemberRow): WorkspaceMember {
 // presence, tasks, the Daily Report) queries by workspace_id, since every
 // other table's FK -- and every realtime filter -- is keyed by that uuid,
 // never the slug.
+//
+// `personal-workspace` is the one slug that isn't a lookup key: it's the same
+// URL for every user and means "MY personal workspace", resolved by owner
+// rather than by slug -- so it can only ever resolve to the signed-in user's
+// own row, never someone else's.
 export function useWorkspace(workspaceSlug: string, user: AuthUser | null) {
   const userId = user?.id
   const dispatch = useAppDispatch()
@@ -102,22 +84,44 @@ export function useWorkspace(workspaceSlug: string, user: AuthUser | null) {
 
     setReady(false)
     setError(null)
-    supabase
-      .from('workspaces')
-      .select('*')
-      .eq('slug', workspaceSlug)
-      .single()
-      .then(async workspaceResult => {
-        if (cancelled) return
-        if (workspaceResult.error || !workspaceResult.data) {
-          setError(
-            "Couldn't load this workspace — it may not exist, or you may not be a member.",
-          )
-          setReady(true)
-          return
-        }
-        const loaded = rowToWorkspace(workspaceResult.data as WorkspaceRow)
-        setWorkspace(loaded)
+
+    const loadWorkspaceRow = async () => {
+      if (workspaceSlug !== PERSONAL_WORKSPACE_SLUG) {
+        return supabase
+          .from('workspaces')
+          .select('*')
+          .eq('slug', workspaceSlug)
+          .single()
+      }
+      const personal = await supabase
+        .from('workspaces')
+        .select('*')
+        .eq('type', 'personal')
+        .eq('owner_id', userId)
+        .maybeSingle()
+      if (personal.data || personal.error) return personal
+      // Every account gets one at signup; this only fills the gap for an
+      // account whose signup-time provisioning didn't run. Idempotent.
+      return supabase.rpc('ensure_personal_workspace').single()
+    }
+
+    loadWorkspaceRow().then(async workspaceResult => {
+      if (cancelled) return
+      if (workspaceResult.error || !workspaceResult.data) {
+        setError(
+          "Couldn't load this workspace — it may not exist, or you may not be a member.",
+        )
+        setReady(true)
+        return
+      }
+      const loaded = rowToWorkspace(workspaceResult.data as WorkspaceRow)
+      setWorkspace(loaded)
+      // The identity cache is keyed by slug, and a personal workspace's
+      // slug is the SAME string for every user -- caching it would let one
+      // account's name/theme/timezone paint for the next account that
+      // signs in on this browser. Personal workspaces don't need it (their
+      // header is static), so they're simply never cached.
+      if (loaded.type !== 'personal') {
         dispatch(
           upsertWorkspaceIdentity({
             id: loaded.id,
@@ -127,38 +131,39 @@ export function useWorkspace(workspaceSlug: string, user: AuthUser | null) {
             timezone: loaded.timezone,
           }),
         )
+      }
 
-        await fetchMembers(loaded.id)
-        if (cancelled) return
-        setReady(true)
+      await fetchMembers(loaded.id)
+      if (cancelled) return
+      setReady(true)
 
-        // Realtime payloads carry only the raw row (no embedded profiles
-        // join), so a member-joined/removed event just triggers a fresh
-        // fetch of the full list rather than trying to merge a partial row.
-        channel = supabase
-          .channel(`workspace-members-${loaded.id}`)
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'workspace_members',
-              filter: `workspace_id=eq.${loaded.id}`,
-            },
-            () => {
-              if (!cancelled) fetchMembers(loaded.id)
-            },
-          )
-          .subscribe()
+      // Realtime payloads carry only the raw row (no embedded profiles
+      // join), so a member-joined/removed event just triggers a fresh
+      // fetch of the full list rather than trying to merge a partial row.
+      channel = supabase
+        .channel(`workspace-members-${loaded.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'workspace_members',
+            filter: `workspace_id=eq.${loaded.id}`,
+          },
+          () => {
+            if (!cancelled) fetchMembers(loaded.id)
+          },
+        )
+        .subscribe()
 
-        handleReconnect = () => fetchMembers(loaded.id)
-        handleVisibility = () => {
-          if (document.visibilityState === 'visible' && handleReconnect)
-            handleReconnect()
-        }
-        window.addEventListener('online', handleReconnect)
-        document.addEventListener('visibilitychange', handleVisibility)
-      })
+      handleReconnect = () => fetchMembers(loaded.id)
+      handleVisibility = () => {
+        if (document.visibilityState === 'visible' && handleReconnect)
+          handleReconnect()
+      }
+      window.addEventListener('online', handleReconnect)
+      document.addEventListener('visibilitychange', handleVisibility)
+    })
 
     return () => {
       cancelled = true

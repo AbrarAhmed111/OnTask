@@ -40,10 +40,14 @@ const COMMON_TIMEZONES = [
 
 export function EditWorkspaceModal({
   workspace,
+  isPersonal = false,
   onSave,
   onClose,
 }: {
   workspace: Workspace
+  // A personal workspace keeps its fixed name; only when/where its Daily
+  // Report runs and its accent are up to the user.
+  isPersonal?: boolean
   onSave: (patch: {
     name: string
     description: string
@@ -97,7 +101,11 @@ export function EditWorkspaceModal({
   }
 
   return (
-    <Modal eyebrow="Owner settings" title="Edit workspace" onClose={onClose}>
+    <Modal
+      eyebrow={isPersonal ? 'Personal Workspace' : 'Owner settings'}
+      title={isPersonal ? 'Edit settings' : 'Edit workspace'}
+      onClose={onClose}
+    >
       <form
         onSubmit={handleSubmit}
         style={
@@ -114,25 +122,29 @@ export function EditWorkspaceModal({
             <span>{error}</span>
           </div>
         )}
-        <label className="block text-xs font-semibold text-muted">
-          Workspace name
-          <input
-            required
-            autoFocus
-            value={name}
-            onChange={event => setName(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-sage focus:ring-4 focus:ring-sage/15"
-          />
-        </label>
-        <label className="block text-xs font-semibold text-muted">
-          Description
-          <textarea
-            value={description}
-            onChange={event => setDescription(event.target.value)}
-            rows={2}
-            className="mt-2 w-full font-light resize-none rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-sage focus:ring-4 focus:ring-sage/15"
-          />
-        </label>
+        {!isPersonal && (
+          <>
+            <label className="block text-xs font-semibold text-muted">
+              Workspace name
+              <input
+                required
+                autoFocus
+                value={name}
+                onChange={event => setName(event.target.value)}
+                className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-sage focus:ring-4 focus:ring-sage/15"
+              />
+            </label>
+            <label className="block text-xs font-semibold text-muted">
+              Description
+              <textarea
+                value={description}
+                onChange={event => setDescription(event.target.value)}
+                rows={2}
+                className="mt-2 w-full font-light resize-none rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-sage focus:ring-4 focus:ring-sage/15"
+              />
+            </label>
+          </>
+        )}
         <label className="block text-xs font-semibold text-muted">
           Timezone
           <select

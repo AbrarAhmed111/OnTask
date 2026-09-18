@@ -5,7 +5,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import fullLogo from '@/assets/img/Full-logo.png'
 import { Home, LogOut, Settings2, Users } from 'lucide-react'
-import { NotificationBell } from '@/components/notifications/NotificationBell'
 import type { AuthUser } from '@/hooks/useAuth'
 
 export function Header({
@@ -17,8 +16,12 @@ export function Header({
   onLogout,
   pendingInvitationCount = 0,
   context = 'personal',
+  homeHref = '/',
+  homeLabel = 'Go to the OnTask home page',
 }: {
-  onSettings: () => void
+  // Omit to hide the settings button (the workspaces hub has no settings of
+  // its own — each workspace has its own).
+  onSettings?: () => void
   user: AuthUser | null
   authReady: boolean
   onOpenAuth: () => void
@@ -27,8 +30,15 @@ export function Header({
   pendingInvitationCount?: number
   // Which page this header is on — swaps the nav button's destination so it
   // always points at "the other place" instead of linking back to the page
-  // you're already viewing.
+  // you're already viewing. `personal` is the guest page (its button opens
+  // sign-in to reach workspaces); `workspaces` is the signed-in hub (its
+  // button opens the Personal Workspace).
   context?: 'personal' | 'workspaces'
+  // Where the logo links. The guest page and the hub differ: signed-in users
+  // clicking the logo on the hub should stay on the hub, not be bounced on to
+  // their Personal Workspace by the `/` redirect.
+  homeHref?: string
+  homeLabel?: string
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const initials = (user?.fullName || user?.email || '?')
@@ -37,7 +47,7 @@ export function Header({
 
   return (
     <header className="mx-auto flex h-[76px] w-[min(1120px,calc(100%-32px))] items-center justify-between border-b border-line">
-      <Link href="/" aria-label="Go to your personal dashboard">
+      <Link href={homeHref} aria-label={homeLabel}>
         <Image
           src={fullLogo}
           alt="OnTask"
@@ -59,8 +69,8 @@ export function Header({
           onClick={onOpenWorkspaces}
           aria-label={
             context === 'workspaces'
-              ? 'Go to your personal dashboard'
-              : 'Go to Shared Workspaces'
+              ? 'Go to your Personal Workspace'
+              : 'Log in to open your workspaces'
           }
           className="relative flex items-center gap-1.5 rounded-full border border-line bg-white/60 px-2.5 py-2 text-[11px] font-semibold text-forest transition hover:border-forest sm:px-3"
         >
@@ -72,7 +82,7 @@ export function Header({
           ) : (
             <>
               <Users size={14} />{' '}
-              <span className="hidden sm:inline">Shared Workspaces</span>
+              <span className="hidden sm:inline">Workspaces</span>
             </>
           )}
           {context !== 'workspaces' && pendingInvitationCount > 0 && (
@@ -84,7 +94,6 @@ export function Header({
             </span>
           )}
         </button>
-        {authReady && user && <NotificationBell />}
         {authReady && user ? (
           <div className="relative">
             <button
@@ -144,13 +153,15 @@ export function Header({
             Sign in
           </button>
         )}
-        <button
-          aria-label="Settings"
-          onClick={onSettings}
-          className="grid h-9 w-9 place-items-center rounded-lg border border-line bg-white/60 text-forest transition hover:border-forest"
-        >
-          <Settings2 size={17} />
-        </button>
+        {onSettings && (
+          <button
+            aria-label="Settings"
+            onClick={onSettings}
+            className="grid h-9 w-9 place-items-center rounded-lg border border-line bg-white/60 text-forest transition hover:border-forest"
+          >
+            <Settings2 size={17} />
+          </button>
+        )}
       </div>
     </header>
   )

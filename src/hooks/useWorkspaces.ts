@@ -1,46 +1,29 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { AuthUser } from '@/hooks/useAuth'
 import { Workspace } from '@/types/workspace'
+import { WorkspaceRow, rowToWorkspace } from '@/lib/workspaces'
 
-type WorkspaceRow = {
-  id: string
-  slug: string
-  name: string
-  description: string | null
-  owner_id: string
-  timezone: string
-  report_time: string
-  accent: string
-  created_at: string
-  updated_at: string
-}
-
-function rowToWorkspace(row: WorkspaceRow): Workspace {
-  return {
-    id: row.id,
-    slug: row.slug,
-    name: row.name,
-    description: row.description,
-    ownerId: row.owner_id,
-    timezone: row.timezone,
-    reportTime: row.report_time,
-    accent: row.accent,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
-}
-
-// List + create for the /workspaces page. Detail data (members, tasks) lives
-// in useWorkspace, fetched separately per workspace page.
+// The workspace hub's data: the caller's SHARED workspaces (+ member counts)
+// and create. The Personal Workspace deliberately isn't part of this list —
+// it's always exactly one, always at the same URL, and never has members, so
+// the hub renders it as its own fixed card instead of as a list entry.
+// Only workspaces the caller has actually JOINED are listed. RLS alone isn't
+// enough to guarantee that: an invitee can read a workspace they've merely been
+// invited to (so the row must be filtered by real membership here), and an
+// invitation is only ever shown in the invitations section until it's accepted.
+// Detail data lives in useWorkspace.
 export function useWorkspaces(user: AuthUser | null) {
   const userId = user?.id
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Bumped by reload() to re-run the fetch below (e.g. after accepting an
+  // invitation adds a workspace to the list).
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     if (!userId) {
@@ -50,11 +33,14 @@ export function useWorkspaces(user: AuthUser | null) {
       return
     }
     let cancelled = false
-    setReady(false)
     const supabase = createClient()
     supabase
       .from('workspaces')
-      .select('*')
+      // The inner-joined membership row is the filter: a workspace the user is
+      // only invited to has no member row for them, so it drops out.
+      .select('*, workspace_members!inner(user_id)')
+      .eq('workspace_members.user_id', userId)
+      .eq('type', 'shared')
       .order('created_at', { ascending: false })
       .then(async ({ data, error: fetchError }) => {
         if (cancelled) return
@@ -63,10 +49,14 @@ export function useWorkspaces(user: AuthUser | null) {
           setReady(true)
           return
         }
+        setError(null)
         const rows = (data ?? []) as WorkspaceRow[]
         setWorkspaces(rows.map(rowToWorkspace))
         setReady(true)
-        if (rows.length === 0) return
+        if (rows.length === 0) {
+          setMemberCounts({})
+          return
+        }
 
         const { data: members } = await supabase
           .from('workspace_members')
@@ -86,7 +76,9 @@ export function useWorkspaces(user: AuthUser | null) {
     return () => {
       cancelled = true
     }
-  }, [userId])
+  }, [userId, reloadToken])
+
+  const reload = useCallback(() => setReloadToken(token => token + 1), [])
 
   const createWorkspace = async (
     name: string,
@@ -114,5 +106,5 @@ export function useWorkspaces(user: AuthUser | null) {
     return { success: true as const, workspace }
   }
 
-  return { workspaces, memberCounts, ready, error, createWorkspace }
+  return { workspaces, memberCounts, ready, error, createWorkspace, reload }
 }

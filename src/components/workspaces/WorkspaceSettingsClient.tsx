@@ -8,7 +8,8 @@ import { useWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailConte
 
 export function WorkspaceSettingsClient() {
   const router = useRouter()
-  const { workspace, ready, isOwner, updateWorkspace } = useWorkspaceDetail()
+  const { workspace, ready, isOwner, isPersonal, updateWorkspace } =
+    useWorkspaceDetail()
   const [editing, setEditing] = useState(false)
   const [settingsError, setSettingsError] = useState<string | null>(null)
 
@@ -35,6 +36,7 @@ export function WorkspaceSettingsClient() {
         ready={ready}
         error={settingsError}
         workspace={workspace}
+        isPersonal={isPersonal}
         onEdit={() => {
           setSettingsError(null)
           setEditing(true)
@@ -44,6 +46,7 @@ export function WorkspaceSettingsClient() {
       {editing && workspace && (
         <EditWorkspaceModal
           workspace={workspace}
+          isPersonal={isPersonal}
           onSave={handleUpdateWorkspace}
           onClose={() => setEditing(false)}
         />

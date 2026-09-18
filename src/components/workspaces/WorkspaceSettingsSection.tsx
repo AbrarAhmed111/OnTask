@@ -19,11 +19,13 @@ export function WorkspaceSettingsSection({
   ready,
   error,
   workspace,
+  isPersonal = false,
   onEdit,
 }: {
   ready: boolean
   error?: string | null
   workspace: Workspace | null
+  isPersonal?: boolean
   onEdit: () => void
 }) {
   return (
@@ -31,7 +33,8 @@ export function WorkspaceSettingsSection({
       <div className="rounded-2xl border border-line bg-panel shadow-sm">
         <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
           <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight text-ink">
-            <Settings2 size={15} /> Workspace details
+            <Settings2 size={15} />{' '}
+            {isPersonal ? 'Personal Workspace settings' : 'Workspace details'}
           </h2>
           <Button variant="secondary" onClick={onEdit} disabled={!ready}>
             Edit
@@ -51,11 +54,15 @@ export function WorkspaceSettingsSection({
           </div>
         ) : (
           <div className="divide-y divide-line/70">
-            <DetailRow label="Name" value={workspace.name} />
-            <DetailRow
-              label="Description"
-              value={workspace.description || 'No description yet.'}
-            />
+            {!isPersonal && (
+              <>
+                <DetailRow label="Name" value={workspace.name} />
+                <DetailRow
+                  label="Description"
+                  value={workspace.description || 'No description yet.'}
+                />
+              </>
+            )}
             <DetailRow label="Timezone" value={workspace.timezone} />
             <DetailRow
               label="Daily Report time"

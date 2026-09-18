@@ -15,6 +15,7 @@ type GoogleIdConfiguration = {
   context?: 'signin' | 'signup' | 'use'
   use_fedcm_for_prompt?: boolean
   itp_support?: boolean
+  cancel_on_tap_outside?: boolean
 }
 
 type PromptMomentNotification = {
@@ -87,6 +88,12 @@ export function GoogleOneTap({
         context: 'signin',
         use_fedcm_for_prompt: true,
         itp_support: true,
+        // By default GIS aborts the prompt on any click elsewhere on the page,
+        // including the "Sign in" button. With FedCM that abort rejects the
+        // browser request and GIS logs "FedCM get() rejects with AbortError"
+        // as a console error, so leave the prompt alone and let the visitor
+        // dismiss it themselves.
+        cancel_on_tap_outside: false,
         nonce: hashedNonce,
         callback: async response => {
           const supabase = createClient()

@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react'
 import { AlertTriangle, CirclePlus, Mail, Users, X } from 'lucide-react'
 import { WorkspacePageShell } from '@/components/layout/WorkspacePageShell'
 import { WorkspaceCard } from '@/components/workspaces/WorkspaceCard'
+import { PersonalWorkspaceCard } from '@/components/workspaces/PersonalWorkspaceCard'
 import { CreateWorkspaceModal } from '@/components/workspaces/CreateWorkspaceModal'
 import { RejectInvitationModal } from '@/components/workspaces/RejectInvitationModal'
+import { GuestWorkPrompt } from '@/components/auth/GuestWorkPrompt'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { useMyInvitations } from '@/hooks/useMyInvitations'
 import { clientSignout } from '@/lib/auth/signout'
+import { showSuccessToast } from '@/lib/toast'
 import type { AuthUser } from '@/hooks/useAuth'
 import { WorkspaceInvitation } from '@/types/workspace'
 
@@ -38,8 +41,11 @@ export default function WorkspacesPage() {
   )
 }
 
+// The authenticated user's home: "which workspace do I want to work in?".
+// Pending invitations first (they need an answer), then the always-there
+// Personal Workspace, then the shared workspaces they belong to.
 function WorkspacesContent({ user }: { user: AuthUser }) {
-  const { workspaces, memberCounts, ready, error, createWorkspace } =
+  const { workspaces, memberCounts, ready, error, createWorkspace, reload } =
     useWorkspaces(user)
   const {
     invitations,
@@ -48,10 +54,11 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
   } = useMyInvitations(user)
   const [creating, setCreating] = useState(false)
   const [rejecting, setRejecting] = useState<WorkspaceInvitation | null>(null)
+  const [respondingId, setRespondingId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   // Captured once on mount (then stripped from the URL) so it survives even
-  // after the query string is cleaned up — see the invitation-link flow in
-  // Dashboard.tsx/useAuthGuard.ts that lands a visitor here with ?invite=.
+  // after the query string is cleaned up — an invitation link (email, or
+  // forwarded through sign-in) lands here as ?invite=&workspace=&email=.
   const [inviteLink, setInviteLink] = useState<{
     id: string
     workspaceName: string | null
@@ -73,9 +80,9 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
 
   // The invited address is embedded in the link itself (see
   // send-email/route.ts), so a visitor who's signed in as a *different*
-  // account can be told that directly — RLS means their session simply
-  // can't see this invitation row at all, which would otherwise look
-  // identical to "this invitation no longer exists."
+  // account can be told that directly — the database only ever returns
+  // invitations addressed to the signed-in account, which would otherwise
+  // look identical to "this invitation no longer exists."
   const accountMismatch =
     !!inviteLink?.invitedEmail &&
     !!user.email &&
@@ -116,49 +123,48 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
     return () => window.clearTimeout(timeout)
   }, [notice])
 
+  // Accepting joins the shared workspace through the existing membership
+  // system (accept_workspace_invitation) and leaves the user right here, with
+  // the new workspace now in the list below. Nothing is ever accepted
+  // implicitly — only this explicit click gets here.
   const handleAccept = async (invitation: WorkspaceInvitation) => {
+    setRespondingId(invitation.id)
     const result = await respond(invitation.id, 'accept')
+    setRespondingId(null)
     if (!result.success) {
       setNotice(result.error || 'Failed to accept invitation.')
       return
     }
-    window.location.reload()
+    showSuccessToast(
+      `You joined "${invitation.workspaceName || 'the workspace'}".`,
+    )
+    reload()
   }
 
   const handleReject = async (reason: string) => {
     if (!rejecting) return { success: false, error: 'Nothing to reject.' }
     const result = await respond(rejecting.id, 'reject', reason)
     if (result.success) {
-      setNotice(`Declined the invitation to "${rejecting.workspaceName}".`)
+      showSuccessToast(
+        `Declined the invitation to "${rejecting.workspaceName}".`,
+      )
     }
     return result
   }
 
   return (
     <>
-      <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-coral">
-            Work with others
-          </p>
-          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-            Shared Workspaces{' '}
-            {ready ? (
-              <span className="font-mono text-base font-normal text-muted">
-                {workspaces.length}
-              </span>
-            ) : (
-              <Skeleton className="inline-block h-5 w-6 align-middle" />
-            )}
-          </h1>
-          <p className="mt-2 max-w-md text-xs leading-5 text-muted">
-            Plan together, assign tasks, and track focus time as a team — each
-            workspace keeps its own tasks, members, and activity feed.
-          </p>
-        </div>
-        <Button onClick={() => setCreating(true)}>
-          <CirclePlus size={16} /> Create workspace
-        </Button>
+      <div className="mb-8">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-coral">
+          Your workspaces
+        </p>
+        <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+          Choose a workspace
+        </h1>
+        <p className="mt-2 max-w-md text-xs leading-5 text-muted">
+          Work privately in your Personal Workspace, or jump into a shared one
+          to collaborate.
+        </p>
       </div>
       {notice && (
         <div className="mb-6 rounded-xl border border-coral/20 bg-coral/5 px-4 py-3 text-xs text-coral animate-[fadeIn_180ms_ease-out]">
@@ -188,10 +194,17 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
           </Button>
         </div>
       )}
+
       {invitationsReady && invitations.length > 0 && (
-        <div className="mb-8 rounded-2xl border border-sage/40 bg-sage/5 p-5 animate-[fadeIn_220ms_ease-out] sm:p-6">
+        <section
+          aria-label="Workspace invitations"
+          className="mb-8 rounded-2xl border border-sage/40 bg-sage/5 p-5 animate-[fadeIn_220ms_ease-out] sm:p-6"
+        >
           <h2 className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-forest">
-            <Mail size={14} /> Pending invitations
+            <Mail size={14} /> Workspace Invitations
+            <span className="font-mono font-normal normal-case tracking-normal text-muted">
+              {invitations.length}
+            </span>
           </h2>
           <div className="space-y-3">
             {invitations.map(invitation => (
@@ -215,18 +228,28 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
                   <p className="text-sm font-bold text-ink">
                     {invitation.workspaceName || 'A workspace'}
                   </p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    Invited by{' '}
+                    <span className="font-semibold text-ink">
+                      {invitation.inviterName || 'a teammate'}
+                    </span>
+                  </p>
                   {invitation.message && (
-                    <p className="mt-1 text-xs italic leading-5 text-muted">
+                    <p className="mt-1.5 text-xs italic leading-5 text-muted">
                       &ldquo;{invitation.message}&rdquo;
                     </p>
                   )}
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <Button onClick={() => handleAccept(invitation)}>
+                  <Button
+                    onClick={() => handleAccept(invitation)}
+                    disabled={respondingId === invitation.id}
+                  >
                     Accept
                   </Button>
                   <Button
                     variant="ghost"
+                    disabled={respondingId === invitation.id}
                     onClick={() => setRejecting(invitation)}
                   >
                     <X size={14} /> Reject
@@ -235,40 +258,72 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
-      {!ready ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[0, 1, 2].map(i => (
-            <WorkspaceCardSkeleton key={i} />
-          ))}
-        </div>
-      ) : workspaces.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-sage/70 px-6 py-16 text-center animate-[fadeIn_220ms_ease-out]">
-          <div className="grid h-12 w-12 place-items-center rounded-xl bg-sage/10 text-forest">
-            <Users size={22} />
-          </div>
+
+      <section aria-label="Personal Workspace" className="mb-10">
+        <PersonalWorkspaceCard />
+      </section>
+
+      <section aria-label="Shared Workspaces">
+        <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
-            <p className="text-sm font-bold text-ink">No workspaces yet</p>
-            <p className="mt-1 max-w-xs text-xs leading-5 text-muted">
-              Create one to start planning and tracking focus time with others.
+            <h2 className="text-lg font-bold tracking-tight text-ink">
+              Shared Workspaces{' '}
+              {ready ? (
+                <span className="font-mono text-sm font-normal text-muted">
+                  {workspaces.length}
+                </span>
+              ) : (
+                <Skeleton className="inline-block h-4 w-5 align-middle" />
+              )}
+            </h2>
+            <p className="mt-1 max-w-md text-xs leading-5 text-muted">
+              Plan together, assign tasks, and track focus time as a team — each
+              workspace keeps its own tasks, members, and activity feed.
             </p>
           </div>
-          <Button onClick={() => setCreating(true)}>
-            <CirclePlus size={16} /> Create your first workspace
+          <Button className="self-start" onClick={() => setCreating(true)}>
+            <CirclePlus size={16} /> Create Workspace
           </Button>
         </div>
-      ) : (
-        <div className="grid gap-4 animate-[fadeIn_220ms_ease-out] sm:grid-cols-2 lg:grid-cols-3">
-          {workspaces.map(workspace => (
-            <WorkspaceCard
-              key={workspace.id}
-              workspace={workspace}
-              memberCount={memberCounts[workspace.id] ?? 1}
-            />
-          ))}
-        </div>
-      )}
+        {!ready ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2].map(i => (
+              <WorkspaceCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : workspaces.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-sage/70 px-6 py-12 text-center animate-[fadeIn_220ms_ease-out]">
+            <div className="grid h-12 w-12 place-items-center rounded-xl bg-sage/10 text-forest">
+              <Users size={22} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-ink">
+                No shared workspaces yet
+              </p>
+              <p className="mt-1 max-w-xs text-xs leading-5 text-muted">
+                Want to work with others? Create a shared workspace and invite
+                your team — your Personal Workspace stays yours either way.
+              </p>
+            </div>
+            <Button onClick={() => setCreating(true)}>
+              <CirclePlus size={16} /> Create Workspace
+            </Button>
+          </div>
+        ) : (
+          <div className="grid gap-4 animate-[fadeIn_220ms_ease-out] sm:grid-cols-2 lg:grid-cols-3">
+            {workspaces.map(workspace => (
+              <WorkspaceCard
+                key={workspace.id}
+                workspace={workspace}
+                memberCount={memberCounts[workspace.id] ?? 1}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
       {creating && (
         <CreateWorkspaceModal
           onCreate={createWorkspace}
@@ -282,6 +337,7 @@ function WorkspacesContent({ user }: { user: AuthUser }) {
           onClose={() => setRejecting(null)}
         />
       )}
+      <GuestWorkPrompt />
     </>
   )
 }

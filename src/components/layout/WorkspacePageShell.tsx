@@ -7,13 +7,12 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import type { AuthUser } from '@/hooks/useAuth'
-import { useMyInvitations } from '@/hooks/useMyInvitations'
+import { PERSONAL_WORKSPACE_PATH } from '@/lib/workspaces'
 
-// Shared chrome for every /workspaces route. Guests are redirected home
-// (where the header's "Shared Workspaces" button opens the sign-in modal)
-// rather than this shell rendering its own auth modal — by the time this
-// shell's content is shown, `user` is already guaranteed non-null, so a
-// modal trigger here would never actually be reachable.
+// Shared chrome for the /workspaces hub. Signed-out visitors never get this
+// far (the middleware sends them to the sign-in prompt on `/`; the guard
+// below is the client-side backstop), so by the time this shell's content is
+// shown, `user` is guaranteed non-null.
 export function WorkspacePageShell({
   notice,
   onDismissNotice,
@@ -24,7 +23,6 @@ export function WorkspacePageShell({
   children: (context: { user: AuthUser }) => ReactNode
 }) {
   const { user, ready, handleLogout } = useAuthGuard()
-  const { invitations } = useMyInvitations(user)
   const router = useRouter()
 
   if (!ready || !user) {
@@ -34,14 +32,14 @@ export function WorkspacePageShell({
   return (
     <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_80%_0%,#e4f0e6_0,transparent_30%),linear-gradient(135deg,#f8faf7_0%,#eff3ee_100%)] text-ink">
       <Header
-        onSettings={() => router.push('/')}
         user={user}
         authReady={ready}
         onOpenAuth={() => {}}
-        onOpenWorkspaces={() => router.push('/')}
+        onOpenWorkspaces={() => router.push(PERSONAL_WORKSPACE_PATH)}
         onLogout={handleLogout}
-        pendingInvitationCount={invitations.length}
         context="workspaces"
+        homeHref="/workspaces"
+        homeLabel="Go to your workspaces"
       />
       <div className="mx-auto w-[min(1120px,calc(100%-32px))] pb-16 pt-10">
         {notice && (
