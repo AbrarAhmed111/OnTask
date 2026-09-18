@@ -1,7 +1,10 @@
 import { ClipboardPlus } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 
-export function EmptyState({ onAdd }: { onAdd: () => void }) {
+// The guest dashboard's first-run call to action. A full-width landing prompt
+// rather than a section placeholder, so it's deliberately separate from the
+// shared dashed EmptyState (components/ui/EmptyState) used inside workspaces.
+export function FirstTaskPrompt({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="rounded-2xl border border-dashed border-sage/60 bg-white/45 px-6 py-16 text-center">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-sage/20 text-forest">

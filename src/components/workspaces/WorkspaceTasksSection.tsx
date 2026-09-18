@@ -1,14 +1,10 @@
-import {
-  AlertTriangle,
-  CircleCheck,
-  CirclePlus,
-  Clock3,
-  ListTodo,
-  Users,
-} from 'lucide-react'
+import { CircleCheck, CirclePlus, Clock3, ListTodo, Users } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { WorkspaceTaskList } from '@/components/workspaces/WorkspaceTaskList'
+import { TourAnchor, tourAnchor } from '@/lib/tourAnchors'
 import { WorkspaceMember, WorkspaceTask } from '@/types/workspace'
 import type { AuthUser } from '@/hooks/useAuth'
 
@@ -17,14 +13,19 @@ function StatCard({
   label,
   value,
   valueClassName = 'text-ink',
+  tour,
 }: {
   icon: typeof Clock3
   label: string
   value: number
   valueClassName?: string
+  tour?: TourAnchor
 }) {
   return (
-    <div className="rounded-xl border border-line bg-panel px-4 py-3">
+    <div
+      {...(tour && tourAnchor(tour))}
+      className="rounded-xl border border-line bg-panel px-4 py-3"
+    >
       <p className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-muted">
         <Icon size={12} /> {label}
       </p>
@@ -156,11 +157,14 @@ export function WorkspaceTasksSection({
             {!isPersonal && (
               <StatCard icon={Users} label="Members" value={stats.members} />
             )}
+            {/* The always-rendered "who's working" anchor: the panel below only
+                exists while someone is mid-task, so a tour can't rely on it. */}
             <StatCard
               icon={Clock3}
               label="Working"
               value={stats.working}
               valueClassName="text-[var(--ws-accent,#375b4b)]"
+              tour="working-now"
             />
             <StatCard icon={ListTodo} label="Queued" value={stats.queued} />
             <StatCard
@@ -172,12 +176,7 @@ export function WorkspaceTasksSection({
         )}
       </div>
 
-      {ready && error && (
-        <div className="mb-6 flex items-start gap-2 rounded-xl border border-coral/20 bg-coral/5 p-3 text-xs leading-5 text-coral">
-          <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {ready && error && <ErrorBanner className="mb-6">{error}</ErrorBanner>}
 
       {ready && workingNow.length > 0 && (
         <div className="mb-6 rounded-2xl border border-sage/40 bg-sage/5 p-5 sm:p-6">
@@ -216,7 +215,7 @@ export function WorkspaceTasksSection({
         </div>
       )}
 
-      <div>
+      <div {...tourAnchor('today-tasks')}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-bold tracking-tight text-ink">
             Queue{' '}
@@ -238,13 +237,13 @@ export function WorkspaceTasksSection({
             <TaskRowSkeleton />
           </div>
         ) : queueTasks.length === 0 && workingGoalTasks.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-sage/70 px-5 py-10 text-center text-xs text-muted">
+          <EmptyState>
             {tasks.length === 0
               ? isPersonal
                 ? 'No tasks yet — add one to start planning your day.'
                 : 'No tasks yet — add one to start planning together.'
               : 'Everything is done — nice work.'}
-          </div>
+          </EmptyState>
         ) : (
           <div className="space-y-2 rounded-2xl border border-line bg-panel p-3">
             {goalWorkingRows}

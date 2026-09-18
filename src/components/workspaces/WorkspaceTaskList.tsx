@@ -1,6 +1,7 @@
 import { WorkspaceMember, WorkspaceTask } from '@/types/workspace'
 import { WorkspaceTaskCard } from '@/components/workspaces/WorkspaceTaskCard'
 import { WorkspaceParentTaskCard } from '@/components/workspaces/WorkspaceParentTaskCard'
+import { TaskTree } from '@/components/tasks/TaskTree'
 import type { AuthUser } from '@/hooks/useAuth'
 
 // Renders a flat task list, or a Task -> Subtask tree when some tasks carry
@@ -9,6 +10,7 @@ import type { AuthUser } from '@/hooks/useAuth'
 // permanently-flat workspace overview list and a single Goal's task tree;
 // which one it's rendering falls out of whether any task in `tasks` has a
 // parentTaskId, and whether the hierarchy-management callbacks are passed.
+// Layout and drag-reorder are shared with the guest's list (TaskTree).
 export function WorkspaceTaskList({
   tasks,
   members,
@@ -47,89 +49,60 @@ export function WorkspaceTaskList({
   getBlockedBy?: (task: WorkspaceTask) => string[]
   onManageDependencies?: (task: WorkspaceTask) => void
 }) {
-  const rootTasks = tasks.filter(task => !task.parentTaskId)
-  const childrenOf = (parentId: string) =>
-    tasks.filter(task => task.parentTaskId === parentId)
-  const moveOptions = rootTasks.map(task => ({ id: task.id, name: task.name }))
-
-  const handleDrop = (event: React.DragEvent<HTMLElement>, toIndex: number) => {
-    event.preventDefault()
-    const fromIndex = Number(event.dataTransfer.getData('text/task-index'))
-    onReorder(fromIndex, toIndex)
-  }
-
   return (
-    <div className="space-y-3">
-      {rootTasks.map((task, index) => {
-        const subtasks = childrenOf(task.id)
-        if (subtasks.length > 0) {
-          return (
-            <WorkspaceParentTaskCard
-              key={task.id}
-              parent={task}
-              subtasks={subtasks}
-              members={members}
-              user={user}
-              getWorkedSeconds={getWorkedSeconds}
-              onStart={onStart}
-              onPause={onPause}
-              onEmergencyStop={onEmergencyStop}
-              onFinish={onFinish}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onReassign={onReassign}
-              onAddSubtask={() => onAddSubtask?.(task.id)}
-              onDeleteParent={() => onDeleteParent?.(task)}
-              moveOptions={moveOptions.filter(option => option.id !== task.id)}
-              onMoveTo={(taskId, parentId) => onMoveTo?.(taskId, parentId)}
-              getBlockedBy={getBlockedBy}
-              onManageDependencies={onManageDependencies}
-            />
-          )
-        }
-        return (
-          <WorkspaceTaskCard
-            key={task.id}
-            task={task}
-            index={index}
-            workedSeconds={Math.round(getWorkedSeconds(task))}
-            members={members}
-            user={user}
-            onStart={() => onStart(task.id)}
-            onPause={() => onPause(task)}
-            onEmergencyStop={
-              onEmergencyStop ? () => onEmergencyStop(task) : undefined
-            }
-            onFinish={() => onFinish(task)}
-            onEdit={() => onEdit(task)}
-            onDelete={() => onDelete(task.id)}
-            onReassign={userId => onReassign(task.id, userId)}
-            onAddSubtask={
-              onAddSubtask ? () => onAddSubtask(task.id) : undefined
-            }
-            moveOptions={
-              onMoveTo
-                ? moveOptions.filter(option => option.id !== task.id)
-                : undefined
-            }
-            onMoveTo={
-              onMoveTo ? parentId => onMoveTo(task.id, parentId) : undefined
-            }
-            blockedBy={getBlockedBy?.(task)}
-            onManageDependencies={
-              onManageDependencies
-                ? () => onManageDependencies(task)
-                : undefined
-            }
-            onDragStart={event => {
-              event.dataTransfer.effectAllowed = 'move'
-              event.dataTransfer.setData('text/task-index', String(index))
-            }}
-            onDragOver={event => event.preventDefault()}
-            onDrop={event => handleDrop(event, index)}
-          />
-        )
-      })}
-    </div>
+    <TaskTree
+      tasks={tasks}
+      onReorder={onReorder}
+      renderParent={(parent, subtasks, moveOptions) => (
+        <WorkspaceParentTaskCard
+          parent={parent}
+          subtasks={subtasks}
+          members={members}
+          user={user}
+          getWorkedSeconds={getWorkedSeconds}
+          onStart={onStart}
+          onPause={onPause}
+          onEmergencyStop={onEmergencyStop}
+          onFinish={onFinish}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onReassign={onReassign}
+          onAddSubtask={() => onAddSubtask?.(parent.id)}
+          onDeleteParent={() => onDeleteParent?.(parent)}
+          moveOptions={moveOptions}
+          onMoveTo={(taskId, parentId) => onMoveTo?.(taskId, parentId)}
+          getBlockedBy={getBlockedBy}
+          onManageDependencies={onManageDependencies}
+        />
+      )}
+      renderTask={(task, { index, moveOptions, drag }) => (
+        <WorkspaceTaskCard
+          task={task}
+          index={index}
+          workedSeconds={Math.round(getWorkedSeconds(task))}
+          members={members}
+          user={user}
+          onStart={() => onStart(task.id)}
+          onPause={() => onPause(task)}
+          onEmergencyStop={
+            onEmergencyStop ? () => onEmergencyStop(task) : undefined
+          }
+          onFinish={() => onFinish(task)}
+          onEdit={() => onEdit(task)}
+          onDelete={() => onDelete(task.id)}
+          onReassign={userId => onReassign(task.id, userId)}
+          onAddSubtask={onAddSubtask ? () => onAddSubtask(task.id) : undefined}
+          moveOptions={onMoveTo ? moveOptions : undefined}
+          onMoveTo={
+            onMoveTo ? parentId => onMoveTo(task.id, parentId) : undefined
+          }
+          blockedBy={getBlockedBy?.(task)}
+          onManageDependencies={
+            onManageDependencies ? () => onManageDependencies(task) : undefined
+          }
+          drag={drag}
+        />
+      )}
+    />
   )
 }

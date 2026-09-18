@@ -2,20 +2,38 @@
 
 import { FormEvent } from 'react'
 import { TaskFormValues } from '@/types'
+import { WorkspaceMember } from '@/types/workspace'
 import { Button } from '@/components/ui/Button'
 
+// The one form for creating or editing a task — the guest's local tasks and
+// every kind of workspace task have the same fields. The only structural
+// difference is handing a task to someone else, so that's the one optional
+// slot; the wording differs a little between a guest's "today" and a
+// workspace's plan, so that's two strings.
 export function TaskForm({
   values,
   setValues,
   submitLabel,
   onSubmit,
   onCancel,
+  assignment,
+  targetLabel = "Today's target",
+  namePlaceholder = 'e.g. Project Development',
 }: {
   values: TaskFormValues
   setValues: (values: TaskFormValues) => void
   submitLabel: string
   onSubmit: (event: FormEvent) => void
   onCancel: () => void
+  // Present only where a task can be given to someone else (a shared
+  // workspace). Omit it for the guest dashboard and a personal workspace.
+  assignment?: {
+    members: WorkspaceMember[]
+    assignedTo: string
+    onChange: (userId: string) => void
+  }
+  targetLabel?: string
+  namePlaceholder?: string
 }) {
   const update = (key: keyof TaskFormValues, value: string | boolean) =>
     setValues({ ...values, [key]: value })
@@ -27,12 +45,29 @@ export function TaskForm({
           required
           value={values.name}
           onChange={event => update('name', event.target.value)}
-          placeholder="e.g. Project Development"
+          placeholder={namePlaceholder}
           className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted/60 focus:border-sage focus:ring-4 focus:ring-sage/15"
         />
       </label>
+      {assignment && (
+        <label className="block text-xs font-semibold text-muted">
+          Assign to
+          <select
+            value={assignment.assignedTo}
+            onChange={event => assignment.onChange(event.target.value)}
+            className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-sage focus:ring-4 focus:ring-sage/15"
+          >
+            <option value="">Unassigned</option>
+            {assignment.members.map(member => (
+              <option key={member.userId} value={member.userId}>
+                {member.fullName || member.email}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="block text-xs font-semibold text-muted">
-        Today&apos;s target
+        {targetLabel}
         <div className="mt-2 flex items-center gap-2">
           <input
             required

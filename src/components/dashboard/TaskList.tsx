@@ -1,6 +1,7 @@
 import { Task } from '@/types'
 import { TaskCard } from '@/components/dashboard/TaskCard'
 import { ParentTaskCard } from '@/components/dashboard/ParentTaskCard'
+import { TaskTree } from '@/components/tasks/TaskTree'
 
 export function TaskList({
   tasks,
@@ -31,67 +32,46 @@ export function TaskList({
   onDeleteParent: (task: Task) => void
   onMoveTo: (taskId: string, parentId: string | null) => void
 }) {
-  const rootTasks = tasks.filter(task => !task.parentTaskId)
-  const childrenOf = (parentId: string) =>
-    tasks.filter(task => task.parentTaskId === parentId)
-  const moveOptions = rootTasks.map(task => ({ id: task.id, name: task.name }))
-
-  const handleDrop = (event: React.DragEvent<HTMLElement>, toIndex: number) => {
-    event.preventDefault()
-    const fromIndex = Number(event.dataTransfer.getData('text/task-index'))
-    onReorder(fromIndex, toIndex)
-  }
-
   return (
-    <div className="space-y-3">
-      {rootTasks.map((task, index) => {
-        const subtasks = childrenOf(task.id)
-        if (subtasks.length > 0) {
-          return (
-            <ParentTaskCard
-              key={task.id}
-              parent={task}
-              subtasks={subtasks}
-              getWorkedSeconds={getWorkedSeconds}
-              onStart={onStart}
-              onPause={onPause}
-              onFinish={onFinish}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onRestart={onRestart}
-              onUpdateGoal={onUpdateGoal}
-              onAddSubtask={() => onAddSubtask(task.id)}
-              onDeleteParent={() => onDeleteParent(task)}
-              moveOptions={moveOptions.filter(option => option.id !== task.id)}
-              onMoveTo={onMoveTo}
-            />
-          )
-        }
-        return (
-          <TaskCard
-            key={task.id}
-            task={task}
-            index={index}
-            workedSeconds={Math.round(getWorkedSeconds(task))}
-            onStart={() => onStart(task.id)}
-            onPause={() => onPause(task)}
-            onFinish={() => onFinish(task)}
-            onEdit={() => onEdit(task)}
-            onDelete={() => onDelete(task.id)}
-            onRestart={() => onRestart(task)}
-            onUpdateGoal={() => onUpdateGoal(task)}
-            onAddSubtask={() => onAddSubtask(task.id)}
-            moveOptions={moveOptions.filter(option => option.id !== task.id)}
-            onMoveTo={parentId => onMoveTo(task.id, parentId)}
-            onDragStart={event => {
-              event.dataTransfer.effectAllowed = 'move'
-              event.dataTransfer.setData('text/task-index', String(index))
-            }}
-            onDragOver={event => event.preventDefault()}
-            onDrop={event => handleDrop(event, index)}
-          />
-        )
-      })}
-    </div>
+    <TaskTree
+      tasks={tasks}
+      onReorder={onReorder}
+      renderParent={(parent, subtasks, moveOptions) => (
+        <ParentTaskCard
+          parent={parent}
+          subtasks={subtasks}
+          getWorkedSeconds={getWorkedSeconds}
+          onStart={onStart}
+          onPause={onPause}
+          onFinish={onFinish}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onRestart={onRestart}
+          onUpdateGoal={onUpdateGoal}
+          onAddSubtask={() => onAddSubtask(parent.id)}
+          onDeleteParent={() => onDeleteParent(parent)}
+          moveOptions={moveOptions}
+          onMoveTo={onMoveTo}
+        />
+      )}
+      renderTask={(task, { index, moveOptions, drag }) => (
+        <TaskCard
+          task={task}
+          index={index}
+          workedSeconds={Math.round(getWorkedSeconds(task))}
+          onStart={() => onStart(task.id)}
+          onPause={() => onPause(task)}
+          onFinish={() => onFinish(task)}
+          onEdit={() => onEdit(task)}
+          onDelete={() => onDelete(task.id)}
+          onRestart={() => onRestart(task)}
+          onUpdateGoal={() => onUpdateGoal(task)}
+          onAddSubtask={() => onAddSubtask(task.id)}
+          moveOptions={moveOptions}
+          onMoveTo={parentId => onMoveTo(task.id, parentId)}
+          drag={drag}
+        />
+      )}
+    />
   )
 }
