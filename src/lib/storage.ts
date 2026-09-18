@@ -1,5 +1,32 @@
 import { Settings, Task } from '@/types'
 
+// ── Where state lives in OnTask ─────────────────────────────────────────────
+// Persistence follows what the state belongs to, never which component
+// happens to be mounted:
+//
+//  Guest tasks            -> localStorage (this file). Local-first: a guest
+//                            never touches Supabase. When they sign in, the
+//                            guest -> account prompt below offers to import
+//                            them into their Personal Workspace.
+//  Preferences            -> localStorage (this file: `Settings`, e.g. the
+//                            completion sound). Per person and per device, so
+//                            they apply the same to a guest, a personal
+//                            workspace and every shared workspace — there is
+//                            deliberately no per-workspace copy.
+//  Workspace state        -> Supabase, for personal AND shared workspaces
+//  (tasks, goals, notes,     alike: a signed-in user's Personal Workspace is
+//  resources, name,          an ordinary `workspaces` row (type = 'personal'),
+//  accent, timezone, ...)    so it is server-backed under RLS with realtime,
+//                            not localStorage. The workspace accent is a
+//                            property of the workspace (everyone in it sees
+//                            the same one), not of the viewer.
+//  Workspace identity     -> localStorage, as a paint-first *cache only*
+//  (name/accent/timezone)    (lib/redux/persist.ts) so a refresh doesn't
+//                            flash defaults. Supabase stays the source of
+//                            truth and overwrites it on every load.
+//
+// The app has no light/dark mode; "theme" means the workspace accent.
+
 const TASKS_KEY = 'ontask-tasks-v2'
 const SETTINGS_KEY = 'ontask-settings-v1'
 // Legacy (pre-Personal-Workspace) flag: a single "the guest -> account prompt
