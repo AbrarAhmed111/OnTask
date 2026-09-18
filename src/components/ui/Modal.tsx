@@ -6,16 +6,20 @@ import { X } from 'lucide-react'
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+const SIZE_CLASSES = { md: 'max-w-md', lg: 'max-w-4xl' }
+
 export function Modal({
   title,
   eyebrow,
   children,
   onClose,
+  size = 'md',
 }: {
   title: string
   eyebrow?: string
   children: ReactNode
   onClose: () => void
+  size?: 'md' | 'lg'
 }) {
   const dialogRef = useRef<HTMLElement>(null)
   const previouslyFocusedRef = useRef<HTMLElement | null>(null)
@@ -95,7 +99,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby="modal-title"
         tabIndex={-1}
-        className="w-full max-w-md rounded-2xl border border-line bg-panel p-6 shadow-2xl outline-none animate-[modalIn_220ms_ease-out]"
+        className={`w-full ${SIZE_CLASSES[size]} rounded-2xl border border-line bg-panel p-6 shadow-2xl outline-none animate-[modalIn_220ms_ease-out]`}
       >
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
