@@ -117,13 +117,41 @@ call; **Start Fresh** leaves them on the device untouched.
 - Hierarchical workspace tasks (parent tasks with subtasks), each with a
   planned duration, an assignee, and an optional linked goal.
 - Shared timers sync in real time via Supabase Realtime — teammates see a
-  task move between queued, working, paused, completed, and skipped as it
-  happens.
+  task move between queued, working, paused, blocked, completed, and skipped
+  as it happens.
 - Live presence: a status dot on each member's avatar shows who currently
   has the workspace open, with a brief animation on the moment someone comes
   online or goes offline.
 - Activity feed logging task creation, edits, progress changes,
   (re)assignment, and completion across the workspace.
+
+### Task Blockers
+
+A blocker answers *why can't this task move forward?* It is not a paused task
+(stopped on purpose) and not a Goal dependency (a derived link between two
+tasks). It is a shared-workspace feature — a Personal Workspace has no one to
+wait on.
+
+- The task's assignee marks it **Blocked** with a reason and can `@mention`
+  workspace members. Blocking a running task stops its timer and keeps the
+  focused time so far; blocked time is never focused time.
+- Everyone in the workspace sees the blocker and who was asked. Only the
+  **current assignee** or a **member mentioned in it** can resolve it — the
+  workspace owner gets no bypass, and reassigning a task moves the right to the
+  new assignee. Resolving puts the task back in the queue and never starts a
+  timer.
+- A mentioned member gets an in-app notification that opens the task (once per
+  new mention, never for a wording edit); the assignee is told when someone else
+  resolves their blocker.
+- Blockers appear in the activity feed and in the Daily Report as recorded
+  facts (the reason, who was asked, who resolved it); the AI narration can only
+  describe them.
+
+The rules are enforced in Postgres, not just the UI
+([`0041_task_blockers.sql`](supabase/migrations/0041_task_blockers.sql)); check
+them with
+[`supabase/tests/0041_task_blockers.sql`](supabase/tests/0041_task_blockers.sql)
+against a scratch project.
 
 ### Notifications
 
