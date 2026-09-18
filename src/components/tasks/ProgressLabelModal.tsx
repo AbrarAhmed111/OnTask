@@ -6,7 +6,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 
-export function GoalModal({
+export function ProgressLabelModal({
   progress,
   setProgress,
   onSave,
@@ -20,12 +20,12 @@ export function GoalModal({
   return (
     <Modal
       eyebrow="Long-term progress"
-      title="Update goal progress"
+      title="Update progress"
       onClose={onClose}
     >
       <form onSubmit={onSave}>
         <label className="block text-xs font-semibold text-muted">
-          How complete is the overall goal now?
+          How complete is this now?
           <div className="mt-2 flex items-center gap-2">
             <input
               autoFocus

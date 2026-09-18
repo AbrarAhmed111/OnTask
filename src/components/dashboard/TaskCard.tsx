@@ -12,7 +12,7 @@ import { Task } from '@/types'
 import { formatPlanned, formatTime } from '@/lib/time'
 import { Button } from '@/components/ui/Button'
 import { ProgressBar } from '@/components/ui/ProgressBar'
-import { GoalProgress } from '@/components/goals/GoalProgress'
+import { ProgressLabel } from '@/components/tasks/ProgressLabel'
 
 type TaskCardProps = {
   task: Task
@@ -147,10 +147,10 @@ export function TaskCard({
           />
         </div>
 
-        {task.goalName && (
-          <GoalProgress
-            name={task.goalName}
-            progress={task.goalProgress || 0}
+        {task.progressLabel && (
+          <ProgressLabel
+            name={task.progressLabel}
+            progress={task.progressPercentage || 0}
           />
         )}
       </div>
@@ -162,9 +162,9 @@ export function TaskCard({
               <CirclePlus size={13} /> Subtask
             </button>
           )}
-          {task.goalName && (
+          {task.progressLabel && (
             <button onClick={onUpdateGoal} className={ghostChip}>
-              Update goal
+              Update progress
             </button>
           )}
           {onMoveTo && (

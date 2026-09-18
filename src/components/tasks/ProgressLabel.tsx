@@ -1,7 +1,10 @@
 import { Target } from 'lucide-react'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 
-export function GoalProgress({
+// A free-text label + manual percent a member can track on any task —
+// unrelated to workspace Goals (src/components/goals/*), which are a real
+// hierarchical entity with their own tasks/subtasks/dependencies.
+export function ProgressLabel({
   name,
   progress,
 }: {

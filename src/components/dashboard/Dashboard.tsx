@@ -13,7 +13,7 @@ import { Task, TaskFormValues } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { TaskForm } from '@/components/tasks/TaskForm'
-import { GoalModal } from '@/components/tasks/GoalModal'
+import { ProgressLabelModal } from '@/components/tasks/ProgressLabelModal'
 import { CompletionModal } from '@/components/tasks/CompletionModal'
 import { SettingsModal } from '@/components/settings/SettingsModal'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -89,7 +89,7 @@ export function Dashboard() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [pendingParentId, setPendingParentId] = useState<string | null>(null)
   const [form, setForm] = useState<TaskFormValues>(emptyForm)
-  const [goalProgress, setGoalProgress] = useState('0')
+  const [progressPercentageInput, setProgressPercentageInput] = useState('0')
   const [notice, setNotice] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null)
@@ -230,15 +230,15 @@ export function Dashboard() {
       name: task.name,
       hours: String(Math.floor(task.plannedMinutes / 60)),
       minutes: String(task.plannedMinutes % 60),
-      goal: task.goalName || '',
-      progress: String(task.goalProgress || 0),
-      trackGoal: Boolean(task.goalName),
+      goal: task.progressLabel || '',
+      progress: String(task.progressPercentage || 0),
+      trackGoal: Boolean(task.progressLabel),
     })
     setModal('edit')
   }
   const openGoal = (task: Task) => {
     setEditingId(task.id)
-    setGoalProgress(String(task.goalProgress || 0))
+    setProgressPercentageInput(String(task.progressPercentage || 0))
     setModal('goal')
   }
 
@@ -264,8 +264,8 @@ export function Dashboard() {
     updateTask(editingId, {
       name: form.name.trim(),
       plannedMinutes,
-      goalName: form.trackGoal ? form.goal.trim() || undefined : undefined,
-      goalProgress: form.trackGoal
+      progressLabel: form.trackGoal ? form.goal.trim() || undefined : undefined,
+      progressPercentage: form.trackGoal
         ? Math.min(100, Math.max(0, Number(form.progress) || 0))
         : undefined,
     })
@@ -276,7 +276,10 @@ export function Dashboard() {
     event.preventDefault()
     if (editingId)
       updateTask(editingId, {
-        goalProgress: Math.min(100, Math.max(0, Number(goalProgress) || 0)),
+        progressPercentage: Math.min(
+          100,
+          Math.max(0, Number(progressPercentageInput) || 0),
+        ),
       })
     closeModal()
     setNotice('Goal progress updated.')
@@ -512,9 +515,9 @@ export function Dashboard() {
         </Modal>
       )}
       {modal === 'goal' && (
-        <GoalModal
-          progress={goalProgress}
-          setProgress={setGoalProgress}
+        <ProgressLabelModal
+          progress={progressPercentageInput}
+          setProgress={setProgressPercentageInput}
           onSave={handleGoal}
           onClose={closeModal}
         />
