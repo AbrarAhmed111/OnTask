@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTour } from '@/components/tour/TourProvider'
 import { useWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailContext'
 import { TOURS, tourIdForWorkspace } from '@/lib/tour/definitions'
+import { shouldAutoStartInitialTour } from '@/lib/tour/eligibility'
 import { fetchTourOutcome } from '@/lib/tour/progress'
 
 // A beat between "the page has its content" and "a tour opens over it", so the
@@ -11,13 +12,10 @@ import { fetchTourOutcome } from '@/lib/tour/progress'
 const SETTLE_MS = 600
 
 // Runs the workspace's tour from the Overview, where every target lives.
-// Two things start it:
-//
-//  - First visit: this user has never completed or skipped this workspace's
-//    tour (per workspace -- see lib/tour/progress). It opens by itself, once,
-//    when the page is ready and nothing else is asking for attention.
-//  - Replay: Settings filed a request (see TourProvider). It opens the same
-//    way but ignores what was recorded.
+// Automatic onboarding is user-level: only an unseen Personal Workspace tour
+// can open on its own. A shared workspace never becomes eligible merely by
+// being new to the user. Replay from Settings remains available for either
+// workspace type and intentionally ignores the recorded outcome.
 //
 // `contentReady` is the page's own "everything has loaded" signal: a tour must
 // wait for it, because steps are only kept if their target is on screen, and
@@ -32,31 +30,38 @@ export function useWorkspaceTour({ contentReady }: { contentReady: boolean }) {
   const tourId = tourIdForWorkspace(isPersonal ? 'personal' : 'shared')
   const userId = user.id
 
-  // true: never seen, so due. false: already completed or skipped. null: not
-  // known yet, or the lookup failed -- and an unknown is never treated as due,
-  // so a broken lookup can't put the tour in front of someone on every load.
-  const [due, setDue] = useState<boolean | null>(null)
-  // Tours this page has already opened on its own, so finishing one (which
-  // leaves `due` stale until the next visit) can't reopen it.
+  // This is the user-level initial onboarding flag, persisted through the
+  // user's Personal Workspace progress row. Existing members are backfilled as
+  // skipped by migration 0039; a new account has no row until this tour ends.
+  const [initialTourDue, setInitialTourDue] = useState<boolean | null>(null)
+  // The initial tour already opened during this mounted visit. This prevents
+  // stale state from reopening it after completion or skipping.
   const opened = useRef(new Set<string>())
 
   useEffect(() => {
-    if (!workspaceId) return
+    if (!workspaceId || !isPersonal) {
+      setInitialTourDue(false)
+      return
+    }
     let cancelled = false
-    setDue(null)
-    fetchTourOutcome(userId, workspaceId, tourId)
+    setInitialTourDue(null)
+    fetchTourOutcome(userId, workspaceId, 'personal-workspace')
       .then(outcome => {
-        if (!cancelled) setDue(outcome === null)
+        if (!cancelled) setInitialTourDue(outcome === null)
       })
       .catch(error => console.error('Could not load tour progress:', error))
     return () => {
       cancelled = true
     }
-  }, [userId, workspaceId, tourId])
+  }, [userId, workspaceId, isPersonal])
 
-  const key = `${workspaceId}:${tourId}`
+  const key = `${userId}:initial-onboarding`
   const replaying = replayRequest === tourId
-  const openOnItsOwn = due === true && !opened.current.has(key)
+  const openOnItsOwn = shouldAutoStartInitialTour({
+    isPersonal,
+    initialTourDue,
+    alreadyOpened: opened.current.has(key),
+  })
 
   useEffect(() => {
     if (!workspaceId || !contentReady || !canStart) return

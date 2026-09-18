@@ -1,15 +1,10 @@
 import { createClient } from '@/lib/supabase/client'
 import type { TourId, TourOutcome } from '@/lib/tour/types'
 
-// Which tours a user has already finished or skipped, per workspace: one row
-// per (user, workspace, tour) in user_tour_progress (migration 0039). It lives
-// in Supabase rather than the browser so a tour doesn't come back on another
-// device or after site data is cleared, and it is per workspace because every
-// workspace has its own layout and its own people.
-//
-// A person's Personal Workspace is an ordinary workspace row, so the personal
-// tour is stored the same way -- keyed by that workspace -- with no separate
-// per-user mechanism.
+// Tour outcomes are stored per (user, workspace, tour) in user_tour_progress
+// (migration 0039). The Personal Workspace row acts as the user's initial
+// onboarding checkpoint; shared-workspace rows remain useful for replay
+// history, but they never independently trigger automatic onboarding.
 
 // null: never finished or skipped, so the tour is due. Throws when the lookup
 // itself fails (offline, migration not applied); callers treat that as "not

@@ -177,11 +177,10 @@ the rest of the app is dimmed, the section being explained stays lit, and a
 small card says what it is and what to do there.
 
 - **Personal Workspace tour** — daily tasks, goals, resources and settings.
-  Opens the first time you open your Personal Workspace, after the one-time
-  welcome.
+  Opens once as part of initial user onboarding, after the one-time welcome.
 - **Shared Workspace tour** — members, who is working now, tasks, task notes,
-  goals, resources and activity. Opens the first time you open _each_ shared
-  workspace, not once globally.
+  goals, resources and activity. It does not open automatically when you join
+  or visit a shared workspace; use **Settings → Help & guidance** to replay it.
 - Every tour has Back, Next, Skip and Close, a progress indicator, Escape to
   skip and Left/Right to step. Skipping or finishing is remembered, so a tour
   never comes back on its own; **Settings → Help & guidance** replays it.
@@ -190,8 +189,9 @@ small card says what it is and what to do there.
 
 Progress is stored in Supabase per user, workspace and tour
 ([`0039_user_tour_progress.sql`](supabase/migrations/0039_user_tour_progress.sql)),
-so it follows you across devices. Accounts that already belong to a workspace
-when that migration runs are treated as onboarded there.
+so it follows you across devices. The Personal Workspace row is the user's
+initial onboarding checkpoint; existing members are backfilled as onboarded
+when that migration runs.
 
 ### Automatic Daily Report
 
