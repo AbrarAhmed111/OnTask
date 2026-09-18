@@ -20,6 +20,7 @@ import { SettingsModal } from '@/components/settings/SettingsModal'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { DeleteParentModal } from '@/components/tasks/DeleteParentModal'
 import { AuthModal, AuthStep } from '@/components/auth/AuthModal'
+import { VisitorWelcomeModal } from '@/components/auth/VisitorWelcomeModal'
 import { GoogleOneTap } from '@/components/auth/GoogleOneTap'
 import { useSettings } from '@/hooks/useSettings'
 import { useAuth } from '@/hooks/useAuth'
@@ -28,6 +29,7 @@ import { requestNotificationPermission } from '@/lib/notifications'
 import { showErrorToast, showSuccessToast } from '@/lib/toast'
 import { clientSignout } from '@/lib/auth/signout'
 import { resolvePostLoginDestination } from '@/lib/auth/postLogin'
+import { useVisitorWelcome } from '@/hooks/useVisitorWelcome'
 
 const WORKSPACES_LOGIN_PROMPT =
   'Log in to open your Personal Workspace and your shared workspaces.'
@@ -59,6 +61,7 @@ export function Dashboard() {
     passwordRecovery,
     clearPasswordRecovery,
   } = useAuth()
+  const visitorWelcome = useVisitorWelcome({ authReady, user })
   const completionAlert = useCompletionAlert<Task>(settings.soundEnabled)
   const {
     tasks,
@@ -543,9 +546,18 @@ export function Dashboard() {
           onAuthenticated={handleAuthenticated}
         />
       )}
+      {visitorWelcome.open && !user && (
+        <VisitorWelcomeModal
+          onContinue={visitorWelcome.close}
+          onLogin={() => {
+            visitorWelcome.close()
+            openAuth('login')
+          }}
+        />
+      )}
       {authReady && !user && (
         <GoogleOneTap
-          enabled={modal !== 'auth'}
+          enabled={modal !== 'auth' && !visitorWelcome.open}
           onSignedIn={handleAuthenticated}
         />
       )}
