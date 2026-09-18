@@ -86,7 +86,7 @@ export function WorkspaceActivityFeed({
     )
   }
   return (
-    <div className="divide-y divide-line/70">
+    <div className="max-h-[220px] divide-y divide-line/70 overflow-y-auto">
       {events.map(event => {
         const actor = members.find(member => member.userId === event.actorId)
         const actorName = actor?.fullName || actor?.email || 'Someone'

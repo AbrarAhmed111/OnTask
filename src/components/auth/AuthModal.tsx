@@ -48,6 +48,7 @@ export function AuthModal({
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<{
     title: string
@@ -62,7 +63,7 @@ export function AuthModal({
 
   const handleGoogle = async () => {
     setError('')
-    setLoading(true)
+    setGoogleLoading(true)
     const supabase = createClient()
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -70,7 +71,7 @@ export function AuthModal({
     })
     if (oauthError) {
       setError(oauthError.message)
-      setLoading(false)
+      setGoogleLoading(false)
     }
     // On success the browser navigates to Google, so no further state
     // update happens here — the component unmounts.
@@ -264,9 +265,14 @@ export function AuthModal({
                 variant="secondary"
                 className="w-full"
                 onClick={handleGoogle}
-                disabled={loading}
+                disabled={loading || googleLoading}
               >
-                <FcGoogle size={16} /> Continue with Google
+                {googleLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <FcGoogle size={16} />
+                )}{' '}
+                Continue with Google
               </Button>
               <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
                 <span className="h-px flex-1 bg-line" />
@@ -307,7 +313,11 @@ export function AuthModal({
               >
                 Forgot password?
               </button>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || googleLoading}
+              >
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 Sign in
               </Button>
@@ -368,7 +378,11 @@ export function AuthModal({
                   className={inputClass}
                 />
               </label>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || googleLoading}
+              >
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 Create account
               </Button>

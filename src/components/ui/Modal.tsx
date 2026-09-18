@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useEffect, useRef } from 'react'
+import { ReactNode, useEffect, useLayoutEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 
 const FOCUSABLE_SELECTOR =
@@ -20,7 +20,17 @@ export function Modal({
   const dialogRef = useRef<HTMLElement>(null)
   const previouslyFocusedRef = useRef<HTMLElement | null>(null)
 
+  // Keep the latest onClose reachable without making it an effect
+  // dependency — callers pass an inline function that gets a new identity
+  // on every render (e.g. any re-render triggered by typing into a field
+  // inside the modal), and re-running the effect below on every keystroke
+  // would steal focus back to the dialog's first field each time.
+  const onCloseRef = useRef(onClose)
   useEffect(() => {
+    onCloseRef.current = onClose
+  })
+
+  useLayoutEffect(() => {
     previouslyFocusedRef.current = document.activeElement as HTMLElement | null
 
     // Don't steal focus from a field that already autofocused itself (React
@@ -35,7 +45,7 @@ export function Modal({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose()
+        onCloseRef.current()
         return
       }
       if (event.key !== 'Tab') return
@@ -70,7 +80,9 @@ export function Modal({
         previouslyFocused.focus()
       }
     }
-  }, [onClose])
+    // Intentionally mount/unmount-only — see onCloseRef above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div
