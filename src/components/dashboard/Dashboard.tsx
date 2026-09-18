@@ -98,6 +98,7 @@ export function Dashboard() {
     workspaceName: string
     invitedEmail: string | null
   } | null>(null)
+  const [authSubtitle, setAuthSubtitle] = useState<string | undefined>()
 
   useEffect(() => {
     if (!notice) return
@@ -110,8 +111,9 @@ export function Dashboard() {
     if (dataError) setNotice(dataError)
   }, [dataError])
 
-  const openAuth = (step: AuthStep = 'login') => {
+  const openAuth = (step: AuthStep = 'login', subtitle?: string) => {
     setAuthStep(step)
+    setAuthSubtitle(subtitle)
     setModal('auth')
   }
 
@@ -137,6 +139,20 @@ export function Dashboard() {
     })
     openAuth('login')
   }, [authReady, user, router])
+
+  // A guest bounced off /workspaces (or a specific workspace) by
+  // useAuthGuard lands here as /?authIntent=workspaces — show a contextual
+  // sign-in prompt instead of the bare landing page. Skipped when an
+  // invitation link is also present, since that flow's own copy (above)
+  // already covers it.
+  useEffect(() => {
+    if (!authReady || user) return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('invite') || params.get('authIntent') !== 'workspaces')
+      return
+    window.history.replaceState(null, '', window.location.pathname)
+    openAuth('login', 'Log in to create and join workspaces.')
+  }, [authReady, user])
 
   useEffect(() => {
     if (!passwordRecovery) return
@@ -180,7 +196,7 @@ export function Dashboard() {
 
   const handleOpenWorkspaces = () => {
     if (!user) {
-      openAuth('login')
+      openAuth('login', 'Log in to create and join workspaces.')
       return
     }
     router.push('/workspaces')
@@ -196,6 +212,7 @@ export function Dashboard() {
     setEditingId(null)
     setPendingParentId(null)
     setInviteContext(null)
+    setAuthSubtitle(undefined)
   }
   const openAdd = () => {
     setForm({ ...emptyForm })
@@ -508,6 +525,7 @@ export function Dashboard() {
           inviteId={inviteContext?.id}
           inviteWorkspaceName={inviteContext?.workspaceName}
           prefillEmail={inviteContext?.invitedEmail ?? undefined}
+          subtitle={authSubtitle}
           onClose={closeModal}
           onAuthenticated={handleAuthenticated}
         />

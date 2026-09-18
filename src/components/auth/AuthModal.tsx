@@ -24,6 +24,7 @@ export function AuthModal({
   inviteId,
   inviteWorkspaceName,
   prefillEmail,
+  subtitle,
   onClose,
   onAuthenticated,
 }: {
@@ -39,6 +40,10 @@ export function AuthModal({
   // invitation was sent to) — saves retyping it and steers a visitor away
   // from accidentally authenticating with the wrong account.
   prefillEmail?: string
+  // A short explanatory line shown above the login/signup form, for contexts
+  // where it isn't obvious why sign-in is required (e.g. a guest bounced off
+  // /workspaces). Ignored when inviteWorkspaceName's own copy is showing.
+  subtitle?: string
   onClose: () => void
   onAuthenticated: () => void
 }) {
@@ -190,7 +195,7 @@ export function AuthModal({
 
   return (
     <Modal eyebrow={copy.eyebrow} title={copy.title} onClose={onClose}>
-      {inviteWorkspaceName && (step === 'login' || step === 'signup') && (
+      {inviteWorkspaceName && (step === 'login' || step === 'signup') ? (
         <p className="mb-4 text-xs leading-5 text-muted">
           Once you&apos;re signed in, you&apos;ll be connected to{' '}
           <strong className="font-semibold text-ink">
@@ -198,6 +203,11 @@ export function AuthModal({
           </strong>
           .
         </p>
+      ) : (
+        subtitle &&
+        (step === 'login' || step === 'signup') && (
+          <p className="mb-4 text-xs leading-5 text-muted">{subtitle}</p>
+        )
       )}
       {error && (
         <div className="mb-4 flex items-start gap-2 rounded-xl border border-coral/20 bg-coral/5 p-3 text-xs leading-5 text-coral">

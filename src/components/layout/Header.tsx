@@ -56,15 +56,22 @@ export function Header({
         </div>
         <button
           onClick={onOpenWorkspaces}
-          className="relative hidden items-center gap-1.5 rounded-full border border-line bg-white/60 px-3 py-2 text-[11px] font-semibold text-forest transition hover:border-forest sm:flex"
+          aria-label={
+            context === 'workspaces'
+              ? 'Go to your personal dashboard'
+              : 'Go to Shared Workspaces'
+          }
+          className="relative flex items-center gap-1.5 rounded-full border border-line bg-white/60 px-2.5 py-2 text-[11px] font-semibold text-forest transition hover:border-forest sm:px-3"
         >
           {context === 'workspaces' ? (
             <>
-              <Home size={14} /> Personal
+              <Home size={14} />{' '}
+              <span className="hidden sm:inline">Personal</span>
             </>
           ) : (
             <>
-              <Users size={14} /> Shared Workspaces
+              <Users size={14} />{' '}
+              <span className="hidden sm:inline">Shared Workspaces</span>
             </>
           )}
           {context !== 'workspaces' && pendingInvitationCount > 0 && (
