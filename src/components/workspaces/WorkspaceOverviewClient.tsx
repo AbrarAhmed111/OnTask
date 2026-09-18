@@ -43,7 +43,7 @@ const emptyGoalForm: GoalFormValues = {
 }
 
 export function WorkspaceOverviewClient() {
-  const { workspaceId, user, workspace, members, isOwner, ready } =
+  const { workspaceId, user, workspace, members, isOwner, isPersonal, ready } =
     useWorkspaceDetail()
   const [completionTask, setCompletionTask] = useState<WorkspaceTask | null>(
     null,
@@ -54,6 +54,7 @@ export function WorkspaceOverviewClient() {
     error: tasksError,
     startTask,
     pauseTask,
+    emergencyStopTask,
     finishTask,
     addTask,
     updateTask,
@@ -61,8 +62,12 @@ export function WorkspaceOverviewClient() {
     reassignTask,
     reorderTasks,
     getLiveSeconds,
-  } = useWorkspaceTasks(workspaceId, user, members, task =>
-    setCompletionTask(task),
+  } = useWorkspaceTasks(
+    workspaceId,
+    user,
+    members,
+    task => setCompletionTask(task),
+    isPersonal,
   )
   const {
     goals,
@@ -253,6 +258,7 @@ export function WorkspaceOverviewClient() {
       <WorkspaceTasksSection
         ready={ready && tasksReady}
         error={tasksError}
+        isPersonal={isPersonal}
         stats={stats}
         workingNow={workingNow}
         workingGoalTasks={workingGoalTasks}
@@ -265,6 +271,7 @@ export function WorkspaceOverviewClient() {
         onAddTask={openAddTask}
         onStart={startTask}
         onPause={pauseTask}
+        onEmergencyStop={emergencyStopTask}
         onFinish={handleFinishTask}
         onEdit={openEditTask}
         onDelete={handleDeleteTask}

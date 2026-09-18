@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useTimer } from '@/hooks/useTimer'
 import { notifyTaskCompletion } from '@/lib/notifications'
 import { useWorkspaceTaskActions } from '@/hooks/useWorkspaceTaskActions'
+import { canControlTimer } from '@/lib/tasks/timerPermissions'
 import {
   WorkspaceTaskRow,
   getWorkspaceLiveSeconds,
@@ -52,6 +53,7 @@ export function useGoalDetail(
   user: AuthUser | null,
   members: WorkspaceMember[],
   onComplete?: (task: WorkspaceTask) => void,
+  isPersonal = false,
 ) {
   const userId = user?.id
   const [tasks, setTasks] = useState<WorkspaceTask[]>([])
@@ -244,6 +246,7 @@ export function useGoalDetail(
     updateTask,
     startTask,
     pauseTask,
+    emergencyStopTask,
     finishTask,
     deleteTask,
     moveTask,
@@ -257,6 +260,7 @@ export function useGoalDetail(
     setError,
     onComplete: task => onCompleteRef.current?.(task),
     now,
+    isPersonal,
   })
 
   const addTask = (
@@ -270,7 +274,12 @@ export function useGoalDetail(
   // goal tasks use the identical execution model.
   useEffect(() => {
     if (!userId) return
-    const working = tasks.find(task => task.status === 'working')
+    // Only the timer's own controller completes it — see useWorkspaceTasks.ts.
+    const working = tasks.find(
+      task =>
+        task.status === 'working' &&
+        canControlTimer(task, { userId, isPersonal }),
+    )
     if (
       !working ||
       getWorkspaceLiveSeconds(working, now) < working.plannedMinutes * 60
@@ -302,7 +311,7 @@ export function useGoalDetail(
         completingRef.current.delete(working.id)
         if (rpcError) setError("Couldn't save task completion.")
       })
-  }, [now, tasks, userId])
+  }, [now, tasks, userId, isPersonal])
 
   const tasksMap = buildTasksById(tasks)
 
@@ -314,6 +323,7 @@ export function useGoalDetail(
     updateTask,
     startTask,
     pauseTask,
+    emergencyStopTask,
     finishTask,
     deleteTask,
     moveTask,

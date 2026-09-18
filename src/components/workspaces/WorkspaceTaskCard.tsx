@@ -10,13 +10,20 @@ import {
   Pause,
   Pencil,
   Play,
+  Square,
   Trash2,
 } from 'lucide-react'
 import { WorkspaceMember, WorkspaceTask } from '@/types/workspace'
 import { formatPlanned, formatTime } from '@/lib/time'
+import {
+  canControlTimer,
+  canEmergencyStop,
+  timerLockReason,
+} from '@/lib/tasks/timerPermissions'
 import { Button } from '@/components/ui/Button'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { AssigneePicker } from '@/components/workspaces/AssigneePicker'
+import { useOptionalWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailContext'
 import { ProgressLabel } from '@/components/tasks/ProgressLabel'
 import { TaskNotesPanel } from '@/components/tasks/TaskNotesPanel'
 import type { AuthUser } from '@/hooks/useAuth'
@@ -29,6 +36,7 @@ export function WorkspaceTaskCard({
   user,
   onStart,
   onPause,
+  onEmergencyStop,
   onFinish,
   onEdit,
   onDelete,
@@ -49,6 +57,8 @@ export function WorkspaceTaskCard({
   user: AuthUser | null
   onStart: () => void
   onPause: () => void
+  // Owner-only: stops someone else's running timer (never starts one).
+  onEmergencyStop?: () => void
   onFinish: () => void
   onEdit: () => void
   onDelete: () => void
@@ -84,6 +94,20 @@ export function WorkspaceTaskCard({
           ? 'Paused'
           : 'Queued'
   const assignee = members.find(member => member.userId === task.assignedTo)
+  const workspaceDetail = useOptionalWorkspaceDetail()
+  // Nobody else to hand a task to in a personal workspace.
+  const isPersonal = workspaceDetail?.isPersonal ?? false
+  // Only the task's current assignee drives its timer; the owner gets a
+  // separate, stop-only override for someone else's running one. The server
+  // enforces the same rules — this just hides what it would reject.
+  const timerActor = {
+    userId: user?.id,
+    isPersonal,
+    isOwner: workspaceDetail?.isOwner ?? false,
+  }
+  const canTimer = canControlTimer(task, timerActor)
+  const canStop = canEmergencyStop(task, timerActor)
+  const running = task.status === 'working'
   const ghostChip =
     'inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-1.5 text-[10px] font-semibold text-muted transition hover:border-[var(--ws-accent,#375b4b)] hover:text-[var(--ws-accent,#375b4b)]'
 
@@ -179,11 +203,13 @@ export function WorkspaceTaskCard({
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/70 px-4 py-3 sm:px-5 sm:pl-[68px]">
         <div className="flex flex-wrap items-center gap-2">
-          <AssigneePicker
-            assignee={assignee}
-            members={members}
-            onReassign={onReassign}
-          />
+          {!isPersonal && (
+            <AssigneePicker
+              assignee={assignee}
+              members={members}
+              onReassign={onReassign}
+            />
+          )}
           {onMoveTo && (
             <select
               aria-label={`Move ${task.name}`}
@@ -221,21 +247,23 @@ export function WorkspaceTaskCard({
           >
             <MessageSquare size={13} /> Notes
           </button>
-          {!completed && (
+          {/* Finishing a running task stops its timer, so it needs the same
+              permission as Pause; finishing an idle one is open to anyone. */}
+          {!completed && (canTimer || !running) && (
             <button onClick={onFinish} className={ghostChip}>
               Finish
             </button>
           )}
-          {!completed && (
+          {!completed && canTimer && (
             <Button
-              variant={task.status === 'working' ? 'danger' : 'primary'}
-              onClick={task.status === 'working' ? onPause : onStart}
+              variant={running ? 'danger' : 'primary'}
+              onClick={running ? onPause : onStart}
               disabled={blocked}
               title={
                 blocked ? 'Blocked by an incomplete dependency' : undefined
               }
             >
-              {task.status === 'working' ? (
+              {running ? (
                 <>
                   <Pause size={15} /> Pause
                 </>
@@ -245,6 +273,23 @@ export function WorkspaceTaskCard({
                   {task.status === 'paused' ? 'Resume' : 'Start'}
                 </>
               )}
+            </Button>
+          )}
+          {!completed && !canTimer && !running && (
+            <Button
+              disabled
+              title={timerLockReason(task, timerActor) ?? undefined}
+            >
+              <Play size={15} /> {task.status === 'paused' ? 'Resume' : 'Start'}
+            </Button>
+          )}
+          {canStop && onEmergencyStop && (
+            <Button
+              variant="danger"
+              onClick={onEmergencyStop}
+              title="Stop this timer. The time already recorded is kept and the task stays assigned."
+            >
+              <Square size={14} /> Emergency stop
             </Button>
           )}
           <span className="mx-0.5 h-5 w-px shrink-0 bg-line" />

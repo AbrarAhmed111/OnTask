@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react'
 import { loadTasks, saveTasks } from '@/lib/storage'
 import { getLiveSeconds, useTimer } from '@/hooks/useTimer'
 import { notifyTaskCompletion } from '@/lib/notifications'
+import { shouldReopenOnExtend } from '@/lib/tasks/reopen'
 import { Settings, Task, TaskFormValues } from '@/types'
 
 export function useTasks(
@@ -65,7 +66,19 @@ export function useTasks(
 
   const updateTask = (id: string, update: Partial<Task>) => {
     setTasks(current =>
-      current.map(task => (task.id === id ? { ...task, ...update } : task)),
+      current.map(task =>
+        task.id === id
+          ? {
+              ...task,
+              ...update,
+              // More time on a completed task means it has work left: hand it
+              // back as paused so it can be resumed.
+              ...(shouldReopenOnExtend(task, update.plannedMinutes)
+                ? { status: 'paused' as const, startedAt: null }
+                : {}),
+            }
+          : task,
+      ),
     )
   }
 

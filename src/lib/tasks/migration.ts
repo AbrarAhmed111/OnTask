@@ -1,37 +1,37 @@
 import { createClient } from '@/lib/supabase/client'
 import { getLiveSeconds } from '@/hooks/useTimer'
 import { Task } from '@/types'
-import { taskStatusToRow } from '@/lib/tasks/mappers'
 
 export type MigrationResult =
-  { success: true } | { success: false; error: string }
+  { success: true; imported: number } | { success: false; error: string }
 
-// A locally-active task has no cloud equivalent to hand its running timer to
-// (there's no cross-device "resume this" concept), so it's frozen as paused
-// at whatever it had accumulated — same treatment start_personal_task already
-// gives any other task that gets parked when a new one starts.
-export async function migrateGuestTasks(
+// Saves a guest's local tasks into their Personal Workspace, in one atomic
+// database call (see supabase/migrations/0031_import_guest_tasks_to_personal_
+// workspace.sql for the exact mapping — subtasks become a Goal, statuses map
+// onto workspace statuses, recorded time is carried over).
+//
+// A locally-running task has no cloud timer to hand over, so it's sent with
+// the time it had accumulated and the database parks it as paused.
+export async function importGuestTasksToPersonalWorkspace(
   localTasks: Task[],
 ): Promise<MigrationResult> {
   const now = Date.now()
-  const payload = localTasks.map(task => {
-    const status = task.status === 'active' ? 'paused' : task.status
-    return {
-      id: task.id,
-      parent_task_id: task.parentTaskId,
-      title: task.name,
-      planned_seconds: task.plannedMinutes * 60,
-      actual_seconds: Math.round(getLiveSeconds(task, now)),
-      status: taskStatusToRow(status),
-      progress_label: task.progressLabel ?? null,
-      progress_percentage: task.progressPercentage ?? null,
-    }
-  })
+  const payload = localTasks.map(task => ({
+    id: task.id,
+    parent_task_id: task.parentTaskId,
+    title: task.name,
+    planned_seconds: task.plannedMinutes * 60,
+    actual_seconds: Math.round(getLiveSeconds(task, now)),
+    status: task.status,
+    progress_label: task.progressLabel ?? null,
+    progress_percentage: task.progressPercentage ?? null,
+  }))
 
   const supabase = createClient()
-  const { error } = await supabase.rpc('migrate_guest_tasks', {
-    p_tasks: payload,
-  })
+  const { data, error } = await supabase.rpc(
+    'import_guest_tasks_to_personal_workspace',
+    { p_tasks: payload },
+  )
   if (error) return { success: false, error: error.message }
-  return { success: true }
+  return { success: true, imported: typeof data === 'number' ? data : 0 }
 }

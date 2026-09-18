@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useTimer } from '@/hooks/useTimer'
 import { notifyTaskCompletion } from '@/lib/notifications'
 import { useWorkspaceTaskActions } from '@/hooks/useWorkspaceTaskActions'
+import { canControlTimer } from '@/lib/tasks/timerPermissions'
 import {
   WorkspaceTaskRow,
   getWorkspaceLiveSeconds,
@@ -21,6 +22,7 @@ export function useWorkspaceTasks(
   user: AuthUser | null,
   members: WorkspaceMember[],
   onComplete?: (task: WorkspaceTask) => void,
+  isPersonal = false,
 ) {
   const userId = user?.id
   const [tasks, setTasks] = useState<WorkspaceTask[]>([])
@@ -129,6 +131,7 @@ export function useWorkspaceTasks(
     updateTask,
     startTask,
     pauseTask,
+    emergencyStopTask,
     finishTask,
     deleteTask,
     reassignTask,
@@ -141,6 +144,7 @@ export function useWorkspaceTasks(
     setError,
     onComplete: task => onCompleteRef.current?.(task),
     now,
+    isPersonal,
   })
 
   // Flat tasks never have a parent or a goal — the two params other callers
@@ -185,7 +189,13 @@ export function useWorkspaceTasks(
 
   useEffect(() => {
     if (!userId) return
-    const working = tasks.find(task => task.status === 'working')
+    // Only the timer's own controller completes it — every member's browser
+    // sees the same running task, and the server rejects anyone else.
+    const working = tasks.find(
+      task =>
+        task.status === 'working' &&
+        canControlTimer(task, { userId, isPersonal }),
+    )
     if (
       !working ||
       getWorkspaceLiveSeconds(working, now) < working.plannedMinutes * 60
@@ -217,7 +227,7 @@ export function useWorkspaceTasks(
         completingRef.current.delete(working.id)
         if (rpcError) setError("Couldn't save task completion.")
       })
-  }, [now, tasks, userId])
+  }, [now, tasks, userId, isPersonal])
 
   const activeTask = tasks.find(task => task.status === 'working')
 
@@ -230,6 +240,7 @@ export function useWorkspaceTasks(
     updateTask,
     startTask,
     pauseTask,
+    emergencyStopTask,
     finishTask,
     deleteTask,
     reassignTask,

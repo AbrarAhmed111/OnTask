@@ -1,8 +1,18 @@
 export type WorkspaceRole = 'owner' | 'member'
 
+// A `personal` workspace is the single, private, owner-only workspace every
+// registered user gets automatically; `shared` workspaces are the
+// collaborative ones. Both live in the same table and share every feature —
+// see supabase/migrations/0028_personal_workspaces.sql.
+export type WorkspaceType = 'personal' | 'shared'
+
 export type Workspace = {
   id: string
+  // For a personal workspace this is always the reserved alias
+  // `personal-workspace` (the same URL for every user) rather than the row's
+  // stored slug — see lib/workspaces.ts.
   slug: string
+  type: WorkspaceType
   name: string
   description: string | null
   ownerId: string
@@ -34,6 +44,10 @@ export type WorkspaceInvitation = {
   workspaceId: string
   workspaceName: string | null
   invitedBy: string
+  // Display name (or email) of whoever sent the invitation. Only populated
+  // for the invitee's own list (list_my_pending_invitations) — the owner's
+  // per-workspace list already knows who they are.
+  inviterName: string | null
   invitedEmail: string
   invitedUserId: string | null
   message: string | null
@@ -120,6 +134,8 @@ export type NotificationType =
   | 'member_joined'
   | 'member_removed'
   | 'daily_report_ready'
+  // The workspace owner emergency-stopped this member's running task timer.
+  | 'timer_stopped'
 
 export type NotificationEntityType =
   'task' | 'goal' | 'resource' | 'note' | 'workspace'
@@ -138,6 +154,16 @@ export type WorkspaceNotification = {
   actorId: string | null
   readAt: string | null
   createdAt: string
+}
+
+// A notification as the bell renders it: the row plus the workspace it came
+// from, so every entry can name (and deep-link to) its origin. See
+// lib/workspaceNotifications.ts.
+export type NotificationWithWorkspace = WorkspaceNotification & {
+  workspaceSlug: string
+  workspaceName: string
+  workspaceType: WorkspaceType
+  workspaceAccent: string
 }
 
 export type WorkspaceResource = {

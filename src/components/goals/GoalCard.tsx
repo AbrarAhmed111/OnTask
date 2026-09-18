@@ -22,6 +22,7 @@ import { DeleteParentModal } from '@/components/tasks/DeleteParentModal'
 import { GoalDetailHeader } from '@/components/goals/GoalDetailHeader'
 import { GoalForm } from '@/components/goals/GoalForm'
 import { DependencyPicker } from '@/components/goals/DependencyPicker'
+import { useOptionalWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailContext'
 import { useGoalDetail } from '@/hooks/useGoalDetail'
 import { GoalFormValues } from '@/hooks/useWorkspaceGoals'
 import type { AuthUser } from '@/hooks/useAuth'
@@ -79,12 +80,16 @@ export function GoalCard({
   const [completionTask, setCompletionTask] = useState<WorkspaceTask | null>(
     null,
   )
+  // A personal workspace has no assignment step, so its sole member is the
+  // implicit assignee of every task's timer.
+  const isPersonal = useOptionalWorkspaceDetail()?.isPersonal ?? false
   const {
     tasks,
     ready: tasksReady,
     error: tasksError,
     startTask,
     pauseTask,
+    emergencyStopTask,
     finishTask,
     addTask,
     updateTask,
@@ -96,8 +101,13 @@ export function GoalCard({
     addDependency,
     removeDependency,
     blockingTasksFor,
-  } = useGoalDetail(goal.id, workspaceId, user, members, task =>
-    setCompletionTask(task),
+  } = useGoalDetail(
+    goal.id,
+    workspaceId,
+    user,
+    members,
+    task => setCompletionTask(task),
+    isPersonal,
   )
 
   const [taskModal, setTaskModal] = useState<'add' | 'edit' | null>(null)
@@ -364,6 +374,7 @@ export function GoalCard({
                 getWorkedSeconds={getLiveSeconds}
                 onStart={startTask}
                 onPause={pauseTask}
+                onEmergencyStop={emergencyStopTask}
                 onFinish={handleFinishTask}
                 onEdit={openEditTask}
                 onDelete={handleDeleteTask}

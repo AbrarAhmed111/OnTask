@@ -57,6 +57,7 @@ export function WorkspaceParentTaskCard({
   getWorkedSeconds,
   onStart,
   onPause,
+  onEmergencyStop,
   onFinish,
   onEdit,
   onDelete,
@@ -75,6 +76,7 @@ export function WorkspaceParentTaskCard({
   getWorkedSeconds: (task: WorkspaceTask) => number
   onStart: (id: string) => void
   onPause: (task: WorkspaceTask) => void
+  onEmergencyStop?: (task: WorkspaceTask) => void
   onFinish: (task: WorkspaceTask) => void
   onEdit: (task: WorkspaceTask) => void
   onDelete: (id: string) => void
@@ -181,6 +183,9 @@ export function WorkspaceParentTaskCard({
               user={user}
               onStart={() => onStart(task.id)}
               onPause={() => onPause(task)}
+              onEmergencyStop={
+                onEmergencyStop ? () => onEmergencyStop(task) : undefined
+              }
               onFinish={() => onFinish(task)}
               onEdit={() => onEdit(task)}
               onDelete={() => onDelete(task.id)}

@@ -58,6 +58,7 @@ function TaskRowSkeleton() {
 export function WorkspaceTasksSection({
   ready,
   error,
+  isPersonal = false,
   stats,
   workingNow,
   workingGoalTasks,
@@ -70,6 +71,7 @@ export function WorkspaceTasksSection({
   onAddTask,
   onStart,
   onPause,
+  onEmergencyStop,
   onFinish,
   onEdit,
   onDelete,
@@ -81,6 +83,9 @@ export function WorkspaceTasksSection({
 }: {
   ready: boolean
   error?: string | null
+  // A personal workspace has no other members: no Members stat, and work in
+  // progress is always yours.
+  isPersonal?: boolean
   stats: {
     members: number
     working: number
@@ -98,6 +103,7 @@ export function WorkspaceTasksSection({
   onAddTask: () => void
   onStart: (id: string) => void
   onPause: (task: WorkspaceTask) => void
+  onEmergencyStop?: (task: WorkspaceTask) => void
   onFinish: (task: WorkspaceTask) => void
   onEdit: (task: WorkspaceTask) => void
   onDelete: (id: string) => void
@@ -109,8 +115,12 @@ export function WorkspaceTasksSection({
 }) {
   const parentOf = (task: WorkspaceTask) =>
     task.parentTaskId ? tasks.find(t => t.id === task.parentTaskId) : undefined
+  const workerName = (assignedTo: string | null) => {
+    if (isPersonal) return 'You'
+    const assignee = members.find(m => m.userId === assignedTo)
+    return assignee?.fullName || assignee?.email || 'Someone'
+  }
   const goalWorkingRows = workingGoalTasks.map(({ task, goalName }) => {
-    const assignee = members.find(m => m.userId === task.assignedTo)
     return (
       <div
         key={task.id}
@@ -123,7 +133,7 @@ export function WorkspaceTasksSection({
           <p className="truncate text-[10px] text-muted">Goal: {goalName}</p>
         </div>
         <p className="shrink-0 text-[11px] text-muted">
-          {assignee?.fullName || assignee?.email || 'Someone'}
+          {workerName(task.assignedTo)}
         </p>
       </div>
     )
@@ -131,17 +141,21 @@ export function WorkspaceTasksSection({
 
   return (
     <div>
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div
+        className={`mb-6 grid gap-3 ${isPersonal ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4'}`}
+      >
         {!ready ? (
           <>
-            <StatCardSkeleton />
+            {!isPersonal && <StatCardSkeleton />}
             <StatCardSkeleton />
             <StatCardSkeleton />
             <StatCardSkeleton />
           </>
         ) : (
           <>
-            <StatCard icon={Users} label="Members" value={stats.members} />
+            {!isPersonal && (
+              <StatCard icon={Users} label="Members" value={stats.members} />
+            )}
             <StatCard
               icon={Clock3}
               label="Working"
@@ -176,7 +190,6 @@ export function WorkspaceTasksSection({
           </h2>
           <div className="space-y-2">
             {workingNow.map(task => {
-              const assignee = members.find(m => m.userId === task.assignedTo)
               const parent = parentOf(task)
               return (
                 <div
@@ -194,7 +207,7 @@ export function WorkspaceTasksSection({
                     )}
                   </div>
                   <p className="shrink-0 text-[11px] text-muted">
-                    {assignee?.fullName || assignee?.email || 'Someone'}
+                    {workerName(task.assignedTo)}
                   </p>
                 </div>
               )
@@ -227,7 +240,9 @@ export function WorkspaceTasksSection({
         ) : queueTasks.length === 0 && workingGoalTasks.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-sage/70 px-5 py-10 text-center text-xs text-muted">
             {tasks.length === 0
-              ? 'No tasks yet — add one to start planning together.'
+              ? isPersonal
+                ? 'No tasks yet — add one to start planning your day.'
+                : 'No tasks yet — add one to start planning together.'
               : 'Everything is done — nice work.'}
           </div>
         ) : (
@@ -241,6 +256,7 @@ export function WorkspaceTasksSection({
                 getWorkedSeconds={getLiveSeconds}
                 onStart={onStart}
                 onPause={onPause}
+                onEmergencyStop={onEmergencyStop}
                 onFinish={onFinish}
                 onEdit={onEdit}
                 onDelete={onDelete}
@@ -270,6 +286,7 @@ export function WorkspaceTasksSection({
             getWorkedSeconds={getLiveSeconds}
             onStart={onStart}
             onPause={onPause}
+            onEmergencyStop={onEmergencyStop}
             onFinish={onFinish}
             onEdit={onEdit}
             onDelete={onDelete}

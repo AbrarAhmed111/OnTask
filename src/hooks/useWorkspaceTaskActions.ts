@@ -4,9 +4,21 @@ import { notifyTaskCompletion } from '@/lib/notifications'
 import { WorkspaceMember, WorkspaceTask } from '@/types/workspace'
 import { TaskFormValues } from '@/types'
 import { getWorkspaceLiveSeconds } from '@/lib/tasks/workspaceMappers'
+import { canControlTimer, canEmergencyStop } from '@/lib/tasks/timerPermissions'
+import { shouldReopenOnExtend } from '@/lib/tasks/reopen'
 
 function memberDisplayName(member?: WorkspaceMember) {
   return member?.fullName || member?.email || 'Someone'
+}
+
+// The timer RPCs reject a caller who isn't allowed with 42501 and a message
+// meant to be read ("only the member this task is assigned to..."); anything
+// else stays the generic fallback.
+function timerErrorMessage(
+  error: { code?: string; message?: string },
+  fallback: string,
+) {
+  return error.code === '42501' && error.message ? error.message : fallback
 }
 
 // Shared task-mutation logic for both the flat workspace task list
@@ -23,6 +35,7 @@ export function useWorkspaceTaskActions({
   setError,
   onComplete,
   now,
+  isPersonal = false,
 }: {
   workspaceId: string
   userId: string | undefined
@@ -32,7 +45,22 @@ export function useWorkspaceTaskActions({
   setError: (error: string | null) => void
   onComplete?: (task: WorkspaceTask) => void
   now: number
+  isPersonal?: boolean
 }) {
+  const timerActor = {
+    userId,
+    isPersonal,
+    isOwner: members.some(m => m.userId === userId && m.role === 'owner'),
+  }
+
+  // Timer changes are applied optimistically, so a request the server turns
+  // down (a stale tab that still thought it held the timer) has to put the
+  // tasks it touched back the way they were.
+  const restoreTasks = (snapshot: WorkspaceTask[]) =>
+    setTasks(current =>
+      current.map(task => snapshot.find(s => s.id === task.id) ?? task),
+    )
+
   const logEvent = (
     taskId: string,
     eventType: string,
@@ -121,8 +149,30 @@ export function useWorkspaceTaskActions({
   const updateTask = (id: string, update: Partial<WorkspaceTask>) => {
     if (!userId) return
     const before = tasks.find(task => task.id === id)
+    // More time on a completed task means it has work left, so it goes back to
+    // paused (resumable). The database makes the same change in the same write
+    // — status isn't client-writable, see reopen_workspace_task_on_extend in
+    // 0037 — so this only mirrors it for an instant UI update. It's also why
+    // `row` below never carries a status.
+    const reopens = before
+      ? shouldReopenOnExtend(before, update.plannedMinutes)
+      : false
     setTasks(current =>
-      current.map(task => (task.id === id ? { ...task, ...update } : task)),
+      current.map(task =>
+        task.id === id
+          ? {
+              ...task,
+              ...update,
+              ...(reopens
+                ? {
+                    status: 'paused' as const,
+                    startedAt: null,
+                    completedAt: null,
+                  }
+                : {}),
+            }
+          : task,
+      ),
     )
     const row: Record<string, unknown> = {}
     if (update.name !== undefined) row.title = update.name
@@ -140,6 +190,9 @@ export function useWorkspaceTaskActions({
       .eq('id', id)
       .then(({ error: updateError }) => {
         if (updateError) {
+          // Don't leave a task showing as reopened when the save that would
+          // have reopened it failed.
+          if (reopens && before) restoreTasks([before])
           setError("Couldn't save your changes.")
           return
         }
@@ -182,13 +235,23 @@ export function useWorkspaceTaskActions({
 
   const startTask = (id: string) => {
     if (!userId) return
+    const target = tasks.find(task => task.id === id)
+    if (!target || !canControlTimer(target, timerActor)) return
     const isParent = tasks.some(task => task.parentTaskId === id)
     if (isParent) return
+    // Starting a task only ever ends the caller's OWN running timer (one
+    // active timer per person) — never a teammate's task that happens to be
+    // in the same list.
+    const isMyRunningTimer = (task: WorkspaceTask) =>
+      task.status === 'working' && canControlTimer(task, timerActor)
+    const touched = tasks.filter(
+      task => task.id === id || isMyRunningTimer(task),
+    )
     setTasks(current =>
       current.map(task => {
         if (task.id === id)
           return { ...task, status: 'working', startedAt: Date.now() }
-        if (task.status === 'working')
+        if (isMyRunningTimer(task))
           return {
             ...task,
             status: 'paused',
@@ -202,12 +265,14 @@ export function useWorkspaceTaskActions({
     void supabase
       .rpc('start_workspace_task', { p_task_id: id })
       .then(({ error: rpcError }) => {
-        if (rpcError) setError("Couldn't start the timer.")
+        if (!rpcError) return
+        restoreTasks(touched)
+        setError(timerErrorMessage(rpcError, "Couldn't start the timer."))
       })
   }
 
   const pauseTask = (task: WorkspaceTask) => {
-    if (!userId) return
+    if (!userId || !canControlTimer(task, timerActor)) return
     const workedSeconds = Math.round(getWorkspaceLiveSeconds(task, now))
     setTasks(current =>
       current.map(t =>
@@ -220,12 +285,41 @@ export function useWorkspaceTaskActions({
     void supabase
       .rpc('pause_workspace_task', { p_task_id: task.id })
       .then(({ error: rpcError }) => {
-        if (rpcError) setError("Couldn't pause the timer.")
+        if (!rpcError) return
+        restoreTasks([task])
+        setError(timerErrorMessage(rpcError, "Couldn't pause the timer."))
+      })
+  }
+
+  // The owner's override for someone else's running timer: stops it (the
+  // task is paused, not completed, and keeps its assignee and every second
+  // recorded so far). It never starts anything.
+  const emergencyStopTask = (task: WorkspaceTask) => {
+    if (!userId || !canEmergencyStop(task, timerActor)) return
+    const workedSeconds = Math.round(getWorkspaceLiveSeconds(task, now))
+    setTasks(current =>
+      current.map(t =>
+        t.id === task.id
+          ? { ...t, status: 'paused', workedSeconds, startedAt: null }
+          : t,
+      ),
+    )
+    const supabase = createClient()
+    void supabase
+      .rpc('emergency_stop_workspace_task', { p_task_id: task.id })
+      .then(({ error: rpcError }) => {
+        if (!rpcError) return
+        restoreTasks([task])
+        setError(timerErrorMessage(rpcError, "Couldn't stop the timer."))
       })
   }
 
   const finishTask = (task: WorkspaceTask, early = false) => {
     if (!userId) return
+    // Finishing a task whose timer is running stops that timer, so it takes
+    // the same permission as pausing it. A task that isn't running can be
+    // finished by anyone, as before.
+    if (task.status === 'working' && !canControlTimer(task, timerActor)) return
     notifyTaskCompletion(task.name)
     onComplete?.(task)
     const workedSeconds = Math.round(getWorkspaceLiveSeconds(task, now))
@@ -246,7 +340,9 @@ export function useWorkspaceTaskActions({
     void supabase
       .rpc('complete_workspace_task', { p_task_id: task.id, p_skip: early })
       .then(({ error: rpcError }) => {
-        if (rpcError) setError("Couldn't save task completion.")
+        if (!rpcError) return
+        restoreTasks([task])
+        setError(timerErrorMessage(rpcError, "Couldn't save task completion."))
       })
   }
 
@@ -336,8 +432,30 @@ export function useWorkspaceTaskActions({
       : undefined
     const fromName = memberDisplayName(fromMember)
     const toName = newAssigneeId ? memberDisplayName(toMember) : 'Unassigned'
+    // Changing hands stops a running timer — the database does this in the
+    // same write (time recorded so far is kept, and the new assignee can then
+    // resume) — so the card mustn't keep counting under the new name while
+    // waiting for the realtime update to land.
+    const stopsTimer =
+      task?.status === 'working' &&
+      task.assignedTo !== newAssigneeId &&
+      !isPersonal
     setTasks(current =>
-      current.map(t => (t.id === id ? { ...t, assignedTo: newAssigneeId } : t)),
+      current.map(t =>
+        t.id === id
+          ? {
+              ...t,
+              assignedTo: newAssigneeId,
+              ...(stopsTimer
+                ? {
+                    status: 'paused' as const,
+                    workedSeconds: Math.round(getWorkspaceLiveSeconds(t, now)),
+                    startedAt: null,
+                  }
+                : {}),
+            }
+          : t,
+      ),
     )
     const supabase = createClient()
     void supabase
@@ -346,6 +464,7 @@ export function useWorkspaceTaskActions({
       .eq('id', id)
       .then(({ error: updateError }) => {
         if (updateError) {
+          if (task) restoreTasks([task])
           setError("Couldn't reassign the task.")
           return
         }
@@ -381,6 +500,7 @@ export function useWorkspaceTaskActions({
     updateTask,
     startTask,
     pauseTask,
+    emergencyStopTask,
     finishTask,
     deleteTask,
     moveTask,

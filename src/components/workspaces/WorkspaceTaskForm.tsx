@@ -4,6 +4,7 @@ import { FormEvent } from 'react'
 import { TaskFormValues } from '@/types'
 import { WorkspaceMember } from '@/types/workspace'
 import { Button } from '@/components/ui/Button'
+import { useOptionalWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailContext'
 
 export function WorkspaceTaskForm({
   values,
@@ -26,6 +27,8 @@ export function WorkspaceTaskForm({
 }) {
   const update = (key: keyof TaskFormValues, value: string | boolean) =>
     setValues({ ...values, [key]: value })
+  // Nobody else to assign to in a personal workspace.
+  const isPersonal = useOptionalWorkspaceDetail()?.isPersonal ?? false
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <label className="block text-xs font-semibold text-muted">
@@ -38,21 +41,23 @@ export function WorkspaceTaskForm({
           className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted/60 focus:border-sage focus:ring-4 focus:ring-sage/15"
         />
       </label>
-      <label className="block text-xs font-semibold text-muted">
-        Assign to
-        <select
-          value={assignedTo}
-          onChange={event => setAssignedTo(event.target.value)}
-          className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-sage focus:ring-4 focus:ring-sage/15"
-        >
-          <option value="">Unassigned</option>
-          {members.map(member => (
-            <option key={member.userId} value={member.userId}>
-              {member.fullName || member.email}
-            </option>
-          ))}
-        </select>
-      </label>
+      {!isPersonal && (
+        <label className="block text-xs font-semibold text-muted">
+          Assign to
+          <select
+            value={assignedTo}
+            onChange={event => setAssignedTo(event.target.value)}
+            className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-sage focus:ring-4 focus:ring-sage/15"
+          >
+            <option value="">Unassigned</option>
+            {members.map(member => (
+              <option key={member.userId} value={member.userId}>
+                {member.fullName || member.email}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="block text-xs font-semibold text-muted">
         Planned time
         <div className="mt-2 flex items-center gap-2">
