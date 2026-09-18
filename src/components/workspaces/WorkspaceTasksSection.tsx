@@ -4,6 +4,10 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { WorkspaceTaskList } from '@/components/workspaces/WorkspaceTaskList'
+import {
+  BlockedNowItem,
+  BlockedNowPanel,
+} from '@/components/blockers/BlockedNowPanel'
 import { TourAnchor, tourAnchor } from '@/lib/tourAnchors'
 import { WorkspaceMember, WorkspaceTask } from '@/types/workspace'
 import type { AuthUser } from '@/hooks/useAuth'
@@ -63,6 +67,7 @@ export function WorkspaceTasksSection({
   stats,
   workingNow,
   workingGoalTasks,
+  blockedItems = [],
   tasks,
   members,
   user,
@@ -95,6 +100,8 @@ export function WorkspaceTasksSection({
   }
   workingNow: WorkspaceTask[]
   workingGoalTasks: { task: WorkspaceTask; goalName: string }[]
+  // Tasks with an active blocker (flat and Goal alike) and the blocker itself.
+  blockedItems?: BlockedNowItem[]
   tasks: WorkspaceTask[]
   members: WorkspaceMember[]
   user: AuthUser | null
@@ -214,6 +221,14 @@ export function WorkspaceTasksSection({
             {goalWorkingRows}
           </div>
         </div>
+      )}
+
+      {ready && (
+        <BlockedNowPanel
+          items={blockedItems}
+          members={members}
+          isPersonal={isPersonal}
+        />
       )}
 
       <div {...tourAnchor('today-tasks')}>

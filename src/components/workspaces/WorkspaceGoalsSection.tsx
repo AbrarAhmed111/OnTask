@@ -21,6 +21,7 @@ export function WorkspaceGoalsSection({
   updateGoal,
   setGoalStatus,
   onWorkingTasksChange,
+  onBlockedTasksChange,
   onAddGoal,
 }: {
   ready: boolean
@@ -43,6 +44,8 @@ export function WorkspaceGoalsSection({
   ) => void
   setGoalStatus: (id: string, status: Goal['status']) => void
   onWorkingTasksChange: (goalId: string, tasks: WorkspaceTask[]) => void
+  // The goal's blocked tasks, for the overview's "Blocked" panel.
+  onBlockedTasksChange?: (goalId: string, tasks: WorkspaceTask[]) => void
   onAddGoal: () => void
 }) {
   const [showArchived, setShowArchived] = useState(false)
@@ -104,6 +107,7 @@ export function WorkspaceGoalsSection({
               updateGoal={updateGoal}
               setGoalStatus={setGoalStatus}
               onWorkingTasksChange={onWorkingTasksChange}
+              onBlockedTasksChange={onBlockedTasksChange}
             />
           ))}
         </div>

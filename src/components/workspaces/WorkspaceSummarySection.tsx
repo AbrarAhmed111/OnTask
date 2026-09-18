@@ -6,6 +6,7 @@ import {
   ChevronUp,
   Clock,
   Loader2,
+  OctagonAlert,
   RefreshCw,
   Sparkles,
   UserPlus,
@@ -17,6 +18,7 @@ import { formatMemberEvent } from '@/lib/workspaceSummaryEvents'
 import { formatBoundary } from '@/lib/dailyReportWindow'
 import { formatHM } from '@/lib/time'
 import {
+  StructuredSnapshotBlocker,
   StructuredSnapshotMember,
   StructuredSnapshotTaskActivity,
   StructuredSnapshotWorkspaceChanges,
@@ -195,6 +197,64 @@ function WorkspaceChangesSection({
       <ul className="mt-2.5 list-disc space-y-1 border-t border-line/50 pl-5 pt-2.5 text-xs leading-5 text-ink">
         {items.map((item, i) => (
           <li key={i}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// Every blocker that overlapped the window, rendered straight from the
+// snapshot: the reason and note verbatim, who was asked to help, who resolved it
+// and when. Nothing here is narrated — it is the deterministic record the
+// narrative is only allowed to describe.
+export function BlockersSection({
+  blockers,
+}: {
+  blockers: StructuredSnapshotBlocker[]
+}) {
+  if (blockers.length === 0) return null
+  return (
+    <div className="rounded-xl border border-line/70 bg-paper/60 p-4">
+      <p className="flex items-center gap-1.5 text-xs font-bold text-ink">
+        <OctagonAlert size={13} aria-hidden="true" /> Blockers{' '}
+        <span className="font-mono text-muted">{blockers.length}</span>
+      </p>
+      <ul className="mt-2.5 space-y-3 border-t border-line/50 pt-2.5">
+        {blockers.map(blocker => (
+          <li key={blocker.blocker_id} className="text-xs leading-5">
+            <div className="flex items-start justify-between gap-3">
+              <span className="min-w-0 font-semibold text-ink">
+                {blocker.parent_title
+                  ? `${blocker.task_title} (under ${blocker.parent_title})`
+                  : blocker.task_title}
+              </span>
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${blocker.still_blocked_at_report_end ? 'bg-coral/10 text-coral' : 'bg-sage/20 text-forest'}`}
+              >
+                {blocker.still_blocked_at_report_end
+                  ? 'Still blocked'
+                  : 'Resolved'}
+              </span>
+            </div>
+            <p className="whitespace-pre-wrap break-words text-muted">
+              {blocker.reason}
+            </p>
+            <p className="text-[11px] text-muted">
+              Reported by {blocker.blocked_by_name} ·{' '}
+              {formatTimestamp(blocker.blocked_at)}
+              {blocker.mentioned.length > 0 &&
+                ` · asked ${blocker.mentioned.map(m => m.display_name).join(', ')}`}
+              {blocker.blocked_seconds > 0 &&
+                ` · blocked ${formatHM(blocker.blocked_seconds)} in this period`}
+            </p>
+            {blocker.resolved_at && (
+              <p className="text-[11px] text-muted">
+                Resolved by {blocker.resolved_by_name ?? 'a former member'} ·{' '}
+                {formatTimestamp(blocker.resolved_at)}
+                {blocker.resolution_note && ` — ${blocker.resolution_note}`}
+              </p>
+            )}
+          </li>
         ))}
       </ul>
     </div>
@@ -407,6 +467,10 @@ export function WorkspaceSummarySection({
               <WorkspaceChangesSection
                 changes={summary.structuredSnapshot.workspace_changes}
                 summaryText={summary.narrative.workspace_changes_summary}
+              />
+
+              <BlockersSection
+                blockers={summary.structuredSnapshot.blockers ?? []}
               />
 
               <StatusRollup
