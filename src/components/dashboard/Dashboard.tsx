@@ -2,21 +2,14 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  Check,
-  CirclePlus,
-  LogIn,
-  Pause,
-  Play,
-  Plus,
-  Target,
-} from 'lucide-react'
+import { CirclePlus, LogIn, Pause, Play, Plus, Target } from 'lucide-react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { DailyProgress } from '@/components/dashboard/DailyProgress'
-import { EmptyState } from '@/components/dashboard/EmptyState'
+import { FirstTaskPrompt } from '@/components/dashboard/FirstTaskPrompt'
 import { TaskList } from '@/components/dashboard/TaskList'
 import { useTasks } from '@/hooks/useTasks'
+import { useCompletionAlert } from '@/hooks/useCompletionAlert'
 import { Task, TaskFormValues } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -32,6 +25,7 @@ import { useSettings } from '@/hooks/useSettings'
 import { useAuth } from '@/hooks/useAuth'
 import { clearStoredData } from '@/lib/storage'
 import { requestNotificationPermission } from '@/lib/notifications'
+import { showErrorToast, showSuccessToast } from '@/lib/toast'
 import { clientSignout } from '@/lib/auth/signout'
 import { resolvePostLoginDestination } from '@/lib/auth/postLogin'
 
@@ -65,7 +59,7 @@ export function Dashboard() {
     passwordRecovery,
     clearPasswordRecovery,
   } = useAuth()
-  const [completionTask, setCompletionTask] = useState<Task | null>(null)
+  const completionAlert = useCompletionAlert<Task>(settings.soundEnabled)
   const {
     tasks,
     ready,
@@ -81,10 +75,7 @@ export function Dashboard() {
     moveTask,
     reorderTasks,
     getLiveSeconds: liveSeconds,
-  } = useTasks(
-    settings,
-    task => settings.soundEnabled && setCompletionTask(task),
-  )
+  } = useTasks(settings, completionAlert.notify)
   const [modal, setModal] = useState<'add' | 'edit' | 'goal' | 'auth' | null>(
     null,
   )
@@ -93,7 +84,6 @@ export function Dashboard() {
   const [pendingParentId, setPendingParentId] = useState<string | null>(null)
   const [form, setForm] = useState<TaskFormValues>(emptyForm)
   const [progressPercentageInput, setProgressPercentageInput] = useState('0')
-  const [notice, setNotice] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null)
   const [inviteContext, setInviteContext] = useState<{
@@ -114,13 +104,6 @@ export function Dashboard() {
   // when it finishes.
   const resetActiveRef = useRef(false)
   const resetFlowActive = modal === 'auth' && authStep === 'reset'
-
-  useEffect(() => {
-    if (!notice) return
-
-    const timeout = window.setTimeout(() => setNotice(''), 5000)
-    return () => window.clearTimeout(timeout)
-  }, [notice])
 
   const openAuth = (step: AuthStep = 'login', subtitle?: string) => {
     setAuthStep(step)
@@ -218,7 +201,8 @@ export function Dashboard() {
 
   const handleLogout = async () => {
     const result = await clientSignout()
-    setNotice(result.success ? "You're signed out." : 'Sign out failed.')
+    if (result.success) showSuccessToast("You're signed out.")
+    else showErrorToast('Sign out failed.')
   }
 
   const closeModal = () => {
@@ -261,11 +245,13 @@ export function Dashboard() {
     if (addTask(event, form, pendingParentId)) {
       const wasSubtask = Boolean(pendingParentId)
       closeModal()
-      setNotice(wasSubtask ? 'Subtask added.' : 'Task added to your day.')
+      showSuccessToast(
+        wasSubtask ? 'Subtask added.' : 'Task added to your day.',
+      )
       const permission = await requestNotificationPermission()
       if (permission === 'denied') {
-        setNotice(
-          'Task added. Browser notifications are blocked; enable them in site settings.',
+        showErrorToast(
+          'Browser notifications are blocked; enable them in site settings.',
         )
       }
     }
@@ -285,7 +271,7 @@ export function Dashboard() {
         : undefined,
     })
     closeModal()
-    setNotice('Task updated.')
+    showSuccessToast('Task updated.')
   }
   const handleGoal = (event: FormEvent) => {
     event.preventDefault()
@@ -297,11 +283,11 @@ export function Dashboard() {
         ),
       })
     closeModal()
-    setNotice('Goal progress updated.')
+    showSuccessToast('Goal progress updated.')
   }
   const handleFinish = (task: Task) => {
     finishTask(task, true)
-    setNotice(`${task.name} finished for today.`)
+    showSuccessToast(`${task.name} finished for today.`)
   }
   const handleDelete = (id: string) => {
     setConfirmation({ type: 'delete', taskId: id })
@@ -312,7 +298,7 @@ export function Dashboard() {
   }
   const handleMoveTo = (taskId: string, parentId: string | null) => {
     moveTask(taskId, parentId)
-    setNotice(
+    showSuccessToast(
       parentId ? 'Task moved under its new parent.' : 'Task made standalone.',
     )
   }
@@ -325,7 +311,7 @@ export function Dashboard() {
 
     if (confirmation.type === 'delete') {
       deleteTask(confirmation.taskId)
-      setNotice('Task removed from today.')
+      showSuccessToast('Task removed from today.')
       closeConfirmation()
       return
     }
@@ -341,7 +327,7 @@ export function Dashboard() {
       .filter(task => task.parentTaskId === confirmation.task.id)
       .forEach(child => deleteTask(child.id))
     deleteTask(confirmation.task.id)
-    setNotice(`${confirmation.task.name} and its subtasks were removed.`)
+    showSuccessToast(`${confirmation.task.name} and its subtasks were removed.`)
     closeConfirmation()
   }
   const confirmOrphanChildren = () => {
@@ -350,7 +336,7 @@ export function Dashboard() {
       .filter(task => task.parentTaskId === confirmation.task.id)
       .forEach(child => moveTask(child.id, null))
     deleteTask(confirmation.task.id)
-    setNotice(
+    showSuccessToast(
       `${confirmation.task.name} removed — its subtasks are now standalone.`,
     )
     closeConfirmation()
@@ -440,20 +426,8 @@ export function Dashboard() {
               </Button>
             </div>
           </div>
-          {notice && (
-            <div className="mb-4 flex items-center gap-2 rounded-xl border border-sage/40 bg-sage/10 px-4 py-3 text-xs text-forest animate-[fadeIn_180ms_ease-out]">
-              <Check size={16} />
-              <span>{notice}</span>
-              <button
-                className="ml-auto text-forest/60 hover:text-forest"
-                onClick={() => setNotice('')}
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
           {tasks.length === 0 ? (
-            <EmptyState onAdd={openAdd} />
+            <FirstTaskPrompt onAdd={openAdd} />
           ) : (
             <TaskList
               tasks={tasks}
@@ -465,7 +439,7 @@ export function Dashboard() {
               onDelete={handleDelete}
               onRestart={task => {
                 restartTask(task)
-                setNotice(`${task.name} restarted as a new task.`)
+                showSuccessToast(`${task.name} restarted as a new task.`)
               }}
               onUpdateGoal={openGoal}
               onReorder={reorderTasks}
@@ -583,10 +557,10 @@ export function Dashboard() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
-      {completionTask && (
+      {completionAlert.task && (
         <CompletionModal
-          taskName={completionTask.name}
-          onStop={() => setCompletionTask(null)}
+          taskName={completionAlert.task.name}
+          onStop={completionAlert.dismiss}
         />
       )}
       {confirmation?.type === 'delete' && (

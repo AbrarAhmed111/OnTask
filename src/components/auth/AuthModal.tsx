@@ -1,7 +1,8 @@
 'use client'
 
 import { FormEvent, useState } from 'react'
-import { AlertTriangle, ArrowLeft, Check, Loader2 } from 'lucide-react'
+import { ArrowLeft, Check, Loader2 } from 'lucide-react'
+import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { FcGoogle } from 'react-icons/fc'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -209,12 +210,7 @@ export function AuthModal({
           <p className="mb-4 text-xs leading-5 text-muted">{subtitle}</p>
         )
       )}
-      {error && (
-        <div className="mb-4 flex items-start gap-2 rounded-xl border border-coral/20 bg-coral/5 p-3 text-xs leading-5 text-coral">
-          <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorBanner className="mb-4">{error}</ErrorBanner>}
 
       {success ? (
         <div>

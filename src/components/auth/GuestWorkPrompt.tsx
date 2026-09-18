@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Loader2, RotateCcw, Save } from 'lucide-react'
+import { Loader2, RotateCcw, Save } from 'lucide-react'
+import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { showSuccessToast } from '@/lib/toast'
@@ -80,12 +81,7 @@ export function GuestWorkPrompt({
         Saving keeps them in your private workspace — with any focus time
         you&apos;ve recorded — so they follow you across devices.
       </p>
-      {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-coral/20 bg-coral/5 p-3 text-xs leading-5 text-coral">
-          <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorBanner className="mt-4">{error}</ErrorBanner>}
       <div className="mt-5 flex flex-col gap-2">
         <Button
           type="button"
