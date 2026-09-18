@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import {
-  AlertTriangle,
   ChevronDown,
   ChevronUp,
   Clock,
@@ -12,6 +11,7 @@ import {
   UserPlus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { formatMemberEvent } from '@/lib/workspaceSummaryEvents'
 import { formatBoundary } from '@/lib/dailyReportWindow'
@@ -61,15 +61,6 @@ const STATUS_LABEL: Record<SummaryTaskStatus, string> = {
   completed: 'Completed',
   in_progress: 'In progress',
   skipped: 'Skipped',
-}
-
-function ErrorBanner({ message }: { message: string }) {
-  return (
-    <div className="flex items-start gap-2 rounded-xl border border-coral/20 bg-coral/5 p-3 text-xs leading-5 text-coral">
-      <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-      <span>{message}</span>
-    </div>
-  )
 }
 
 function TaskActivityRow({
@@ -335,7 +326,9 @@ export function WorkspaceSummarySection({
         </div>
       ) : isFailed ? (
         <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
-          <ErrorBanner message="Daily Report couldn't be generated yet." />
+          <ErrorBanner>
+            Daily Report couldn&apos;t be generated yet.
+          </ErrorBanner>
           <Button onClick={onRegenerate} disabled={generating}>
             {generating ? (
               <Loader2 size={14} className="animate-spin" />
@@ -379,7 +372,7 @@ export function WorkspaceSummarySection({
 
           {error && (
             <div className="px-5 pb-4">
-              <ErrorBanner message={error} />
+              <ErrorBanner>{error}</ErrorBanner>
             </div>
           )}
 

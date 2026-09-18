@@ -1,7 +1,9 @@
-import { Activity, AlertTriangle } from 'lucide-react'
+import { Activity } from 'lucide-react'
+import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { WorkspaceActivityFeed } from '@/components/workspaces/WorkspaceActivityFeed'
 import { ActivityEvent } from '@/hooks/useWorkspaceActivity'
+import { tourAnchor } from '@/lib/tourAnchors'
 import { WorkspaceMember } from '@/types/workspace'
 
 function ActivityRowSkeleton() {
@@ -25,7 +27,10 @@ export function WorkspaceActivitySection({
   members: WorkspaceMember[]
 }) {
   return (
-    <div className="rounded-2xl border border-line bg-panel shadow-sm">
+    <div
+      {...tourAnchor('activity')}
+      className="rounded-2xl border border-line bg-panel shadow-sm"
+    >
       <div className="border-b border-line/70 px-5 py-4">
         <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight text-ink">
           <Activity size={15} /> Activity
@@ -39,10 +44,7 @@ export function WorkspaceActivitySection({
           <ActivityRowSkeleton />
         </div>
       ) : error ? (
-        <div className="flex items-start gap-2 px-5 py-4 text-xs leading-5 text-coral">
-          <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
+        <ErrorBanner variant="plain">{error}</ErrorBanner>
       ) : (
         <WorkspaceActivityFeed events={events} members={members} />
       )}

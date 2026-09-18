@@ -1,5 +1,4 @@
 import {
-  AlertTriangle,
   ArrowRight,
   CirclePlus,
   File,
@@ -9,9 +8,11 @@ import {
   FolderOpen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { useOptionalWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailContext'
 import { categorize } from '@/lib/resources'
+import { tourAnchor } from '@/lib/tourAnchors'
 import { WorkspaceResource } from '@/types/workspace'
 
 const ICONS = {
@@ -38,21 +39,26 @@ function TypeChip({ resource }: { resource: WorkspaceResource }) {
 export function WorkspaceResourcesSection({
   ready,
   error,
+  isPersonal,
   resources,
   onOpen,
   onAddResource,
 }: {
   ready: boolean
   error?: string | null
+  // Only changes the empty-state wording: files "you need" vs "the team needs".
+  isPersonal: boolean
   resources: WorkspaceResource[]
   onOpen: () => void
   onAddResource: () => void
 }) {
   const preview = resources.slice(0, PREVIEW_COUNT)
-  const isPersonal = useOptionalWorkspaceDetail()?.isPersonal ?? false
 
   return (
-    <div className="rounded-2xl border border-line bg-panel p-5 shadow-sm sm:p-6">
+    <div
+      {...tourAnchor('resources')}
+      className="rounded-2xl border border-line bg-panel p-5 shadow-sm sm:p-6"
+    >
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight text-ink">
           <FolderOpen size={15} className="text-[var(--ws-accent,#375b4b)]" />
@@ -68,30 +74,26 @@ export function WorkspaceResourcesSection({
         )}
       </div>
 
-      {ready && error && (
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-coral/20 bg-coral/5 p-3 text-xs leading-5 text-coral">
-          <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {ready && error && <ErrorBanner className="mt-4">{error}</ErrorBanner>}
 
       {!ready ? (
         <Skeleton className="mt-4 h-16 rounded-xl" />
       ) : resources.length === 0 ? (
-        <div className="mt-4 rounded-2xl border border-dashed border-sage/70 px-5 py-8 text-center">
-          <FolderOpen size={22} className="mx-auto text-sage" />
-          <p className="mt-3 text-xs font-semibold text-ink">
-            No resources yet
-          </p>
-          <p className="mx-auto mt-1 max-w-xs text-[11px] leading-5 text-muted">
-            {isPersonal
-              ? 'Add documents, images and other files you need.'
-              : 'Add documents, images and other files the team needs.'}
-          </p>
-          <Button onClick={onAddResource} className="mx-auto mt-4">
-            <CirclePlus size={14} /> Add Resource
-          </Button>
-        </div>
+        <EmptyState
+          icon={FolderOpen}
+          title="No resources yet"
+          size="sm"
+          className="mt-4"
+          action={
+            <Button onClick={onAddResource}>
+              <CirclePlus size={14} /> Add Resource
+            </Button>
+          }
+        >
+          {isPersonal
+            ? 'Add documents, images and other files you need.'
+            : 'Add documents, images and other files the team needs.'}
+        </EmptyState>
       ) : (
         <button
           onClick={onOpen}

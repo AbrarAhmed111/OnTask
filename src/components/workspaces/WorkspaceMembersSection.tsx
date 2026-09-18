@@ -1,13 +1,7 @@
-import {
-  AlertTriangle,
-  LogOut,
-  Mail,
-  Trash2,
-  UserMinus,
-  UserPlus,
-  X,
-} from 'lucide-react'
+import { LogOut, Mail, Trash2, UserMinus, UserPlus, X } from 'lucide-react'
+import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
+import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { PresenceDot } from '@/components/workspaces/PresenceDot'
 import { WorkspaceInvitation, WorkspaceMember } from '@/types/workspace'
@@ -90,12 +84,7 @@ export function WorkspaceMembersSection({
             </Button>
           )}
         </div>
-        {error && (
-          <div className="flex items-start gap-2 border-b border-line/70 px-5 py-3 text-xs leading-5 text-coral">
-            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <ErrorBanner variant="flush">{error}</ErrorBanner>}
         <div className="divide-y divide-line/70">
           {!ready ? (
             <>
@@ -105,9 +94,6 @@ export function WorkspaceMembersSection({
             </>
           ) : (
             members.map(member => {
-              const initials = (member.fullName || member.email || '?')
-                .charAt(0)
-                .toUpperCase()
               const online = onlineUserIds.has(member.userId)
               return (
                 <div
@@ -115,19 +101,10 @@ export function WorkspaceMembersSection({
                   className="flex items-center gap-3 px-5 py-3.5"
                 >
                   <div className="relative h-9 w-9 shrink-0">
-                    <div className="grid h-full w-full place-items-center overflow-hidden rounded-full border border-line bg-[var(--ws-accent,#375b4b)] text-xs font-bold text-white">
-                      {member.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={member.avatarUrl}
-                          alt=""
-                          referrerPolicy="no-referrer"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        initials
-                      )}
-                    </div>
+                    <Avatar
+                      person={member}
+                      className="h-full w-full border border-line text-xs"
+                    />
                     <PresenceDot online={online} />
                   </div>
                   <div className="min-w-0 flex-1">

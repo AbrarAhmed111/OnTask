@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useRef, useState } from 'react'
 import { Loader2, Search, Upload } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Modal } from '@/components/ui/Modal'
 import { ResourceCard } from '@/components/resources/ResourceCard'
 import { categorize, ResourceCategory } from '@/lib/resources'
@@ -110,11 +111,11 @@ export function ResourcesModal({
         </div>
 
         {filtered.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-sage/70 px-5 py-14 text-center text-xs text-muted">
+          <EmptyState size="lg">
             {resources.length === 0
               ? 'No resources yet — upload the first one.'
               : 'No resources match your search.'}
-          </div>
+          </EmptyState>
         ) : (
           <div className="grid max-h-[55vh] grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
             {filtered.map(resource => (

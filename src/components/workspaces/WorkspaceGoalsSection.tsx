@@ -1,8 +1,11 @@
 import { useState } from 'react'
-import { AlertTriangle, Archive, CirclePlus, Target } from 'lucide-react'
+import { Archive, CirclePlus, Target } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { GoalCard } from '@/components/goals/GoalCard'
+import { tourAnchor } from '@/lib/tourAnchors'
 import { Goal, WorkspaceMember, WorkspaceTask } from '@/types/workspace'
 import type { AuthUser } from '@/hooks/useAuth'
 
@@ -11,6 +14,8 @@ export function WorkspaceGoalsSection({
   error,
   goals,
   workspaceId,
+  isPersonal,
+  soundEnabled,
   user,
   members,
   updateGoal,
@@ -22,6 +27,12 @@ export function WorkspaceGoalsSection({
   error?: string | null
   goals: Goal[]
   workspaceId: string
+  // Which kind of workspace these goals are in — a personal one has nobody to
+  // assign a goal's tasks to. Passed down to each GoalCard.
+  isPersonal: boolean
+  // The user's completion-sound preference, applied to every goal task's
+  // "finished" alarm.
+  soundEnabled: boolean
   user: AuthUser | null
   members: WorkspaceMember[]
   updateGoal: (
@@ -41,7 +52,7 @@ export function WorkspaceGoalsSection({
   )
 
   return (
-    <div>
+    <div {...tourAnchor('goals')}>
       <div className="mb-4 flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight text-ink">
           <Target size={15} className="text-[var(--ws-accent,#375b4b)]" />
@@ -63,12 +74,7 @@ export function WorkspaceGoalsSection({
         </div>
       </div>
 
-      {ready && error && (
-        <div className="mb-4 flex items-start gap-2 rounded-xl border border-coral/20 bg-coral/5 p-3 text-xs leading-5 text-coral">
-          <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {ready && error && <ErrorBanner className="mb-4">{error}</ErrorBanner>}
 
       {!ready ? (
         <div className="space-y-3">
@@ -76,18 +82,14 @@ export function WorkspaceGoalsSection({
           <Skeleton className="h-16 rounded-2xl" />
         </div>
       ) : visibleGoals.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-sage/70 px-5 py-10 text-center">
-          <Target size={22} className="mx-auto text-sage" />
-          <p className="mt-3 text-xs font-semibold text-ink">
-            {showArchived ? 'No archived goals' : 'No goals yet'}
-          </p>
-          {!showArchived && (
-            <p className="mx-auto mt-1 max-w-xs text-[11px] leading-5 text-muted">
-              Goals group related tasks and subtasks toward a bigger outcome —
-              create one when work needs more structure than a single task.
-            </p>
-          )}
-        </div>
+        <EmptyState
+          icon={Target}
+          title={showArchived ? 'No archived goals' : 'No goals yet'}
+        >
+          {showArchived
+            ? null
+            : 'Goals group related tasks and subtasks toward a bigger outcome — create one when work needs more structure than a single task.'}
+        </EmptyState>
       ) : (
         <div className="space-y-3">
           {visibleGoals.map(goal => (
@@ -95,6 +97,8 @@ export function WorkspaceGoalsSection({
               key={goal.id}
               goal={goal}
               workspaceId={workspaceId}
+              isPersonal={isPersonal}
+              soundEnabled={soundEnabled}
               user={user}
               members={members}
               updateGoal={updateGoal}

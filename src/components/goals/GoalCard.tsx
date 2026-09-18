@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { showErrorToast, showSuccessToast } from '@/lib/toast'
 import { Button } from '@/components/ui/Button'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Modal } from '@/components/ui/Modal'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { WorkspaceTaskList } from '@/components/workspaces/WorkspaceTaskList'
@@ -22,7 +23,7 @@ import { DeleteParentModal } from '@/components/tasks/DeleteParentModal'
 import { GoalDetailHeader } from '@/components/goals/GoalDetailHeader'
 import { GoalForm } from '@/components/goals/GoalForm'
 import { DependencyPicker } from '@/components/goals/DependencyPicker'
-import { useOptionalWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailContext'
+import { useCompletionAlert } from '@/hooks/useCompletionAlert'
 import { useGoalDetail } from '@/hooks/useGoalDetail'
 import { GoalFormValues } from '@/hooks/useWorkspaceGoals'
 import type { AuthUser } from '@/hooks/useAuth'
@@ -57,6 +58,8 @@ const emptyTaskForm: TaskFormValues = {
 export function GoalCard({
   goal,
   workspaceId,
+  isPersonal,
+  soundEnabled,
   user,
   members,
   updateGoal,
@@ -65,6 +68,11 @@ export function GoalCard({
 }: {
   goal: Goal
   workspaceId: string
+  // A personal workspace has no assignment step, so its sole member is the
+  // implicit assignee of every task's timer.
+  isPersonal: boolean
+  // The user's completion-sound preference (gates the "finished" alarm).
+  soundEnabled: boolean
   user: AuthUser | null
   members: WorkspaceMember[]
   updateGoal: (
@@ -77,12 +85,7 @@ export function GoalCard({
   onWorkingTasksChange: (goalId: string, tasks: WorkspaceTask[]) => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [completionTask, setCompletionTask] = useState<WorkspaceTask | null>(
-    null,
-  )
-  // A personal workspace has no assignment step, so its sole member is the
-  // implicit assignee of every task's timer.
-  const isPersonal = useOptionalWorkspaceDetail()?.isPersonal ?? false
+  const completionAlert = useCompletionAlert<WorkspaceTask>(soundEnabled)
   const {
     tasks,
     ready: tasksReady,
@@ -106,7 +109,7 @@ export function GoalCard({
     workspaceId,
     user,
     members,
-    task => setCompletionTask(task),
+    completionAlert.notify,
     isPersonal,
   )
 
@@ -362,10 +365,10 @@ export function GoalCard({
                 <Skeleton className="h-20 rounded-2xl" />
               </div>
             ) : tasks.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-sage/70 px-5 py-8 text-center text-xs text-muted">
+              <EmptyState size="sm">
                 No tasks in this goal yet — add one to start breaking down the
                 work.
-              </div>
+              </EmptyState>
             ) : (
               <WorkspaceTaskList
                 tasks={tasks}
@@ -402,6 +405,7 @@ export function GoalCard({
           <WorkspaceTaskForm
             values={taskForm}
             setValues={setTaskForm}
+            isPersonal={isPersonal}
             members={members}
             assignedTo={taskAssignee}
             setAssignedTo={setTaskAssignee}
@@ -420,6 +424,7 @@ export function GoalCard({
           <WorkspaceTaskForm
             values={taskForm}
             setValues={setTaskForm}
+            isPersonal={isPersonal}
             members={members}
             assignedTo={taskAssignee}
             setAssignedTo={setTaskAssignee}
@@ -444,10 +449,10 @@ export function GoalCard({
           />
         </Modal>
       )}
-      {completionTask && (
+      {completionAlert.task && (
         <CompletionModal
-          taskName={completionTask.name}
-          onStop={() => setCompletionTask(null)}
+          taskName={completionAlert.task.name}
+          onStop={completionAlert.dismiss}
         />
       )}
       {pendingDeleteParent && (

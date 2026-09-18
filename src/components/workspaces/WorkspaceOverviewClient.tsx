@@ -13,6 +13,8 @@ import { GoalForm } from '@/components/goals/GoalForm'
 import { ResourcesModal } from '@/components/resources/ResourcesModal'
 import { Modal } from '@/components/ui/Modal'
 import { useWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailContext'
+import { useCompletionAlert } from '@/hooks/useCompletionAlert'
+import { useSettings } from '@/hooks/useSettings'
 import { useWorkspaceTasks } from '@/hooks/useWorkspaceTasks'
 import { useWorkspaceGoals, GoalFormValues } from '@/hooks/useWorkspaceGoals'
 import { useWorkspaceResources } from '@/hooks/useWorkspaceResources'
@@ -45,8 +47,12 @@ const emptyGoalForm: GoalFormValues = {
 export function WorkspaceOverviewClient() {
   const { workspaceId, user, workspace, members, isOwner, isPersonal, ready } =
     useWorkspaceDetail()
-  const [completionTask, setCompletionTask] = useState<WorkspaceTask | null>(
-    null,
+  // The completion-sound preference is per person and device (localStorage),
+  // not per workspace, so the same setting governs a guest's tasks, a
+  // personal workspace and every shared one. Read once here and handed down.
+  const { settings } = useSettings()
+  const completionAlert = useCompletionAlert<WorkspaceTask>(
+    settings.soundEnabled,
   )
   const {
     tasks,
@@ -66,7 +72,7 @@ export function WorkspaceOverviewClient() {
     workspaceId,
     user,
     members,
-    task => setCompletionTask(task),
+    completionAlert.notify,
     isPersonal,
   )
   const {
@@ -284,6 +290,8 @@ export function WorkspaceOverviewClient() {
         error={goalsError}
         goals={goals}
         workspaceId={workspaceId}
+        isPersonal={isPersonal}
+        soundEnabled={settings.soundEnabled}
         user={user}
         members={members}
         updateGoal={updateGoal}
@@ -295,6 +303,7 @@ export function WorkspaceOverviewClient() {
       <WorkspaceResourcesSection
         ready={ready && resourcesReady}
         error={resourcesError}
+        isPersonal={isPersonal}
         resources={resources}
         onOpen={() => setResourcesModalOpen(true)}
         onAddResource={() => setResourcesModalOpen(true)}
@@ -323,6 +332,7 @@ export function WorkspaceOverviewClient() {
           <WorkspaceTaskForm
             values={taskForm}
             setValues={setTaskForm}
+            isPersonal={isPersonal}
             members={members}
             assignedTo={taskAssignee}
             setAssignedTo={setTaskAssignee}
@@ -341,6 +351,7 @@ export function WorkspaceOverviewClient() {
           <WorkspaceTaskForm
             values={taskForm}
             setValues={setTaskForm}
+            isPersonal={isPersonal}
             members={members}
             assignedTo={taskAssignee}
             setAssignedTo={setTaskAssignee}
@@ -365,10 +376,10 @@ export function WorkspaceOverviewClient() {
           />
         </Modal>
       )}
-      {completionTask && (
+      {completionAlert.task && (
         <CompletionModal
-          taskName={completionTask.name}
-          onStop={() => setCompletionTask(null)}
+          taskName={completionAlert.task.name}
+          onStop={completionAlert.dismiss}
         />
       )}
       {resourcesModalOpen && (
