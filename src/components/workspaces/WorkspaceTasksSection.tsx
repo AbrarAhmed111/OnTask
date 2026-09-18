@@ -178,7 +178,7 @@ export function WorkspaceTasksSection({
 
       {ready && error && <ErrorBanner className="mb-6">{error}</ErrorBanner>}
 
-      {ready && workingNow.length > 0 && (
+      {ready && (workingNow.length > 0 || workingGoalTasks.length > 0) && (
         <div className="mb-6 rounded-2xl border border-sage/40 bg-sage/5 p-5 sm:p-6">
           <h2 className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-[var(--ws-accent,#375b4b)]">
             <span className="relative flex h-2 w-2">
@@ -211,6 +211,7 @@ export function WorkspaceTasksSection({
                 </div>
               )
             })}
+            {goalWorkingRows}
           </div>
         </div>
       )}
@@ -221,8 +222,7 @@ export function WorkspaceTasksSection({
             Queue{' '}
             {ready && (
               <span className="font-mono text-xs font-normal text-muted">
-                {queueTasks.filter(task => !task.parentTaskId).length +
-                  workingGoalTasks.length}
+                {queueTasks.filter(task => !task.parentTaskId).length}
               </span>
             )}
           </h2>
@@ -236,36 +236,33 @@ export function WorkspaceTasksSection({
             <TaskRowSkeleton />
             <TaskRowSkeleton />
           </div>
-        ) : queueTasks.length === 0 && workingGoalTasks.length === 0 ? (
+        ) : queueTasks.length === 0 ? (
           <EmptyState>
             {tasks.length === 0
               ? isPersonal
                 ? 'No tasks yet — add one to start planning your day.'
                 : 'No tasks yet — add one to start planning together.'
-              : 'Everything is done — nice work.'}
+              : 'No queued tasks right now.'}
           </EmptyState>
         ) : (
           <div className="space-y-2 rounded-2xl border border-line bg-panel p-3">
-            {goalWorkingRows}
-            {queueTasks.length > 0 && (
-              <WorkspaceTaskList
-                tasks={queueTasks}
-                members={members}
-                user={user}
-                getWorkedSeconds={getLiveSeconds}
-                onStart={onStart}
-                onPause={onPause}
-                onEmergencyStop={onEmergencyStop}
-                onFinish={onFinish}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onReassign={onReassign}
-                onReorder={onReorder}
-                onAddSubtask={onAddSubtask}
-                onDeleteParent={onDeleteParent}
-                onMoveTo={onMoveTo}
-              />
-            )}
+            <WorkspaceTaskList
+              tasks={queueTasks}
+              members={members}
+              user={user}
+              getWorkedSeconds={getLiveSeconds}
+              onStart={onStart}
+              onPause={onPause}
+              onEmergencyStop={onEmergencyStop}
+              onFinish={onFinish}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onReassign={onReassign}
+              onReorder={onReorder}
+              onAddSubtask={onAddSubtask}
+              onDeleteParent={onDeleteParent}
+              onMoveTo={onMoveTo}
+            />
           </div>
         )}
       </div>

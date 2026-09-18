@@ -29,6 +29,7 @@ import {
   TaskMoveSelect,
 } from '@/components/tasks/TaskMoveSelect'
 import { TaskNotesPanel } from '@/components/tasks/TaskNotesPanel'
+import { useTaskNoteCount } from '@/hooks/useTaskNotes'
 import type { AuthUser } from '@/hooks/useAuth'
 
 // A workspace task (shared or personal, flat or inside a Goal). The card frame
@@ -78,6 +79,7 @@ export function WorkspaceTaskCard({
   onManageDependencies?: () => void
 }) {
   const [notesOpen, setNotesOpen] = useState(false)
+  const noteCount = useTaskNoteCount(task.id, user)
   const completed = task.status === 'completed' || task.status === 'skipped'
   const blocked = Boolean(blockedBy && blockedBy.length > 0) && !completed
   const running = task.status === 'working'
@@ -166,6 +168,11 @@ export function WorkspaceTaskCard({
             className={TASK_CHIP_CLASS}
           >
             <MessageSquare size={13} /> Notes
+            {noteCount > 0 && (
+              <span aria-label={`${noteCount} note${noteCount === 1 ? '' : 's'}`}>
+                ({noteCount})
+              </span>
+            )}
           </button>
           {/* Finishing a running task stops its timer, so it needs the same
               permission as Pause; finishing an idle one is open to anyone. */}
