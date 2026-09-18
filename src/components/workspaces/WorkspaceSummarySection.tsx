@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { formatMemberEvent } from '@/lib/workspaceSummaryEvents'
 import { formatBoundary } from '@/lib/dailyReportWindow'
+import { formatHM } from '@/lib/time'
 import {
   StructuredSnapshotMember,
   StructuredSnapshotTaskActivity,
@@ -23,12 +24,6 @@ import {
   WorkspaceDailySummary,
   WorkspaceMember,
 } from '@/types/workspace'
-
-function formatHM(totalSeconds: number): string {
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.round((totalSeconds % 3600) / 60)
-  return `${hours}h ${minutes}m`
-}
 
 // The report's own frozen report_timezone is used here (never the
 // workspace's current timezone) so a historical report keeps displaying the

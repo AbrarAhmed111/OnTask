@@ -1,3 +1,17 @@
+// The single canonical "Xh Ym" formatter for the Daily Report -- floor/floor,
+// no padding, no seconds (mirrors ontask-llm's summary_service.py::_format_hm
+// exactly, byte for byte). Every place that renders a Daily Report duration
+// (member totals, the workspace total, the deterministic fallback narrative)
+// must go through this one function so the same number of seconds always
+// reads the same way everywhere, instead of each call site rounding it
+// slightly differently.
+export function formatHM(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds))
+  const hours = Math.floor(safe / 3600)
+  const minutes = Math.floor((safe % 3600) / 60)
+  return `${hours}h ${minutes}m`
+}
+
 export function formatTime(seconds: number, short = false) {
   const safe = Math.max(0, Math.floor(seconds))
   const hours = Math.floor(safe / 3600)

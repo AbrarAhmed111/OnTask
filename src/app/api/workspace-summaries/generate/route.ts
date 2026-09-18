@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import {
+  buildFallbackNarrative,
+  buildUnreachableFallbackMeta,
+} from '@/lib/dailyReportFallback'
+import { WorkspaceStructuredSnapshot } from '@/types/workspace'
 
 // Manual "Regenerate" -- strictly secondary to the automatic scheduler
 // (src/app/api/cron/daily-reports/route.ts), which owns creating a workspace's
@@ -82,6 +87,9 @@ export async function POST(request: Request) {
     )
   }
 
+  // A failure here must NOT throw away the freshly-computed snapshot above -- we still
+  // save a deterministic-only report (mirroring ontask-llm's own fallback narrative)
+  // rather than leaving the user with a 502 and no updated report at all.
   let narrative: unknown
   let meta: unknown
   try {
@@ -98,10 +106,28 @@ export async function POST(request: Request) {
     narrative = data.narrative
     meta = data.meta
   } catch (err) {
-    console.error('Failed to generate AI summary:', err)
-    return NextResponse.json(
-      { error: 'The AI summary service is unavailable. Try again shortly.' },
-      { status: 502 },
+    const message =
+      err instanceof Error ? err.message : 'AI summary service unavailable'
+    console.error(
+      `[workspace-summaries] AI narration unreachable for workspace ${workspaceId}, ` +
+        `falling back to deterministic narrative:`,
+      err,
+    )
+    narrative = buildFallbackNarrative(snapshot as WorkspaceStructuredSnapshot)
+    meta = buildUnreachableFallbackMeta(message)
+  }
+
+  if (
+    (meta as { used_fallback_template?: boolean } | null)
+      ?.used_fallback_template
+  ) {
+    console.warn(
+      `[workspace-summaries] AI narrative fell back to the deterministic template ` +
+        `workspace_id=${workspaceId} report_end=${reportEnd} ` +
+        `validation_failure_reason=${JSON.stringify(
+          (meta as { validation_warnings?: string[] })?.validation_warnings ??
+            [],
+        )}`,
     )
   }
 

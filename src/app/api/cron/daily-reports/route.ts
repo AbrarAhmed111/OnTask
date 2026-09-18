@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/service'
+import {
+  buildFallbackNarrative,
+  buildUnreachableFallbackMeta,
+} from '@/lib/dailyReportFallback'
+import { WorkspaceStructuredSnapshot } from '@/types/workspace'
 
 // The automatic Daily Report scheduler's entry point. Invoked every 5
 // minutes by Supabase pg_cron/pg_net (see the `daily-reports-tick` job in
@@ -54,8 +59,9 @@ async function processCandidate(
     return 'skipped'
   }
 
+  let snapshot: WorkspaceStructuredSnapshot
   try {
-    const { data: snapshot, error: snapshotError } = await supabase.rpc(
+    const { data, error: snapshotError } = await supabase.rpc(
       'generate_workspace_daily_snapshot',
       {
         p_workspace_id: candidate.workspace_id,
@@ -64,12 +70,36 @@ async function processCandidate(
         p_timezone: candidate.timezone,
       },
     )
-    if (snapshotError || !snapshot) {
+    if (snapshotError || !data) {
       throw new Error(
         snapshotError?.message || 'Failed to aggregate workspace activity',
       )
     }
+    snapshot = data as WorkspaceStructuredSnapshot
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : 'Unknown error aggregating workspace activity'
+    console.error(
+      `[daily-reports] snapshot aggregation failed for workspace ${candidate.workspace_id}:`,
+      err,
+    )
+    await supabase.rpc('fail_daily_report', {
+      p_workspace_id: candidate.workspace_id,
+      p_report_end: candidate.report_end,
+      p_error_message: message,
+    })
+    return 'failed'
+  }
 
+  // The deterministic snapshot now exists -- from here on, a failure to reach or parse
+  // ontask-llm must NOT discard it. We fall back to a locally-built deterministic
+  // narrative and still finish the report, exactly as ontask-llm itself would if the
+  // model's own output failed validation (see summary_service.py's _fallback_narrative).
+  let narrative: unknown
+  let meta: unknown
+  try {
     const response = await fetch(`${serviceUrl}/api/summary/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -79,8 +109,36 @@ async function processCandidate(
     if (!response.ok) {
       throw new Error(`ontask-llm responded ${response.status}`)
     }
-    const { narrative, meta } = await response.json()
+    const data = await response.json()
+    narrative = data.narrative
+    meta = data.meta
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'AI summary service unavailable'
+    console.error(
+      `[daily-reports] AI narration unreachable for workspace ${candidate.workspace_id}, ` +
+        `falling back to deterministic narrative:`,
+      err,
+    )
+    narrative = buildFallbackNarrative(snapshot)
+    meta = buildUnreachableFallbackMeta(message)
+  }
 
+  if (
+    (meta as { used_fallback_template?: boolean } | null)
+      ?.used_fallback_template
+  ) {
+    console.warn(
+      `[daily-reports] AI narrative fell back to the deterministic template ` +
+        `workspace_id=${candidate.workspace_id} report_end=${candidate.report_end} ` +
+        `validation_failure_reason=${JSON.stringify(
+          (meta as { validation_warnings?: string[] })?.validation_warnings ??
+            [],
+        )}`,
+    )
+  }
+
+  try {
     const { error: finishError } = await supabase.rpc('finish_daily_report', {
       p_workspace_id: candidate.workspace_id,
       p_report_end: candidate.report_end,
@@ -89,15 +147,12 @@ async function processCandidate(
       p_meta: meta,
     })
     if (finishError) throw new Error(finishError.message)
-
     return 'completed'
   } catch (err) {
     const message =
-      err instanceof Error
-        ? err.message
-        : 'Unknown error generating the Daily Report'
+      err instanceof Error ? err.message : 'Failed to save the Daily Report'
     console.error(
-      `[daily-reports] generation failed for workspace ${candidate.workspace_id}:`,
+      `[daily-reports] saving the report failed for workspace ${candidate.workspace_id}:`,
       err,
     )
     await supabase.rpc('fail_daily_report', {
