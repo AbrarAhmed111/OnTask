@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import {
   Archive,
   CalendarDays,
@@ -23,6 +23,8 @@ import { DeleteParentModal } from '@/components/tasks/DeleteParentModal'
 import { GoalDetailHeader } from '@/components/goals/GoalDetailHeader'
 import { GoalForm } from '@/components/goals/GoalForm'
 import { DependencyPicker } from '@/components/goals/DependencyPicker'
+import { TaskBlockerActionsContext } from '@/components/blockers/TaskBlockerActionsContext'
+import { useAnyTaskFocus } from '@/components/workspaces/FocusedTaskContext'
 import { useCompletionAlert } from '@/hooks/useCompletionAlert'
 import { useGoalDetail } from '@/hooks/useGoalDetail'
 import { GoalFormValues } from '@/hooks/useWorkspaceGoals'
@@ -65,6 +67,7 @@ export function GoalCard({
   updateGoal,
   setGoalStatus,
   onWorkingTasksChange,
+  onBlockedTasksChange,
 }: {
   goal: Goal
   workspaceId: string
@@ -83,6 +86,7 @@ export function GoalCard({
   ) => void
   setGoalStatus: (id: string, status: Goal['status']) => void
   onWorkingTasksChange: (goalId: string, tasks: WorkspaceTask[]) => void
+  onBlockedTasksChange?: (goalId: string, tasks: WorkspaceTask[]) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const completionAlert = useCompletionAlert<WorkspaceTask>(soundEnabled)
@@ -99,6 +103,7 @@ export function GoalCard({
     deleteTask,
     moveTask,
     reassignTask,
+    blockerActions,
     getLiveSeconds,
     dependencies,
     addDependency,
@@ -144,6 +149,24 @@ export function GoalCard({
       tasks.filter(task => task.status === 'working'),
     )
   }, [goal.id, onWorkingTasksChange, tasks])
+  useEffect(() => {
+    onBlockedTasksChange?.(
+      goal.id,
+      tasks.filter(task => task.status === 'blocked'),
+    )
+  }, [goal.id, onBlockedTasksChange, tasks])
+
+  // A notification can point at a task inside this goal; the goal opens itself
+  // so the task's card exists to be scrolled to. Once per request — closing the
+  // goal afterwards must stick, however often its tasks update.
+  const taskFocus = useAnyTaskFocus()
+  const handledFocus = useRef<typeof taskFocus>(null)
+  useEffect(() => {
+    if (!taskFocus || handledFocus.current === taskFocus) return
+    if (!tasks.some(task => task.id === taskFocus.id)) return
+    handledFocus.current = taskFocus
+    setExpanded(true)
+  }, [taskFocus, tasks])
   const totalTasks = tasks.length
   const completedTasks = tasks.filter(isDone).length
   const focusedSeconds = Math.round(
@@ -151,8 +174,12 @@ export function GoalCard({
   )
   const progress =
     totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100)
+  // Blocked either way: waiting on an unfinished dependency, or carrying a
+  // blocker someone raised.
   const blockedTaskCount = tasks.filter(
-    task => !isDone(task) && blockingTasksFor(task.id).length > 0,
+    task =>
+      !isDone(task) &&
+      (task.status === 'blocked' || blockingTasksFor(task.id).length > 0),
   ).length
 
   const closeTaskModal = () => {
@@ -370,27 +397,29 @@ export function GoalCard({
                 work.
               </EmptyState>
             ) : (
-              <WorkspaceTaskList
-                tasks={tasks}
-                members={members}
-                user={user}
-                getWorkedSeconds={getLiveSeconds}
-                onStart={startTask}
-                onPause={pauseTask}
-                onEmergencyStop={emergencyStopTask}
-                onFinish={handleFinishTask}
-                onEdit={openEditTask}
-                onDelete={handleDeleteTask}
-                onReassign={reassignTask}
-                onReorder={() => {}}
-                onAddSubtask={openAddSubtask}
-                onDeleteParent={handleDeleteParent}
-                onMoveTo={handleMoveTo}
-                getBlockedBy={task =>
-                  blockingTasksFor(task.id).map(t => t.name)
-                }
-                onManageDependencies={task => setDependencyTask(task)}
-              />
+              <TaskBlockerActionsContext.Provider value={blockerActions}>
+                <WorkspaceTaskList
+                  tasks={tasks}
+                  members={members}
+                  user={user}
+                  getWorkedSeconds={getLiveSeconds}
+                  onStart={startTask}
+                  onPause={pauseTask}
+                  onEmergencyStop={emergencyStopTask}
+                  onFinish={handleFinishTask}
+                  onEdit={openEditTask}
+                  onDelete={handleDeleteTask}
+                  onReassign={reassignTask}
+                  onReorder={() => {}}
+                  onAddSubtask={openAddSubtask}
+                  onDeleteParent={handleDeleteParent}
+                  onMoveTo={handleMoveTo}
+                  getBlockedBy={task =>
+                    blockingTasksFor(task.id).map(t => t.name)
+                  }
+                  onManageDependencies={task => setDependencyTask(task)}
+                />
+              </TaskBlockerActionsContext.Provider>
             )}
           </div>
         </div>
