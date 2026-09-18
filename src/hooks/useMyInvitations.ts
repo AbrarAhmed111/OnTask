@@ -5,10 +5,15 @@ import { createClient } from '@/lib/supabase/client'
 import type { AuthUser } from '@/hooks/useAuth'
 import { InvitationStatus, WorkspaceInvitation } from '@/types/workspace'
 
+// Shape returned by list_my_pending_invitations() — the workspace name and
+// inviter's display name come pre-joined from Postgres, because an invitee
+// can't read either row directly under RLS until they've actually joined.
 type InvitationRow = {
   id: string
   workspace_id: string
+  workspace_name: string | null
   invited_by: string
+  inviter_name: string | null
   invited_email: string
   invited_user_id: string | null
   message: string | null
@@ -17,15 +22,15 @@ type InvitationRow = {
   created_at: string
   responded_at: string | null
   expires_at: string
-  workspaces: { name: string } | null
 }
 
 function rowToInvitation(row: InvitationRow): WorkspaceInvitation {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
-    workspaceName: row.workspaces?.name ?? null,
+    workspaceName: row.workspace_name,
     invitedBy: row.invited_by,
+    inviterName: row.inviter_name,
     invitedEmail: row.invited_email,
     invitedUserId: row.invited_user_id,
     message: row.message,
@@ -37,13 +42,12 @@ function rowToInvitation(row: InvitationRow): WorkspaceInvitation {
   }
 }
 
-// Pending invitations addressed TO the current user — drives both the
-// Header nav badge count and the accept/reject list on /workspaces. Not
-// email-delivered (no transactional email service is configured); this is
-// the in-app surface the product spec calls for instead.
+// Pending invitations addressed TO the current user — drives the invitation
+// cards on /workspaces and the header's badge count. Recipient authorization
+// is enforced in Postgres (list_my_pending_invitations matches on the
+// caller's own user id/email; accept/reject re-check it), not here.
 export function useMyInvitations(user: AuthUser | null) {
   const userId = user?.id
-  const userEmail = user?.email
   const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([])
   const [ready, setReady] = useState(false)
 
@@ -55,16 +59,7 @@ export function useMyInvitations(user: AuthUser | null) {
     }
     let cancelled = false
     const supabase = createClient()
-    let query = supabase
-      .from('workspace_invitations')
-      .select('*, workspaces(name)')
-      .eq('status', 'pending')
-    query = userEmail
-      ? query.or(
-          `invited_user_id.eq.${userId},invited_email.ilike.${userEmail}`,
-        )
-      : query.eq('invited_user_id', userId)
-    query.then(({ data }) => {
+    supabase.rpc('list_my_pending_invitations').then(({ data }) => {
       if (cancelled) return
       setInvitations(((data ?? []) as InvitationRow[]).map(rowToInvitation))
       setReady(true)
@@ -72,7 +67,7 @@ export function useMyInvitations(user: AuthUser | null) {
     return () => {
       cancelled = true
     }
-  }, [userId, userEmail])
+  }, [userId])
 
   const respond = async (
     invitationId: string,

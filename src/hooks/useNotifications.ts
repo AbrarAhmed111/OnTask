@@ -1,75 +1,50 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { AuthUser } from '@/hooks/useAuth'
+import { NotificationWithWorkspace } from '@/types/workspace'
 import {
-  NotificationEntityType,
-  NotificationType,
-  WorkspaceNotification,
-} from '@/types/workspace'
-
-type NotificationRow = {
-  id: string
-  user_id: string
-  workspace_id: string
-  event_id: string | null
-  goal_id: string | null
-  notification_type: NotificationType
-  entity_type: NotificationEntityType
-  entity_id: string | null
-  title: string
-  body: string | null
-  actor_id: string | null
-  read_at: string | null
-  created_at: string
-  // Embedded via the workspaces(id) FK — the workspace's slug, needed to
-  // deep-link since routing is entirely slug-based (never workspace_id).
-  workspaces: { slug: string } | { slug: string }[] | null
-}
-
-function rowToNotification(
-  row: NotificationRow,
-): WorkspaceNotification & { workspaceSlug: string | null } {
-  const workspace = Array.isArray(row.workspaces)
-    ? row.workspaces[0]
-    : row.workspaces
-  return {
-    id: row.id,
-    userId: row.user_id,
-    workspaceId: row.workspace_id,
-    eventId: row.event_id,
-    goalId: row.goal_id,
-    notificationType: row.notification_type,
-    entityType: row.entity_type,
-    entityId: row.entity_id,
-    title: row.title,
-    body: row.body,
-    actorId: row.actor_id,
-    readAt: row.read_at,
-    createdAt: row.created_at,
-    workspaceSlug: workspace?.slug ?? null,
-  }
-}
+  NotificationRow,
+  NotificationScope,
+  isInScope,
+  rowsToNotifications,
+} from '@/lib/workspaceNotifications'
 
 const LIMIT = 50
 
-// User-scoped (not workspace-scoped) — a person's notifications span every
-// workspace they belong to, so this mounts once at the app root
-// (NotificationsProvider) rather than per-workspace like every other hook
-// here. Same postgres_changes pattern as the rest of the app; a realtime
-// event triggers a full refetch (see comment below) rather than an
-// incremental merge, since the embedded workspace slug isn't in the payload.
-export function useNotifications(user: AuthUser | null) {
+// One hook for both kinds of workspace -- `scope` is the only difference
+// (see NotificationScope). A shared workspace's bell reads just that
+// workspace; the Personal Workspace's reads everything the user can see.
+// Filtering happens in the query (so a busy workspace can't push another's
+// notifications out of the LIMIT) and again on the way out (so switching
+// workspaces can never flash the previous one's notifications while the new
+// fetch is in flight). RLS (0034) is what actually guarantees a user never
+// receives a workspace they aren't a member of.
+//
+// Mounted where the bell is -- inside a workspace -- not at the app root: the
+// guest page and the workspaces hub have no bell, so they shouldn't hold a
+// realtime subscription. Same postgres_changes pattern as the rest of the
+// app; a realtime event triggers a refetch rather than an incremental merge,
+// since the embedded workspace isn't in the payload.
+export function useNotifications(
+  user: AuthUser | null,
+  scope: NotificationScope | null,
+) {
   const userId = user?.id
-  const [notifications, setNotifications] = useState<
-    (WorkspaceNotification & { workspaceSlug: string | null })[]
-  >([])
+  const hasScope = scope !== null
+  const sharedWorkspaceId = scope?.kind === 'shared' ? scope.workspaceId : null
+  const [loaded, setLoaded] = useState<NotificationWithWorkspace[]>([])
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!userId) {
-      setNotifications([])
+      setLoaded([])
       setReady(true)
+      return
+    }
+    if (!hasScope) {
+      setLoaded([])
+      setReady(false)
       return
     }
     let cancelled = false
@@ -77,10 +52,12 @@ export function useNotifications(user: AuthUser | null) {
 
     const fetchNotifications = (showLoading: boolean) => {
       if (showLoading) setReady(false)
-      supabase
+      let query = supabase
         .from('notifications')
-        .select('*, workspaces(slug)')
+        .select('*, workspaces(slug, type, name, accent)')
         .eq('user_id', userId)
+      if (sharedWorkspaceId) query = query.eq('workspace_id', sharedWorkspaceId)
+      query
         .order('created_at', { ascending: false })
         .limit(LIMIT)
         .then(({ data, error: fetchError }) => {
@@ -90,9 +67,7 @@ export function useNotifications(user: AuthUser | null) {
             setReady(true)
             return
           }
-          setNotifications(
-            ((data ?? []) as NotificationRow[]).map(rowToNotification),
-          )
+          setLoaded(rowsToNotifications((data ?? []) as NotificationRow[]))
           setReady(true)
         })
     }
@@ -106,8 +81,10 @@ export function useNotifications(user: AuthUser | null) {
     window.addEventListener('online', handleReconnect)
     document.addEventListener('visibilitychange', handleVisibility)
 
+    // The scope is in the channel name so a workspace switch never reuses --
+    // or tears down -- the previous workspace's channel.
     const channel = supabase
-      .channel(`notifications-${userId}`)
+      .channel(`notifications-${userId}-${sharedWorkspaceId ?? 'all'}`)
       .on(
         'postgres_changes',
         {
@@ -121,14 +98,20 @@ export function useNotifications(user: AuthUser | null) {
           if (payload.eventType === 'DELETE') {
             const deletedId = (payload.old as { id?: string }).id
             if (deletedId)
-              setNotifications(current =>
-                current.filter(n => n.id !== deletedId),
-              )
+              setLoaded(current => current.filter(n => n.id !== deletedId))
             return
           }
-          // The realtime payload doesn't carry the embedded workspaces(slug)
-          // join, so a full refetch keeps that field correct -- new
-          // notifications are infrequent enough that this is cheap.
+          // Realtime can only filter on one column, so a shared workspace's
+          // bell skips other workspaces' changes here rather than refetching
+          // for something it won't display.
+          const changedWorkspaceId = (payload.new as { workspace_id?: string })
+            .workspace_id
+          if (
+            sharedWorkspaceId &&
+            changedWorkspaceId &&
+            changedWorkspaceId !== sharedWorkspaceId
+          )
+            return
           fetchNotifications(false)
         },
       )
@@ -140,10 +123,15 @@ export function useNotifications(user: AuthUser | null) {
       document.removeEventListener('visibilitychange', handleVisibility)
       supabase.removeChannel(channel)
     }
-  }, [userId])
+  }, [userId, hasScope, sharedWorkspaceId])
+
+  const notifications = useMemo(
+    () => (scope ? loaded.filter(n => isInScope(n, scope)) : []),
+    [loaded, scope],
+  )
 
   const markRead = (id: string) => {
-    setNotifications(current =>
+    setLoaded(current =>
       current.map(n =>
         n.id === id && !n.readAt
           ? { ...n, readAt: new Date().toISOString() }
@@ -160,21 +148,27 @@ export function useNotifications(user: AuthUser | null) {
       })
   }
 
+  // Marks only what THIS bell shows. In a shared workspace that's just its own
+  // notifications -- clearing the others would silently dismiss things the
+  // user hasn't seen (they're in the Personal Workspace's panel).
   const markAllRead = () => {
-    if (!userId) return
+    if (!userId || !scope) return
     const now = new Date().toISOString()
-    setNotifications(current =>
-      current.map(n => (n.readAt ? n : { ...n, readAt: now })),
+    setLoaded(current =>
+      current.map(n =>
+        isInScope(n, scope) && !n.readAt ? { ...n, readAt: now } : n,
+      ),
     )
     const supabase = createClient()
-    void supabase
+    let query = supabase
       .from('notifications')
       .update({ read_at: now })
       .eq('user_id', userId)
       .is('read_at', null)
-      .then(({ error: updateError }) => {
-        if (updateError) setError("Couldn't update notifications.")
-      })
+    if (sharedWorkspaceId) query = query.eq('workspace_id', sharedWorkspaceId)
+    void query.then(({ error: updateError }) => {
+      if (updateError) setError("Couldn't update notifications.")
+    })
   }
 
   const unreadCount = notifications.filter(n => !n.readAt).length

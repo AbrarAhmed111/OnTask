@@ -15,6 +15,12 @@ function describeEvent(event: ActivityEvent, actorName: string): string {
     case 'started':
       return `${actorName} started "${title}"${under}`
     case 'paused':
+      // Timer stops that weren't the assignee pausing: an owner's emergency
+      // stop, and the automatic stop when a running task is reassigned.
+      if (event.metadata.reason === 'emergency_stop')
+        return `${actorName} stopped ${event.metadata.stopped_user_name || 'a member'}'s timer on "${title}"${under}`
+      if (event.metadata.reason === 'reassigned')
+        return `The timer on "${title}"${under} was stopped because it was reassigned`
       return `${actorName} paused "${title}"${under}`
     case 'resumed':
       return `${actorName} resumed "${title}"${under}`

@@ -25,6 +25,7 @@ function rowToInvitation(row: InvitationRow): WorkspaceInvitation {
     workspaceId: row.workspace_id,
     workspaceName: null,
     invitedBy: row.invited_by,
+    inviterName: null,
     invitedEmail: row.invited_email,
     invitedUserId: row.invited_user_id,
     message: row.message,

@@ -1,19 +1,99 @@
 import Link from 'next/link'
-import { Bell, CheckCheck } from 'lucide-react'
+import { Bell, CheckCheck, Lock, Users } from 'lucide-react'
 import { timeAgo } from '@/lib/time'
-import { WorkspaceNotification } from '@/types/workspace'
+import { getWorkspaceTheme } from '@/lib/workspaceThemes'
+import { groupNotificationsByWorkspace } from '@/lib/workspaceNotifications'
+import { NotificationWithWorkspace, WorkspaceType } from '@/types/workspace'
 
-type Notification = WorkspaceNotification & { workspaceSlug: string | null }
+function WorkspaceIcon({ type, size }: { type: WorkspaceType; size: number }) {
+  const Icon = type === 'personal' ? Lock : Users
+  return <Icon size={size} className="shrink-0" />
+}
 
+// The workspace a notification came from, in that workspace's own accent
+// colour so it's recognisable at a glance.
+function WorkspacePill({
+  notification,
+}: {
+  notification: NotificationWithWorkspace
+}) {
+  const theme = getWorkspaceTheme(notification.workspaceAccent)
+  return (
+    <span
+      style={{ backgroundColor: theme.soft, color: theme.strong }}
+      className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+    >
+      <WorkspaceIcon type={notification.workspaceType} size={10} />
+      <span className="truncate">{notification.workspaceName}</span>
+    </span>
+  )
+}
+
+function NotificationItem({
+  notification,
+  showWorkspace,
+  onMarkRead,
+  onNavigate,
+}: {
+  notification: NotificationWithWorkspace
+  showWorkspace: boolean
+  onMarkRead: (id: string) => void
+  onNavigate: () => void
+}) {
+  const unread = !notification.readAt
+  return (
+    <li className="animate-[slideInFade_260ms_ease-out]">
+      <Link
+        href={`/workspaces/${notification.workspaceSlug}`}
+        onClick={() => {
+          if (unread) onMarkRead(notification.id)
+          onNavigate()
+        }}
+        className={`block px-3.5 py-3 transition hover:bg-slate-50 ${unread ? 'bg-[var(--ws-accent-soft,#e9f0ec)]/40' : ''}`}
+      >
+        <div className="flex items-start gap-2">
+          {unread && (
+            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-coral" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-ink">
+              {notification.title}
+            </p>
+            {notification.body && (
+              <p className="mt-0.5 truncate text-[11px] text-muted">
+                {notification.body}
+              </p>
+            )}
+            <div className="mt-1.5 flex items-center gap-2">
+              {showWorkspace && <WorkspacePill notification={notification} />}
+              <p className="shrink-0 text-[10px] text-muted">
+                {timeAgo(notification.createdAt)}
+              </p>
+            </div>
+          </div>
+        </div>
+      </Link>
+    </li>
+  )
+}
+
+// `groupByWorkspace` is the Personal Workspace's panel: notifications from
+// several workspaces, grouped under each workspace's name, with the name
+// repeated on every entry. A shared workspace's panel is one workspace, so it
+// stays a flat list with no labels to repeat.
 export function NotificationPanel({
   notifications,
+  ready,
   unreadCount,
+  groupByWorkspace,
   onMarkRead,
   onMarkAllRead,
   onNavigate,
 }: {
-  notifications: Notification[]
+  notifications: NotificationWithWorkspace[]
+  ready: boolean
   unreadCount: number
+  groupByWorkspace: boolean
   onMarkRead: (id: string) => void
   onMarkAllRead: () => void
   onNavigate: () => void
@@ -36,51 +116,53 @@ export function NotificationPanel({
           <div className="px-4 py-8 text-center">
             <Bell size={18} className="mx-auto text-muted" />
             <p className="mt-2 text-[11px] text-muted">
-              You&apos;re all caught up.
+              {ready ? 'You’re all caught up.' : 'Loading notifications…'}
             </p>
           </div>
+        ) : groupByWorkspace ? (
+          groupNotificationsByWorkspace(notifications).map(group => {
+            const theme = getWorkspaceTheme(group.accent)
+            return (
+              <section key={group.workspaceId} aria-label={group.name}>
+                <div className="sticky top-0 z-10 flex items-center gap-1.5 border-b border-line/70 bg-slate-50 px-3.5 py-1.5">
+                  <span
+                    style={{ color: theme.strong }}
+                    className="flex min-w-0 flex-1 items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em]"
+                  >
+                    <WorkspaceIcon type={group.type} size={11} />
+                    <span className="truncate">{group.name}</span>
+                  </span>
+                  {group.unreadCount > 0 && (
+                    <span className="shrink-0 font-mono text-[9px] font-bold text-muted">
+                      {group.unreadCount} new
+                    </span>
+                  )}
+                </div>
+                <ul className="divide-y divide-line/70 border-b border-line/70 last:border-b-0">
+                  {group.notifications.map(notification => (
+                    <NotificationItem
+                      key={notification.id}
+                      notification={notification}
+                      showWorkspace
+                      onMarkRead={onMarkRead}
+                      onNavigate={onNavigate}
+                    />
+                  ))}
+                </ul>
+              </section>
+            )
+          })
         ) : (
           <ul className="divide-y divide-line/70">
-            {notifications.map(notification => {
-              const unread = !notification.readAt
-              const href = notification.workspaceSlug
-                ? `/workspaces/${notification.workspaceSlug}`
-                : '/workspaces'
-              return (
-                <li
-                  key={notification.id}
-                  className="animate-[slideInFade_260ms_ease-out]"
-                >
-                  <Link
-                    href={href}
-                    onClick={() => {
-                      if (unread) onMarkRead(notification.id)
-                      onNavigate()
-                    }}
-                    className={`block px-3.5 py-3 transition hover:bg-slate-50 ${unread ? 'bg-[var(--ws-accent-soft,#e9f0ec)]/40' : ''}`}
-                  >
-                    <div className="flex items-start gap-2">
-                      {unread && (
-                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-coral" />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-ink">
-                          {notification.title}
-                        </p>
-                        {notification.body && (
-                          <p className="mt-0.5 truncate text-[11px] text-muted">
-                            {notification.body}
-                          </p>
-                        )}
-                        <p className="mt-1 text-[10px] text-muted">
-                          {timeAgo(notification.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                </li>
-              )
-            })}
+            {notifications.map(notification => (
+              <NotificationItem
+                key={notification.id}
+                notification={notification}
+                showWorkspace={false}
+                onMarkRead={onMarkRead}
+                onNavigate={onNavigate}
+              />
+            ))}
           </ul>
         )}
       </div>

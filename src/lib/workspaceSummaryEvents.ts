@@ -40,6 +40,14 @@ export function formatMemberEvent(event: StructuredSnapshotEvent): string {
     case 'started':
       return withParent(`Started working on "${title}"`)
     case 'paused':
+      if (str('reason') === 'emergency_stop')
+        return withParent(
+          `Stopped ${str('stopped_user_name') ?? 'a member'}'s timer on "${title}"`,
+        )
+      if (str('reason') === 'reassigned')
+        return withParent(
+          `Timer on "${title}" stopped because it was reassigned`,
+        )
       return withParent(`Paused "${title}"`)
     case 'resumed':
       return withParent(`Resumed working on "${title}"`)
