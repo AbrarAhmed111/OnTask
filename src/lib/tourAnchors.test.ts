@@ -1,0 +1,27 @@
+import { describe, expect, it } from 'vitest'
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tourAnchors'
+
+describe('tourAnchor', () => {
+  it('produces the data-tour attribute a tour looks targets up by', () => {
+    expect(tourAnchor('goals')).toEqual({ 'data-tour': 'goals' })
+  })
+
+  it('exposes exactly the targets the onboarding tours rely on', () => {
+    expect([...TOUR_ANCHORS].sort()).toEqual(
+      [
+        'activity',
+        'goals',
+        'resources',
+        'settings',
+        'task-notes',
+        'today-tasks',
+        'workspace-members',
+        'working-now',
+      ].sort(),
+    )
+  })
+
+  it('has no duplicate ids', () => {
+    expect(new Set(TOUR_ANCHORS).size).toBe(TOUR_ANCHORS.length)
+  })
+})

@@ -10,4 +10,7 @@ export default defineConfig({
   resolve: {
     alias: [{ find: '@', replacement: srcDir }],
   },
+  // tsconfig keeps `jsx: preserve` for Next's own compiler; component tests
+  // (server-rendered to static markup) need JSX actually transformed.
+  esbuild: { jsx: 'automatic' },
 })
