@@ -39,6 +39,12 @@ const render = (
   )
 
 describe('WorkspaceSettingsSection', () => {
+  it('lays settings cards out responsively', () => {
+    const html = render()
+    expect(html).toContain('md:grid-cols-2')
+    expect(html).toContain('xl:grid-cols-3')
+  })
+
   it('offers editing the workspace to its owner only', () => {
     expect(render({ canManage: true })).toContain('>Edit<')
     expect(render({ canManage: false })).not.toContain('>Edit<')
@@ -114,5 +120,37 @@ describe('WorkspaceSettingsSection', () => {
 
   it('surfaces a save error inside the details card', () => {
     expect(render({ error: 'Could not save' })).toContain('Could not save')
+  })
+
+  describe('Help & guidance', () => {
+    const guidance = { label: 'Shared Workspace tour', onReplay: noop }
+
+    it('offers to replay the workspace tour, named for the workspace', () => {
+      const html = render({ guidance })
+      expect(html).toContain('Help &amp; guidance')
+      expect(html).toContain('Replay Shared Workspace tour')
+    })
+
+    it('leaves the card out when there is no tour to replay', () => {
+      expect(render()).not.toContain('Help &amp; guidance')
+    })
+
+    it('is offered to every member, not only the owner', () => {
+      expect(render({ canManage: false, guidance })).toContain(
+        'Replay Shared Workspace tour',
+      )
+    })
+
+    it("waits for the workspace to load, since the tour can't start without it", () => {
+      const loading = render({
+        ready: false,
+        workspace: null,
+        canManage: false,
+        guidance,
+      })
+      const loaded = render({ canManage: false, guidance })
+      expect(loading).toContain('disabled=""')
+      expect(loaded).not.toContain('disabled=""')
+    })
   })
 })

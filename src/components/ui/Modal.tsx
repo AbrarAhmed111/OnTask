@@ -12,6 +12,7 @@ import {
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { usePortalTheme } from '@/components/ui/PortalTheme'
+import { lockBodyScroll } from '@/lib/scrollLock'
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -31,36 +32,6 @@ const FILL_CLASSES =
 // confirmation opened over another dialog closes by itself instead of taking
 // the dialog underneath with it, and two focus traps never fight.
 const openModals: symbol[] = []
-
-// While any modal is open the page behind it must not scroll. Reference
-// counted so stacked modals share one lock; the scrollbar's width is added
-// back as padding so the page doesn't jump sideways when it disappears.
-let scrollLocks = 0
-let restoreScroll: (() => void) | null = null
-
-function lockBodyScroll(): () => void {
-  if (scrollLocks++ === 0) {
-    const { body, documentElement } = document
-    const previousOverflow = body.style.overflow
-    const previousPadding = body.style.paddingRight
-    const scrollbarWidth = window.innerWidth - documentElement.clientWidth
-    body.style.overflow = 'hidden'
-    if (scrollbarWidth > 0) body.style.paddingRight = `${scrollbarWidth}px`
-    restoreScroll = () => {
-      body.style.overflow = previousOverflow
-      body.style.paddingRight = previousPadding
-    }
-  }
-  let released = false
-  return () => {
-    if (released) return
-    released = true
-    if (--scrollLocks === 0) {
-      restoreScroll?.()
-      restoreScroll = null
-    }
-  }
-}
 
 type ModalProps = {
   title: string

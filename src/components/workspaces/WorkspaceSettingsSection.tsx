@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import { Bell, Settings2, SlidersHorizontal } from 'lucide-react'
+import { Bell, CircleHelp, Settings2, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { PreferenceToggle } from '@/components/ui/PreferenceToggle'
@@ -53,6 +53,8 @@ function SettingsCard({
 //  - Your preferences (completion sound): a property of the person on this
 //    device, kept in localStorage. Available to every member.
 //
+// Plus "Help & guidance", which replays this workspace's onboarding tour.
+//
 // A personal workspace keeps its fixed name and has no description.
 export function WorkspaceSettingsSection({
   ready,
@@ -61,6 +63,7 @@ export function WorkspaceSettingsSection({
   isPersonal = false,
   canManage,
   preferences,
+  guidance,
   onEdit,
 }: {
   ready: boolean
@@ -74,12 +77,15 @@ export function WorkspaceSettingsSection({
     soundEnabled: boolean
     onSoundEnabledChange: (enabled: boolean) => void
   }
+  // Replaying this workspace's onboarding tour. `label` names it ("Personal
+  // Workspace tour"); omit `guidance` to leave the card out.
+  guidance?: { label: string; onReplay: () => void }
   onEdit: () => void
 }) {
   const theme = getWorkspaceTheme(workspace?.accent)
 
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="grid w-full max-w-[1200px] gap-6 md:grid-cols-2 xl:grid-cols-3">
       <SettingsCard
         icon={Settings2}
         title={isPersonal ? 'Personal Workspace settings' : 'Workspace details'}
@@ -147,6 +153,24 @@ export function WorkspaceSettingsSection({
           </p>
         </div>
       </SettingsCard>
+
+      {guidance && (
+        <SettingsCard icon={CircleHelp} title="Help & guidance">
+          <div className="flex items-center justify-between gap-4 px-5 py-4">
+            <p className="text-xs leading-5 text-muted">
+              Take a quick look around this workspace again.
+            </p>
+            <Button
+              variant="secondary"
+              onClick={guidance.onReplay}
+              disabled={!ready}
+              className="shrink-0"
+            >
+              Replay {guidance.label}
+            </Button>
+          </div>
+        </SettingsCard>
+      )}
     </div>
   )
 }

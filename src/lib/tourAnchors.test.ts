@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { TOUR_ANCHORS, tourAnchor } from '@/lib/tourAnchors'
+import { TOUR_ANCHORS, tourAnchor, tourInset } from '@/lib/tourAnchors'
+
+describe('tourInset', () => {
+  it('marks sticky chrome a tour must keep its targets clear of', () => {
+    expect(tourInset('top')).toEqual({ 'data-tour-inset': 'top' })
+  })
+})
 
 describe('tourAnchor', () => {
   it('produces the data-tour attribute a tour looks targets up by', () => {

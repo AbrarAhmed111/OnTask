@@ -24,6 +24,12 @@ import { Settings, Task } from '@/types'
 //  (name/accent/timezone)    (lib/redux/persist.ts) so a refresh doesn't
 //                            flash defaults. Supabase stays the source of
 //                            truth and overwrites it on every load.
+//  Onboarding tour        -> Supabase (`user_tour_progress`, lib/tour/
+//  progress                  progress.ts), one row per user + workspace +
+//                            tour. Not localStorage: a tour someone has
+//                            finished must not come back on another device or
+//                            after clearing site data, and it is per
+//                            workspace because each has its own layout.
 //
 // The app has no light/dark mode; "theme" means the workspace accent.
 

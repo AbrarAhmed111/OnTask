@@ -12,9 +12,11 @@ import { CompletionModal } from '@/components/tasks/CompletionModal'
 import { GoalForm } from '@/components/goals/GoalForm'
 import { ResourcesModal } from '@/components/resources/ResourcesModal'
 import { Modal } from '@/components/ui/Modal'
+import { TourLayer } from '@/components/tour/TourLayer'
 import { useWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailContext'
 import { useCompletionAlert } from '@/hooks/useCompletionAlert'
 import { useSettings } from '@/hooks/useSettings'
+import { useWorkspaceTour } from '@/hooks/useWorkspaceTour'
 import { useWorkspaceTasks } from '@/hooks/useWorkspaceTasks'
 import { useWorkspaceGoals, GoalFormValues } from '@/hooks/useWorkspaceGoals'
 import { useWorkspaceResources } from '@/hooks/useWorkspaceResources'
@@ -112,6 +114,13 @@ export function WorkspaceOverviewClient() {
     workspace?.timezone ?? '',
     workspace?.reportTime ?? '12:00:00',
   )
+
+  // The tour's steps point at things these sections render, so it waits until
+  // every one of them has its data (each shows a placeholder until then).
+  useWorkspaceTour({
+    contentReady:
+      ready && tasksReady && goalsReady && resourcesReady && activityReady,
+  })
 
   const [taskModal, setTaskModal] = useState<'add' | 'edit' | null>(null)
   const [taskForm, setTaskForm] = useState<TaskFormValues>(emptyTaskForm)
@@ -404,6 +413,7 @@ export function WorkspaceOverviewClient() {
           onClose={() => setResourcesModalOpen(false)}
         />
       )}
+      <TourLayer />
     </div>
   )
 }

@@ -142,6 +142,29 @@ notification only while they are a member of its workspace, and can update only
 its read state
 ([`0034_notifications_workspace_scoped_access.sql`](supabase/migrations/0034_notifications_workspace_scoped_access.sql)).
 
+### Guided Tours
+
+A short, contextual tour points at the real interface instead of a setup wizard:
+the rest of the app is dimmed, the section being explained stays lit, and a
+small card says what it is and what to do there.
+
+- **Personal Workspace tour** — daily tasks, goals, resources and settings.
+  Opens the first time you open your Personal Workspace, after the one-time
+  welcome.
+- **Shared Workspace tour** — members, who is working now, tasks, task notes,
+  goals, resources and activity. Opens the first time you open _each_ shared
+  workspace, not once globally.
+- Every tour has Back, Next, Skip and Close, a progress indicator, Escape to
+  skip and Left/Right to step. Skipping or finishing is remembered, so a tour
+  never comes back on its own; **Settings → Help & guidance** replays it.
+- A step is only shown if the thing it points at is on screen, so a workspace
+  without tasks yet simply has no "Task notes" step.
+
+Progress is stored in Supabase per user, workspace and tour
+([`0039_user_tour_progress.sql`](supabase/migrations/0039_user_tour_progress.sql)),
+so it follows you across devices. Accounts that already belong to a workspace
+when that migration runs are treated as onboarded there.
+
 ### Automatic Daily Report
 
 - Every workspace automatically gets a **Daily Report at a configured time of
@@ -228,12 +251,15 @@ src/
 │   ├── layout/                     # Header, footer, workspace shell
 │   ├── settings/                   # Settings modal
 │   ├── tasks/                      # Task forms and modals
+│   ├── tour/                       # Onboarding tour engine (provider, highlight, popover)
 │   ├── ui/                         # Shared primitives (Button, Modal, ...)
 │   └── workspaces/                 # Workspace cards, members, tasks, activity, Daily Report
 ├── hooks/                          # useAuth, useTasks, useTimer, useWorkspace*, ...
 ├── lib/
 │   ├── auth/, email/, redux/, supabase/, tasks/
 │   ├── notifications.ts, storage.ts, time.ts, dailyReportWindow.ts
+│   ├── tour/                       # Tour definitions, layout maths, persistence
+│   ├── tourAnchors.ts              # `data-tour` ids the tours point at
 │   ├── workspaces.ts               # Personal-workspace alias + row mapping
 │   ├── workspaceNotifications.ts   # Notification scoping (personal vs shared) + grouping
 │   └── workspaceThemes.ts

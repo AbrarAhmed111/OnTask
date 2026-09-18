@@ -28,3 +28,10 @@ export type TourAnchor = (typeof TOUR_ANCHORS)[number]
 export function tourAnchor(id: TourAnchor) {
   return { 'data-tour': id } as const
 }
+
+// Marks sticky chrome (the workspace header) that stays put while the page
+// scrolls. A tour keeps its targets clear of it when it scrolls them into
+// view, and doesn't try to scroll a target that lives inside it.
+export function tourInset(edge: 'top') {
+  return { 'data-tour-inset': edge } as const
+}

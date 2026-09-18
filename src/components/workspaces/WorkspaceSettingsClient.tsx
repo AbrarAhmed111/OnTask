@@ -1,12 +1,18 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { WorkspaceSettingsSection } from '@/components/workspaces/WorkspaceSettingsSection'
 import { EditWorkspaceModal } from '@/components/workspaces/EditWorkspaceModal'
 import { useWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailContext'
+import { useTour } from '@/components/tour/TourProvider'
 import { useSettings } from '@/hooks/useSettings'
+import { TOURS, tourIdForWorkspace } from '@/lib/tour/definitions'
+import { PERSONAL_WORKSPACE_PATH, workspacePath } from '@/lib/workspaces'
 
 export function WorkspaceSettingsClient() {
+  const router = useRouter()
+  const { requestReplay } = useTour()
   const { workspace, ready, isOwner, isPersonal, updateWorkspace } =
     useWorkspaceDetail()
   const { settings, ready: settingsReady, updateSettings } = useSettings()
@@ -23,6 +29,15 @@ export function WorkspaceSettingsClient() {
     return result
   }
 
+  // The tour points at the Overview, so replaying it means going there: the
+  // request outlives this page and the Overview starts it once it has loaded.
+  const tour = TOURS[tourIdForWorkspace(isPersonal ? 'personal' : 'shared')]
+  const handleReplayTour = () => {
+    if (!workspace) return
+    requestReplay(tour.id)
+    router.push(isPersonal ? PERSONAL_WORKSPACE_PATH : workspacePath(workspace))
+  }
+
   return (
     <>
       <WorkspaceSettingsSection
@@ -37,6 +52,7 @@ export function WorkspaceSettingsClient() {
           onSoundEnabledChange: soundEnabled =>
             updateSettings({ soundEnabled }),
         }}
+        guidance={{ label: tour.label, onReplay: handleReplayTour }}
         onEdit={() => {
           setSettingsError(null)
           setEditing(true)

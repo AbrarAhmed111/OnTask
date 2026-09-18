@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useEffect, useState } from 'react'
+import { ReactNode, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -12,6 +12,7 @@ import { usePersonalWelcome } from '@/hooks/usePersonalWelcome'
 import { InviteMemberModal } from '@/components/workspaces/InviteMemberModal'
 import { PersonalWelcomeModal } from '@/components/workspaces/PersonalWelcomeModal'
 import { GuestWorkPrompt } from '@/components/auth/GuestWorkPrompt'
+import { TourProvider } from '@/components/tour/TourProvider'
 import {
   WorkspaceShell,
   WorkspaceSection,
@@ -21,6 +22,8 @@ import {
   WorkspaceDetailContextValue,
 } from '@/components/workspaces/WorkspaceDetailContext'
 import type { AuthUser } from '@/hooks/useAuth'
+import { saveTourOutcome } from '@/lib/tour/progress'
+import type { TourId, TourOutcome } from '@/lib/tour/types'
 import { PERSONAL_WORKSPACE_SLUG } from '@/lib/workspaces'
 
 // The section a pathname like /workspaces/[slug], /workspaces/[slug]/members
@@ -104,6 +107,20 @@ function WorkspaceLayout({
   const [inviting, setInviting] = useState(false)
   const welcome = usePersonalWelcome({ user, workspace, updateWorkspace })
 
+  // Skipping or finishing a tour is remembered per user and workspace so it
+  // doesn't come back on its own. The tour is already gone from the screen by
+  // now, so a failed save is only logged -- worst case it is offered again.
+  const userId = user.id
+  const recordTourOutcome = useCallback(
+    (tourId: TourId, outcome: TourOutcome) => {
+      if (!workspaceId) return
+      saveTourOutcome(userId, workspaceId, tourId, outcome).catch(error =>
+        console.error('Could not save tour progress:', error),
+      )
+    },
+    [userId, workspaceId],
+  )
+
   // A personal workspace has exactly one URL. Reaching it through its stored
   // slug (an old link, a notification) or through the members page — which a
   // personal workspace doesn't have — lands back on the canonical page.
@@ -167,36 +184,45 @@ function WorkspaceLayout({
 
   return (
     <WorkspaceDetailContext.Provider value={contextValue}>
-      <WorkspaceShell
-        workspaceId={workspaceId}
-        workspaceSlug={workspace?.slug ?? workspaceSlug}
-        workspace={workspace}
-        members={members}
-        role={role}
-        ready={ready}
-        user={user}
-        onlineUserIds={onlineUserIds}
-        section={section}
-        onSectionChange={handleSectionChange}
-        isPersonal={isPersonal}
-        onInvite={isOwner && !isPersonal ? () => setInviting(true) : undefined}
-        onLogout={onLogout}
+      {/* The first-visit welcome comes first: the personal tour opens once it
+          has been shown and dismissed, not while it is still being decided. */}
+      <TourProvider
+        paused={isPersonal && (!welcome.checked || welcome.open)}
+        onOutcome={recordTourOutcome}
       >
-        {children}
-      </WorkspaceShell>
+        <WorkspaceShell
+          workspaceId={workspaceId}
+          workspaceSlug={workspace?.slug ?? workspaceSlug}
+          workspace={workspace}
+          members={members}
+          role={role}
+          ready={ready}
+          user={user}
+          onlineUserIds={onlineUserIds}
+          section={section}
+          onSectionChange={handleSectionChange}
+          isPersonal={isPersonal}
+          onInvite={
+            isOwner && !isPersonal ? () => setInviting(true) : undefined
+          }
+          onLogout={onLogout}
+        >
+          {children}
+        </WorkspaceShell>
 
-      {inviting && !isPersonal && (
-        <InviteMemberModal
-          onInvite={inviteByEmail}
-          onClose={() => setInviting(false)}
-        />
-      )}
-      {isPersonal && welcome.open && (
-        <PersonalWelcomeModal onClose={welcome.close} />
-      )}
-      {isPersonal && ready && (
-        <GuestWorkPrompt suppressed={!welcome.checked || welcome.open} />
-      )}
+        {inviting && !isPersonal && (
+          <InviteMemberModal
+            onInvite={inviteByEmail}
+            onClose={() => setInviting(false)}
+          />
+        )}
+        {isPersonal && welcome.open && (
+          <PersonalWelcomeModal onClose={welcome.close} />
+        )}
+        {isPersonal && ready && (
+          <GuestWorkPrompt suppressed={!welcome.checked || welcome.open} />
+        )}
+      </TourProvider>
     </WorkspaceDetailContext.Provider>
   )
 }

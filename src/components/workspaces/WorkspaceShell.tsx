@@ -20,7 +20,7 @@ import { AccountMenu } from '@/components/layout/AccountMenu'
 import { PresenceDot } from '@/components/workspaces/PresenceDot'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { getWorkspaceTheme } from '@/lib/workspaceThemes'
-import { TourAnchor, tourAnchor } from '@/lib/tourAnchors'
+import { TourAnchor, tourAnchor, tourInset } from '@/lib/tourAnchors'
 import { useAppSelector } from '@/lib/redux/hooks'
 import { selectCachedWorkspaceIdentity } from '@/lib/redux/workspaceCacheSlice'
 import type { AuthUser } from '@/hooks/useAuth'
@@ -206,7 +206,10 @@ export function WorkspaceShell({
       }
       className="min-h-screen bg-[radial-gradient(circle_at_80%_0%,#e4f0e6_0,transparent_30%),linear-gradient(135deg,#f8faf7_0%,#eff3ee_100%)] text-ink"
     >
-      <header className="sticky top-0 z-30 border-b border-line bg-paper/85 backdrop-blur">
+      <header
+        {...tourInset('top')}
+        className="sticky top-0 z-30 border-b border-line bg-paper/85 backdrop-blur"
+      >
         <div className="px-3 pt-2 sm:hidden">
           <Link href="/workspaces" className={BACK_LINK_CLASS}>
             <ArrowLeft size={13} />
