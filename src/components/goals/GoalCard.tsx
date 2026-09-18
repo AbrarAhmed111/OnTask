@@ -1,0 +1,465 @@
+'use client'
+
+import { FormEvent, useEffect, useState } from 'react'
+import {
+  Archive,
+  CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  CircleCheck,
+  CirclePlus,
+  RotateCcw,
+  Target,
+} from 'lucide-react'
+import { showErrorToast, showSuccessToast } from '@/lib/toast'
+import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { WorkspaceTaskList } from '@/components/workspaces/WorkspaceTaskList'
+import { WorkspaceTaskForm } from '@/components/workspaces/WorkspaceTaskForm'
+import { CompletionModal } from '@/components/tasks/CompletionModal'
+import { DeleteParentModal } from '@/components/tasks/DeleteParentModal'
+import { GoalDetailHeader } from '@/components/goals/GoalDetailHeader'
+import { GoalForm } from '@/components/goals/GoalForm'
+import { DependencyPicker } from '@/components/goals/DependencyPicker'
+import { useGoalDetail } from '@/hooks/useGoalDetail'
+import { GoalFormValues } from '@/hooks/useWorkspaceGoals'
+import type { AuthUser } from '@/hooks/useAuth'
+import { Goal, WorkspaceMember, WorkspaceTask } from '@/types/workspace'
+import { TaskFormValues } from '@/types'
+
+const STATUS_STYLES: Record<Goal['status'], string> = {
+  active: 'bg-[var(--ws-accent-soft,#e9f0ec)] text-[var(--ws-accent,#375b4b)]',
+  completed: 'bg-sage/15 text-forest',
+  archived: 'bg-slate-100 text-muted',
+}
+const STATUS_LABEL: Record<Goal['status'], string> = {
+  active: 'Active',
+  completed: 'Completed',
+  archived: 'Archived',
+}
+
+const emptyTaskForm: TaskFormValues = {
+  name: '',
+  hours: '1',
+  minutes: '0',
+  goal: '',
+  progress: '0',
+  trackGoal: false,
+}
+
+// A single Goal, rendered as a card that expands in place to its full detail
+// (stats, currently-working, task/subtask tree, dependencies) — the same
+// "one card, expand in place, no navigation" pattern already used for the
+// Daily Report (WorkspaceSummarySection) and for a task's own subtasks
+// (WorkspaceParentTaskCard). There is deliberately no separate Goals route.
+export function GoalCard({
+  goal,
+  workspaceId,
+  user,
+  members,
+  updateGoal,
+  setGoalStatus,
+  onWorkingTasksChange,
+}: {
+  goal: Goal
+  workspaceId: string
+  user: AuthUser | null
+  members: WorkspaceMember[]
+  updateGoal: (
+    id: string,
+    update: Partial<
+      Pick<Goal, 'name' | 'description' | 'targetDate' | 'status'>
+    >,
+  ) => void
+  setGoalStatus: (id: string, status: Goal['status']) => void
+  onWorkingTasksChange: (goalId: string, tasks: WorkspaceTask[]) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [completionTask, setCompletionTask] = useState<WorkspaceTask | null>(
+    null,
+  )
+  const {
+    tasks,
+    ready: tasksReady,
+    error: tasksError,
+    startTask,
+    pauseTask,
+    finishTask,
+    addTask,
+    updateTask,
+    deleteTask,
+    moveTask,
+    reassignTask,
+    getLiveSeconds,
+    dependencies,
+    addDependency,
+    removeDependency,
+    blockingTasksFor,
+  } = useGoalDetail(goal.id, workspaceId, user, members, task =>
+    setCompletionTask(task),
+  )
+
+  const [taskModal, setTaskModal] = useState<'add' | 'edit' | null>(null)
+  const [taskForm, setTaskForm] = useState<TaskFormValues>(emptyTaskForm)
+  const [taskAssignee, setTaskAssignee] = useState('')
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [pendingParentId, setPendingParentId] = useState<string | null>(null)
+  const [pendingDeleteParent, setPendingDeleteParent] = useState<{
+    task: WorkspaceTask
+    childCount: number
+  } | null>(null)
+  const [dependencyTask, setDependencyTask] = useState<WorkspaceTask | null>(
+    null,
+  )
+  const [editingGoal, setEditingGoal] = useState(false)
+  const [goalForm, setGoalForm] = useState<GoalFormValues>({
+    name: goal.name,
+    description: goal.description ?? '',
+    targetDate: goal.targetDate ?? '',
+  })
+
+  useEffect(() => {
+    if (expanded && tasksError) showErrorToast(tasksError)
+  }, [expanded, tasksError])
+
+  const isDone = (task: WorkspaceTask) =>
+    task.status === 'completed' || task.status === 'skipped'
+  useEffect(() => {
+    onWorkingTasksChange(
+      goal.id,
+      tasks.filter(task => task.status === 'working'),
+    )
+  }, [goal.id, onWorkingTasksChange, tasks])
+  const totalTasks = tasks.length
+  const completedTasks = tasks.filter(isDone).length
+  const focusedSeconds = Math.round(
+    tasks.reduce((total, task) => total + getLiveSeconds(task), 0),
+  )
+  const progress =
+    totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100)
+  const blockedTaskCount = tasks.filter(
+    task => !isDone(task) && blockingTasksFor(task.id).length > 0,
+  ).length
+
+  const closeTaskModal = () => {
+    setTaskModal(null)
+    setEditingTaskId(null)
+    setPendingParentId(null)
+  }
+  const openAddTask = () => {
+    setTaskForm({ ...emptyTaskForm })
+    setTaskAssignee('')
+    setPendingParentId(null)
+    setTaskModal('add')
+  }
+  const openAddSubtask = (parentId: string) => {
+    setTaskForm({ ...emptyTaskForm })
+    setTaskAssignee('')
+    setPendingParentId(parentId)
+    setTaskModal('add')
+  }
+  const openEditTask = (task: WorkspaceTask) => {
+    setEditingTaskId(task.id)
+    setTaskForm({
+      name: task.name,
+      hours: String(Math.floor(task.plannedMinutes / 60)),
+      minutes: String(task.plannedMinutes % 60),
+      goal: task.progressLabel || '',
+      progress: String(task.progressPercentage || 0),
+      trackGoal: Boolean(task.progressLabel),
+    })
+    setTaskAssignee(task.assignedTo ?? '')
+    setTaskModal('edit')
+  }
+
+  const handleAddTask = (event: FormEvent) => {
+    if (addTask(event, taskForm, pendingParentId, taskAssignee || null)) {
+      closeTaskModal()
+      showSuccessToast(pendingParentId ? 'Subtask added.' : 'Task added.')
+    }
+  }
+  const handleEditTask = (event: FormEvent) => {
+    event.preventDefault()
+    if (!editingTaskId) return
+    const plannedMinutes =
+      Number(taskForm.hours || 0) * 60 + Number(taskForm.minutes || 0)
+    if (!taskForm.name.trim() || plannedMinutes <= 0) return
+    updateTask(editingTaskId, {
+      name: taskForm.name.trim(),
+      plannedMinutes,
+      progressLabel: taskForm.trackGoal
+        ? taskForm.goal.trim() || undefined
+        : undefined,
+      progressPercentage: taskForm.trackGoal
+        ? Math.min(100, Math.max(0, Number(taskForm.progress) || 0))
+        : undefined,
+    })
+    if (
+      taskAssignee !==
+      (tasks.find(t => t.id === editingTaskId)?.assignedTo ?? '')
+    ) {
+      reassignTask(editingTaskId, taskAssignee || null)
+    }
+    closeTaskModal()
+    showSuccessToast('Task updated.')
+  }
+  const handleFinishTask = (task: WorkspaceTask) => {
+    finishTask(task, true)
+    showSuccessToast(`${task.name} finished.`)
+  }
+  const handleDeleteTask = (id: string) => {
+    deleteTask(id)
+    showSuccessToast('Task removed.')
+  }
+  const handleDeleteParent = (task: WorkspaceTask) => {
+    const childCount = tasks.filter(t => t.parentTaskId === task.id).length
+    setPendingDeleteParent({ task, childCount })
+  }
+  const handleMoveTo = (taskId: string, parentId: string | null) => {
+    moveTask(taskId, parentId)
+    showSuccessToast(
+      parentId ? 'Subtask moved under its new task.' : 'Task made standalone.',
+    )
+  }
+  const confirmDeleteParentAndChildren = () => {
+    if (!pendingDeleteParent) return
+    tasks
+      .filter(task => task.parentTaskId === pendingDeleteParent.task.id)
+      .forEach(child => deleteTask(child.id))
+    deleteTask(pendingDeleteParent.task.id)
+    showSuccessToast(
+      `${pendingDeleteParent.task.name} and its subtasks were removed.`,
+    )
+    setPendingDeleteParent(null)
+  }
+  const confirmOrphanChildren = () => {
+    if (!pendingDeleteParent) return
+    tasks
+      .filter(task => task.parentTaskId === pendingDeleteParent.task.id)
+      .forEach(child => moveTask(child.id, null))
+    deleteTask(pendingDeleteParent.task.id)
+    showSuccessToast(
+      `${pendingDeleteParent.task.name} removed — its subtasks are now standalone tasks in this goal.`,
+    )
+    setPendingDeleteParent(null)
+  }
+
+  const openEditGoal = () => {
+    setGoalForm({
+      name: goal.name,
+      description: goal.description ?? '',
+      targetDate: goal.targetDate ?? '',
+    })
+    setEditingGoal(true)
+  }
+  const handleEditGoal = (event: FormEvent) => {
+    event.preventDefault()
+    if (!goalForm.name.trim()) return
+    updateGoal(goal.id, {
+      name: goalForm.name.trim(),
+      description: goalForm.description.trim() || null,
+      targetDate: goalForm.targetDate || null,
+    })
+    setEditingGoal(false)
+    showSuccessToast('Goal updated.')
+  }
+
+  const StatusIcon =
+    goal.status === 'completed'
+      ? CircleCheck
+      : goal.status === 'archived'
+        ? Archive
+        : Target
+
+  return (
+    <div className="rounded-2xl border border-line bg-panel shadow-sm">
+      <button
+        type="button"
+        onClick={() => setExpanded(open => !open)}
+        className="flex w-full items-start gap-3 px-5 py-4 text-left"
+      >
+        {expanded ? (
+          <ChevronDown size={16} className="mt-0.5 shrink-0 text-muted" />
+        ) : (
+          <ChevronRight size={16} className="mt-0.5 shrink-0 text-muted" />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="min-w-0 truncate text-sm font-bold tracking-tight text-ink">
+              {goal.name}
+            </h3>
+            <span
+              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase ${STATUS_STYLES[goal.status]}`}
+            >
+              <StatusIcon size={10} /> {STATUS_LABEL[goal.status]}
+            </span>
+          </div>
+          {!expanded && goal.description && (
+            <p className="mt-1 line-clamp-1 text-xs text-muted">
+              {goal.description}
+            </p>
+          )}
+          {!expanded && goal.targetDate && (
+            <p className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold text-muted">
+              <CalendarDays size={11} />
+              Target{' '}
+              {new Date(goal.targetDate).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+              })}
+            </p>
+          )}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="space-y-6 border-t border-line/70 px-5 py-5">
+          <GoalDetailHeader
+            goal={goal}
+            progress={progress}
+            focusedSeconds={focusedSeconds}
+            totalTasks={totalTasks}
+            completedTasks={completedTasks}
+            blockedTasks={blockedTaskCount}
+            onEdit={openEditGoal}
+            onMarkComplete={() => {
+              setGoalStatus(goal.id, 'completed')
+              showSuccessToast('Goal marked complete.')
+            }}
+            onArchive={() => {
+              setGoalStatus(goal.id, 'archived')
+              showSuccessToast('Goal archived.')
+            }}
+            onReactivate={() => {
+              setGoalStatus(goal.id, 'active')
+              showSuccessToast('Goal reactivated.')
+            }}
+          />
+
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-xs font-bold tracking-tight text-ink">
+                Tasks
+              </h4>
+              <Button onClick={openAddTask}>
+                <CirclePlus size={14} /> Add task
+              </Button>
+            </div>
+            {!tasksReady ? (
+              <div className="space-y-3">
+                <Skeleton className="h-20 rounded-2xl" />
+                <Skeleton className="h-20 rounded-2xl" />
+              </div>
+            ) : tasks.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-sage/70 px-5 py-8 text-center text-xs text-muted">
+                No tasks in this goal yet — add one to start breaking down the
+                work.
+              </div>
+            ) : (
+              <WorkspaceTaskList
+                tasks={tasks}
+                members={members}
+                user={user}
+                getWorkedSeconds={getLiveSeconds}
+                onStart={startTask}
+                onPause={pauseTask}
+                onFinish={handleFinishTask}
+                onEdit={openEditTask}
+                onDelete={handleDeleteTask}
+                onReassign={reassignTask}
+                onReorder={() => {}}
+                onAddSubtask={openAddSubtask}
+                onDeleteParent={handleDeleteParent}
+                onMoveTo={handleMoveTo}
+                getBlockedBy={task =>
+                  blockingTasksFor(task.id).map(t => t.name)
+                }
+                onManageDependencies={task => setDependencyTask(task)}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {taskModal === 'add' && (
+        <Modal
+          eyebrow={pendingParentId ? 'New subtask' : 'New task'}
+          title={pendingParentId ? 'Add a subtask' : 'Add a task'}
+          onClose={closeTaskModal}
+        >
+          <WorkspaceTaskForm
+            values={taskForm}
+            setValues={setTaskForm}
+            members={members}
+            assignedTo={taskAssignee}
+            setAssignedTo={setTaskAssignee}
+            submitLabel={pendingParentId ? 'Add subtask' : 'Add task'}
+            onSubmit={handleAddTask}
+            onCancel={closeTaskModal}
+          />
+        </Modal>
+      )}
+      {taskModal === 'edit' && (
+        <Modal
+          eyebrow="Edit task"
+          title="Refine this task"
+          onClose={closeTaskModal}
+        >
+          <WorkspaceTaskForm
+            values={taskForm}
+            setValues={setTaskForm}
+            members={members}
+            assignedTo={taskAssignee}
+            setAssignedTo={setTaskAssignee}
+            submitLabel="Save changes"
+            onSubmit={handleEditTask}
+            onCancel={closeTaskModal}
+          />
+        </Modal>
+      )}
+      {editingGoal && (
+        <Modal
+          eyebrow="Edit goal"
+          title="Refine this goal"
+          onClose={() => setEditingGoal(false)}
+        >
+          <GoalForm
+            values={goalForm}
+            setValues={setGoalForm}
+            submitLabel="Save changes"
+            onSubmit={handleEditGoal}
+            onCancel={() => setEditingGoal(false)}
+          />
+        </Modal>
+      )}
+      {completionTask && (
+        <CompletionModal
+          taskName={completionTask.name}
+          onStop={() => setCompletionTask(null)}
+        />
+      )}
+      {pendingDeleteParent && (
+        <DeleteParentModal
+          taskName={pendingDeleteParent.task.name}
+          childCount={pendingDeleteParent.childCount}
+          onDeleteAll={confirmDeleteParentAndChildren}
+          onOrphan={confirmOrphanChildren}
+          onClose={() => setPendingDeleteParent(null)}
+        />
+      )}
+      {dependencyTask && (
+        <DependencyPicker
+          task={dependencyTask}
+          allTasks={tasks}
+          dependencies={dependencies}
+          onAdd={blockingTaskId =>
+            addDependency(blockingTaskId, dependencyTask.id)
+          }
+          onRemove={removeDependency}
+          onClose={() => setDependencyTask(null)}
+        />
+      )}
+    </div>
+  )
+}
