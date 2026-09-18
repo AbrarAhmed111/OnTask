@@ -1,24 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { WorkspaceSettingsSection } from '@/components/workspaces/WorkspaceSettingsSection'
 import { EditWorkspaceModal } from '@/components/workspaces/EditWorkspaceModal'
 import { useWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailContext'
+import { useSettings } from '@/hooks/useSettings'
 
 export function WorkspaceSettingsClient() {
-  const router = useRouter()
   const { workspace, ready, isOwner, isPersonal, updateWorkspace } =
     useWorkspaceDetail()
+  const { settings, ready: settingsReady, updateSettings } = useSettings()
   const [editing, setEditing] = useState(false)
   const [settingsError, setSettingsError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (ready && !isOwner && workspace)
-      router.replace(`/workspaces/${workspace.slug}`)
-  }, [ready, isOwner, router, workspace])
-
-  if (!isOwner) return null
 
   const handleUpdateWorkspace: typeof updateWorkspace = async patch => {
     const result = await updateWorkspace(patch)
@@ -37,13 +30,20 @@ export function WorkspaceSettingsClient() {
         error={settingsError}
         workspace={workspace}
         isPersonal={isPersonal}
+        canManage={isOwner}
+        preferences={{
+          ready: settingsReady,
+          soundEnabled: settings.soundEnabled,
+          onSoundEnabledChange: soundEnabled =>
+            updateSettings({ soundEnabled }),
+        }}
         onEdit={() => {
           setSettingsError(null)
           setEditing(true)
         }}
       />
 
-      {editing && workspace && (
+      {editing && isOwner && workspace && (
         <EditWorkspaceModal
           workspace={workspace}
           isPersonal={isPersonal}

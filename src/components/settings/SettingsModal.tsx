@@ -5,7 +5,11 @@ import { Bell, Check, PlayCircle, RotateCcw, TimerReset } from 'lucide-react'
 import { Settings } from '@/types'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { PreferenceToggle } from '@/components/ui/PreferenceToggle'
 
+// The guest dashboard's preferences dialog. These are device-local
+// preferences (see lib/storage.ts); the same completion-sound preference is
+// also exposed on a workspace's Settings page once signed in.
 export function SettingsModal({
   settings,
   onSave,
@@ -64,39 +68,20 @@ export function SettingsModal({
             <span className="text-[11px] font-normal">minutes</span>
           </div>
         </label>
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 transition hover:border-sage">
-          <input
-            type="checkbox"
-            checked={soundEnabled}
-            onChange={event => setSoundEnabled(event.target.checked)}
-            className="mt-0.5 h-4 w-4 accent-forest"
-          />
-          <span>
-            <span className="flex items-center gap-2 text-xs font-semibold text-ink">
-              <Bell size={14} className="text-forest" /> Completion sound
-            </span>
-            <span className="mt-1 block text-[11px] leading-5 text-muted">
-              Play a short sound when a task reaches its target.
-            </span>
-          </span>
-        </label>
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 transition hover:border-sage">
-          <input
-            type="checkbox"
-            checked={autoStartNextTask}
-            onChange={event => setAutoStartNextTask(event.target.checked)}
-            className="mt-0.5 h-4 w-4 accent-forest"
-          />
-          <span>
-            <span className="flex items-center gap-2 text-xs font-semibold text-ink">
-              <PlayCircle size={14} className="text-forest" /> Auto-start next
-              task
-            </span>
-            <span className="mt-1 block text-[11px] leading-5 text-muted">
-              Begin the next pending task automatically after completion.
-            </span>
-          </span>
-        </label>
+        <PreferenceToggle
+          icon={Bell}
+          title="Completion sound"
+          description="Play a short sound when a task reaches its target."
+          checked={soundEnabled}
+          onChange={setSoundEnabled}
+        />
+        <PreferenceToggle
+          icon={PlayCircle}
+          title="Auto-start next task"
+          description="Begin the next pending task automatically after completion."
+          checked={autoStartNextTask}
+          onChange={setAutoStartNextTask}
+        />
         <div className="flex items-center justify-between border-t border-line pt-4">
           <button
             type="button"
