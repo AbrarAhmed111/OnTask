@@ -1,21 +1,31 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { showErrorToast, showSuccessToast } from '@/lib/toast'
 import { WorkspaceTasksSection } from '@/components/workspaces/WorkspaceTasksSection'
+import { WorkspaceGoalsSection } from '@/components/workspaces/WorkspaceGoalsSection'
+import { WorkspaceResourcesSection } from '@/components/workspaces/WorkspaceResourcesSection'
 import { WorkspaceActivitySection } from '@/components/workspaces/WorkspaceActivitySection'
 import { WorkspaceSummarySection } from '@/components/workspaces/WorkspaceSummarySection'
 import { WorkspaceTaskForm } from '@/components/workspaces/WorkspaceTaskForm'
-import { DeleteParentModal } from '@/components/tasks/DeleteParentModal'
 import { CompletionModal } from '@/components/tasks/CompletionModal'
+import { GoalForm } from '@/components/goals/GoalForm'
+import { ResourcesModal } from '@/components/resources/ResourcesModal'
 import { Modal } from '@/components/ui/Modal'
 import { useWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailContext'
 import { useWorkspaceTasks } from '@/hooks/useWorkspaceTasks'
+import { useWorkspaceGoals, GoalFormValues } from '@/hooks/useWorkspaceGoals'
+import { useWorkspaceResources } from '@/hooks/useWorkspaceResources'
 import { useWorkspaceActivity } from '@/hooks/useWorkspaceActivity'
 import { useWorkspaceSummary } from '@/hooks/useWorkspaceSummary'
 import { formatTimeOfDay } from '@/lib/dailyReportWindow'
 import { WorkspaceTask } from '@/types/workspace'
 import { TaskFormValues } from '@/types'
+
+type GoalWorkingTask = {
+  task: WorkspaceTask
+  goalName: string
+}
 
 const emptyTaskForm: TaskFormValues = {
   name: '',
@@ -26,8 +36,15 @@ const emptyTaskForm: TaskFormValues = {
   trackGoal: false,
 }
 
+const emptyGoalForm: GoalFormValues = {
+  name: '',
+  description: '',
+  targetDate: '',
+}
+
 export function WorkspaceOverviewClient() {
-  const { workspaceId, user, workspace, members, ready } = useWorkspaceDetail()
+  const { workspaceId, user, workspace, members, isOwner, ready } =
+    useWorkspaceDetail()
   const [completionTask, setCompletionTask] = useState<WorkspaceTask | null>(
     null,
   )
@@ -41,13 +58,29 @@ export function WorkspaceOverviewClient() {
     addTask,
     updateTask,
     deleteTask,
-    moveTask,
     reassignTask,
     reorderTasks,
     getLiveSeconds,
   } = useWorkspaceTasks(workspaceId, user, members, task =>
     setCompletionTask(task),
   )
+  const {
+    goals,
+    ready: goalsReady,
+    error: goalsError,
+    createGoal,
+    updateGoal,
+    setGoalStatus,
+  } = useWorkspaceGoals(workspaceId, user)
+  const {
+    resources,
+    ready: resourcesReady,
+    error: resourcesError,
+    uploading: resourceUploading,
+    upload: uploadResource,
+    remove: removeResource,
+    getSignedUrl,
+  } = useWorkspaceResources(workspaceId, user)
   const {
     events: activityEvents,
     ready: activityReady,
@@ -71,43 +104,50 @@ export function WorkspaceOverviewClient() {
   const [taskForm, setTaskForm] = useState<TaskFormValues>(emptyTaskForm)
   const [taskAssignee, setTaskAssignee] = useState('')
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
-  const [pendingParentId, setPendingParentId] = useState<string | null>(null)
-  const [pendingDeleteParent, setPendingDeleteParent] = useState<{
-    task: WorkspaceTask
-    childCount: number
-  } | null>(null)
+  const [goalModalOpen, setGoalModalOpen] = useState(false)
+  const [resourcesModalOpen, setResourcesModalOpen] = useState(false)
+  const [goalForm, setGoalForm] = useState<GoalFormValues>(emptyGoalForm)
+  const [goalWorkingTasks, setGoalWorkingTasks] = useState<
+    Record<string, GoalWorkingTask[]>
+  >({})
 
   useEffect(() => {
     if (tasksError) showErrorToast(tasksError)
   }, [tasksError])
+  useEffect(() => {
+    if (goalsError) showErrorToast(goalsError)
+  }, [goalsError])
+  useEffect(() => {
+    if (resourcesError) showErrorToast(resourcesError)
+  }, [resourcesError])
 
   const workingNow = tasks.filter(task => task.status === 'working')
-
   const isDone = (task: WorkspaceTask) =>
     task.status === 'completed' || task.status === 'skipped'
-  const rootTasks = tasks.filter(task => !task.parentTaskId)
-  const rootIsDone = (root: WorkspaceTask) => {
-    const children = tasks.filter(task => task.parentTaskId === root.id)
-    return children.length > 0 ? children.every(isDone) : isDone(root)
-  }
-  const queueRootIds = new Set(
-    rootTasks.filter(root => !rootIsDone(root)).map(root => root.id),
-  )
-  const completedRootIds = new Set(
-    rootTasks.filter(root => rootIsDone(root)).map(root => root.id),
-  )
-  const queueTasks = tasks.filter(task =>
-    queueRootIds.has(task.parentTaskId ?? task.id),
-  )
-  const completedTasks = tasks.filter(task =>
-    completedRootIds.has(task.parentTaskId ?? task.id),
+  // Ordinary tasks are permanently flat now (hierarchy only exists inside
+  // Goals — see supabase/migrations/0021_workspace_goals.sql), so the queue
+  // and completed lists are a plain status split with no parent grouping.
+  const queueTasks = tasks.filter(task => !isDone(task))
+  const completedTasks = tasks.filter(isDone)
+  const workingGoalTasks = Object.values(goalWorkingTasks).flat()
+  const handleWorkingTasksChange = useCallback(
+    (goalId: string, workingTasks: WorkspaceTask[]) => {
+      setGoalWorkingTasks(current => ({
+        ...current,
+        [goalId]: workingTasks.map(task => ({
+          task,
+          goalName: goals.find(goal => goal.id === goalId)?.name ?? 'Goal',
+        })),
+      }))
+    },
+    [goals],
   )
 
   const startOfToday = new Date()
   startOfToday.setHours(0, 0, 0, 0)
   const stats = {
     members: members.length,
-    working: tasks.filter(task => task.status === 'working').length,
+    working: workingNow.length + workingGoalTasks.length,
     queued: tasks.filter(task => task.status === 'queued').length,
     completedToday: tasks.filter(
       task =>
@@ -129,18 +169,10 @@ export function WorkspaceOverviewClient() {
   const closeTaskModal = () => {
     setTaskModal(null)
     setEditingTaskId(null)
-    setPendingParentId(null)
   }
   const openAddTask = () => {
     setTaskForm({ ...emptyTaskForm })
     setTaskAssignee('')
-    setPendingParentId(null)
-    setTaskModal('add')
-  }
-  const openAddSubtask = (parentId: string) => {
-    setTaskForm({ ...emptyTaskForm })
-    setTaskAssignee('')
-    setPendingParentId(parentId)
     setTaskModal('add')
   }
   const openEditTask = (task: WorkspaceTask) => {
@@ -149,18 +181,18 @@ export function WorkspaceOverviewClient() {
       name: task.name,
       hours: String(Math.floor(task.plannedMinutes / 60)),
       minutes: String(task.plannedMinutes % 60),
-      goal: task.goalName || '',
-      progress: String(task.goalProgress || 0),
-      trackGoal: Boolean(task.goalName),
+      goal: task.progressLabel || '',
+      progress: String(task.progressPercentage || 0),
+      trackGoal: Boolean(task.progressLabel),
     })
     setTaskAssignee(task.assignedTo ?? '')
     setTaskModal('edit')
   }
 
   const handleAddTask = (event: FormEvent) => {
-    if (addTask(event, taskForm, pendingParentId, taskAssignee || null)) {
+    if (addTask(event, taskForm, null, taskAssignee || null)) {
       closeTaskModal()
-      showSuccessToast(pendingParentId ? 'Subtask added.' : 'Task added.')
+      showSuccessToast('Task added.')
     }
   }
   const handleEditTask = (event: FormEvent) => {
@@ -172,10 +204,10 @@ export function WorkspaceOverviewClient() {
     updateTask(editingTaskId, {
       name: taskForm.name.trim(),
       plannedMinutes,
-      goalName: taskForm.trackGoal
+      progressLabel: taskForm.trackGoal
         ? taskForm.goal.trim() || undefined
         : undefined,
-      goalProgress: taskForm.trackGoal
+      progressPercentage: taskForm.trackGoal
         ? Math.min(100, Math.max(0, Number(taskForm.progress) || 0))
         : undefined,
     })
@@ -196,37 +228,24 @@ export function WorkspaceOverviewClient() {
     deleteTask(id)
     showSuccessToast('Task removed.')
   }
-  const handleDeleteParent = (task: WorkspaceTask) => {
-    const childCount = tasks.filter(t => t.parentTaskId === task.id).length
-    setPendingDeleteParent({ task, childCount })
+
+  const openAddGoal = () => {
+    setGoalForm({ ...emptyGoalForm })
+    setGoalModalOpen(true)
   }
-  const handleMoveTo = (taskId: string, parentId: string | null) => {
-    moveTask(taskId, parentId)
-    showSuccessToast(
-      parentId ? 'Task moved under its new parent.' : 'Task made standalone.',
-    )
+  const handleAddGoal = (event: FormEvent) => {
+    if (createGoal(event, goalForm)) {
+      setGoalModalOpen(false)
+      showSuccessToast('Goal created.')
+    }
   }
-  const confirmDeleteParentAndChildren = () => {
-    if (!pendingDeleteParent) return
-    tasks
-      .filter(task => task.parentTaskId === pendingDeleteParent.task.id)
-      .forEach(child => deleteTask(child.id))
-    deleteTask(pendingDeleteParent.task.id)
-    showSuccessToast(
-      `${pendingDeleteParent.task.name} and its subtasks were removed.`,
-    )
-    setPendingDeleteParent(null)
+
+  const handleUploadResource = async (file: File) => {
+    if (await uploadResource(file)) showSuccessToast('Resource uploaded.')
   }
-  const confirmOrphanChildren = () => {
-    if (!pendingDeleteParent) return
-    tasks
-      .filter(task => task.parentTaskId === pendingDeleteParent.task.id)
-      .forEach(child => moveTask(child.id, null))
-    deleteTask(pendingDeleteParent.task.id)
-    showSuccessToast(
-      `${pendingDeleteParent.task.name} removed — its subtasks are now standalone.`,
-    )
-    setPendingDeleteParent(null)
+  const handleDeleteResource = (id: string) => {
+    removeResource(id)
+    showSuccessToast('Resource removed.')
   }
 
   return (
@@ -236,8 +255,10 @@ export function WorkspaceOverviewClient() {
         error={tasksError}
         stats={stats}
         workingNow={workingNow}
+        workingGoalTasks={workingGoalTasks}
         tasks={tasks}
         members={members}
+        user={user}
         queueTasks={queueTasks}
         completedTasks={completedTasks}
         getLiveSeconds={getLiveSeconds}
@@ -249,9 +270,27 @@ export function WorkspaceOverviewClient() {
         onDelete={handleDeleteTask}
         onReassign={reassignTask}
         onReorder={reorderTasks}
-        onAddSubtask={openAddSubtask}
-        onDeleteParent={handleDeleteParent}
-        onMoveTo={handleMoveTo}
+      />
+
+      <WorkspaceGoalsSection
+        ready={ready && goalsReady}
+        error={goalsError}
+        goals={goals}
+        workspaceId={workspaceId}
+        user={user}
+        members={members}
+        updateGoal={updateGoal}
+        setGoalStatus={setGoalStatus}
+        onWorkingTasksChange={handleWorkingTasksChange}
+        onAddGoal={openAddGoal}
+      />
+
+      <WorkspaceResourcesSection
+        ready={ready && resourcesReady}
+        error={resourcesError}
+        resources={resources}
+        onOpen={() => setResourcesModalOpen(true)}
+        onAddResource={() => setResourcesModalOpen(true)}
       />
 
       <WorkspaceSummarySection
@@ -273,18 +312,14 @@ export function WorkspaceOverviewClient() {
       />
 
       {taskModal === 'add' && (
-        <Modal
-          eyebrow={pendingParentId ? 'New subtask' : 'New task'}
-          title={pendingParentId ? 'Add a subtask' : 'Add a task'}
-          onClose={closeTaskModal}
-        >
+        <Modal eyebrow="New task" title="Add a task" onClose={closeTaskModal}>
           <WorkspaceTaskForm
             values={taskForm}
             setValues={setTaskForm}
             members={members}
             assignedTo={taskAssignee}
             setAssignedTo={setTaskAssignee}
-            submitLabel={pendingParentId ? 'Add subtask' : 'Add task'}
+            submitLabel="Add task"
             onSubmit={handleAddTask}
             onCancel={closeTaskModal}
           />
@@ -308,19 +343,38 @@ export function WorkspaceOverviewClient() {
           />
         </Modal>
       )}
+      {goalModalOpen && (
+        <Modal
+          eyebrow="New goal"
+          title="Create a goal"
+          onClose={() => setGoalModalOpen(false)}
+        >
+          <GoalForm
+            values={goalForm}
+            setValues={setGoalForm}
+            submitLabel="Create goal"
+            onSubmit={handleAddGoal}
+            onCancel={() => setGoalModalOpen(false)}
+          />
+        </Modal>
+      )}
       {completionTask && (
         <CompletionModal
           taskName={completionTask.name}
           onStop={() => setCompletionTask(null)}
         />
       )}
-      {pendingDeleteParent && (
-        <DeleteParentModal
-          taskName={pendingDeleteParent.task.name}
-          childCount={pendingDeleteParent.childCount}
-          onDeleteAll={confirmDeleteParentAndChildren}
-          onOrphan={confirmOrphanChildren}
-          onClose={() => setPendingDeleteParent(null)}
+      {resourcesModalOpen && (
+        <ResourcesModal
+          resources={resources}
+          members={members}
+          userId={user?.id}
+          isOwner={isOwner}
+          uploading={resourceUploading}
+          onUpload={handleUploadResource}
+          onDelete={handleDeleteResource}
+          getSignedUrl={getSignedUrl}
+          onClose={() => setResourcesModalOpen(false)}
         />
       )}
     </div>

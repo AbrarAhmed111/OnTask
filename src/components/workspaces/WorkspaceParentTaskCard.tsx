@@ -1,9 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, CirclePlus, Trash2 } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  CirclePlus,
+  Link2,
+  MessageSquare,
+  Trash2,
+} from 'lucide-react'
 import { WorkspaceMember, WorkspaceTask } from '@/types/workspace'
 import { WorkspaceTaskCard } from '@/components/workspaces/WorkspaceTaskCard'
+import { TaskNotesPanel } from '@/components/tasks/TaskNotesPanel'
+import type { AuthUser } from '@/hooks/useAuth'
 
 function AssigneeStack({ members }: { members: WorkspaceMember[] }) {
   const shown = members.slice(0, 3)
@@ -44,6 +53,7 @@ export function WorkspaceParentTaskCard({
   parent,
   subtasks,
   members,
+  user,
   getWorkedSeconds,
   onStart,
   onPause,
@@ -55,10 +65,13 @@ export function WorkspaceParentTaskCard({
   onDeleteParent,
   moveOptions,
   onMoveTo,
+  getBlockedBy,
+  onManageDependencies,
 }: {
   parent: WorkspaceTask
   subtasks: WorkspaceTask[]
   members: WorkspaceMember[]
+  user: AuthUser | null
   getWorkedSeconds: (task: WorkspaceTask) => number
   onStart: (id: string) => void
   onPause: (task: WorkspaceTask) => void
@@ -70,8 +83,11 @@ export function WorkspaceParentTaskCard({
   onDeleteParent: () => void
   moveOptions: { id: string; name: string }[]
   onMoveTo: (taskId: string, parentId: string | null) => void
+  getBlockedBy?: (task: WorkspaceTask) => string[]
+  onManageDependencies?: (task: WorkspaceTask) => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
   const completed = subtasks.filter(task => task.status === 'completed').length
   const skipped = subtasks.filter(task => task.status === 'skipped').length
   const remaining = subtasks.length - completed - skipped
@@ -110,6 +126,31 @@ export function WorkspaceParentTaskCard({
           </p>
         </div>
         {assignees.length > 0 && <AssigneeStack members={assignees} />}
+        {(() => {
+          const parentBlockedBy = getBlockedBy?.(parent) ?? []
+          return parentBlockedBy.length > 0 ? (
+            <span
+              title={`Blocked by: ${parentBlockedBy.join(', ')}`}
+              className="shrink-0 whitespace-nowrap rounded-full bg-coral/10 px-2.5 py-1 font-mono text-[9px] uppercase text-coral"
+            >
+              Blocked
+            </span>
+          ) : null
+        })()}
+        {onManageDependencies && (
+          <button
+            onClick={() => onManageDependencies(parent)}
+            className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] font-semibold text-muted transition hover:text-[var(--ws-accent,#375b4b)]"
+          >
+            <Link2 size={12} /> Dependencies
+          </button>
+        )}
+        <button
+          onClick={() => setNotesOpen(open => !open)}
+          className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] font-semibold text-muted transition hover:text-[var(--ws-accent,#375b4b)]"
+        >
+          <MessageSquare size={12} /> Notes
+        </button>
         <button
           onClick={onAddSubtask}
           className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] font-semibold text-[var(--ws-accent,#375b4b)] transition hover:text-coral"
@@ -124,6 +165,11 @@ export function WorkspaceParentTaskCard({
           <Trash2 size={15} />
         </button>
       </div>
+      {notesOpen && (
+        <div className="border-t border-line/70 px-4 py-4 sm:px-5">
+          <TaskNotesPanel taskId={parent.id} user={user} members={members} />
+        </div>
+      )}
       {expanded && (
         <div className="space-y-2 border-t border-line/70 px-4 py-4 sm:px-5">
           {subtasks.map(task => (
@@ -132,6 +178,7 @@ export function WorkspaceParentTaskCard({
               task={task}
               workedSeconds={Math.round(getWorkedSeconds(task))}
               members={members}
+              user={user}
               onStart={() => onStart(task.id)}
               onPause={() => onPause(task)}
               onFinish={() => onFinish(task)}
@@ -140,6 +187,12 @@ export function WorkspaceParentTaskCard({
               onReassign={userId => onReassign(task.id, userId)}
               moveOptions={moveOptions}
               onMoveTo={parentId => onMoveTo(task.id, parentId)}
+              blockedBy={getBlockedBy?.(task)}
+              onManageDependencies={
+                onManageDependencies
+                  ? () => onManageDependencies(task)
+                  : undefined
+              }
             />
           ))}
         </div>

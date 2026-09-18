@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { WorkspaceTaskList } from '@/components/workspaces/WorkspaceTaskList'
 import { WorkspaceMember, WorkspaceTask } from '@/types/workspace'
+import type { AuthUser } from '@/hooks/useAuth'
 
 function StatCard({
   icon: Icon,
@@ -59,8 +60,10 @@ export function WorkspaceTasksSection({
   error,
   stats,
   workingNow,
+  workingGoalTasks,
   tasks,
   members,
+  user,
   queueTasks,
   completedTasks,
   getLiveSeconds,
@@ -85,8 +88,10 @@ export function WorkspaceTasksSection({
     completedToday: number
   }
   workingNow: WorkspaceTask[]
+  workingGoalTasks: { task: WorkspaceTask; goalName: string }[]
   tasks: WorkspaceTask[]
   members: WorkspaceMember[]
+  user: AuthUser | null
   queueTasks: WorkspaceTask[]
   completedTasks: WorkspaceTask[]
   getLiveSeconds: (task: WorkspaceTask) => number
@@ -98,12 +103,31 @@ export function WorkspaceTasksSection({
   onDelete: (id: string) => void
   onReassign: (id: string, userId: string | null) => void
   onReorder: (fromIndex: number, toIndex: number) => void
-  onAddSubtask: (parentId: string) => void
-  onDeleteParent: (task: WorkspaceTask) => void
-  onMoveTo: (taskId: string, parentId: string | null) => void
+  onAddSubtask?: (parentId: string) => void
+  onDeleteParent?: (task: WorkspaceTask) => void
+  onMoveTo?: (taskId: string, parentId: string | null) => void
 }) {
   const parentOf = (task: WorkspaceTask) =>
     task.parentTaskId ? tasks.find(t => t.id === task.parentTaskId) : undefined
+  const goalWorkingRows = workingGoalTasks.map(({ task, goalName }) => {
+    const assignee = members.find(m => m.userId === task.assignedTo)
+    return (
+      <div
+        key={task.id}
+        className="flex items-center justify-between rounded-xl border border-sage/40 bg-sage/5 px-4 py-2.5"
+      >
+        <div className="min-w-0">
+          <p className="truncate text-xs font-bold text-ink">
+            Currently working on {task.name}
+          </p>
+          <p className="truncate text-[10px] text-muted">Goal: {goalName}</p>
+        </div>
+        <p className="shrink-0 text-[11px] text-muted">
+          {assignee?.fullName || assignee?.email || 'Someone'}
+        </p>
+      </div>
+    )
+  })
 
   return (
     <div>
@@ -185,7 +209,8 @@ export function WorkspaceTasksSection({
             Queue{' '}
             {ready && (
               <span className="font-mono text-xs font-normal text-muted">
-                {queueTasks.filter(task => !task.parentTaskId).length}
+                {queueTasks.filter(task => !task.parentTaskId).length +
+                  workingGoalTasks.length}
               </span>
             )}
           </h2>
@@ -199,28 +224,34 @@ export function WorkspaceTasksSection({
             <TaskRowSkeleton />
             <TaskRowSkeleton />
           </div>
-        ) : queueTasks.length === 0 ? (
+        ) : queueTasks.length === 0 && workingGoalTasks.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-sage/70 px-5 py-10 text-center text-xs text-muted">
             {tasks.length === 0
               ? 'No tasks yet — add one to start planning together.'
               : 'Everything is done — nice work.'}
           </div>
         ) : (
-          <WorkspaceTaskList
-            tasks={queueTasks}
-            members={members}
-            getWorkedSeconds={getLiveSeconds}
-            onStart={onStart}
-            onPause={onPause}
-            onFinish={onFinish}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onReassign={onReassign}
-            onReorder={onReorder}
-            onAddSubtask={onAddSubtask}
-            onDeleteParent={onDeleteParent}
-            onMoveTo={onMoveTo}
-          />
+          <div className="space-y-2 rounded-2xl border border-line bg-panel p-3">
+            {goalWorkingRows}
+            {queueTasks.length > 0 && (
+              <WorkspaceTaskList
+                tasks={queueTasks}
+                members={members}
+                user={user}
+                getWorkedSeconds={getLiveSeconds}
+                onStart={onStart}
+                onPause={onPause}
+                onFinish={onFinish}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onReassign={onReassign}
+                onReorder={onReorder}
+                onAddSubtask={onAddSubtask}
+                onDeleteParent={onDeleteParent}
+                onMoveTo={onMoveTo}
+              />
+            )}
+          </div>
         )}
       </div>
 
@@ -235,6 +266,7 @@ export function WorkspaceTasksSection({
           <WorkspaceTaskList
             tasks={completedTasks}
             members={members}
+            user={user}
             getWorkedSeconds={getLiveSeconds}
             onStart={onStart}
             onPause={onPause}

@@ -1,7 +1,12 @@
+'use client'
+
+import { useState } from 'react'
 import {
   Check,
   CirclePlus,
   GripVertical,
+  Link2,
+  MessageSquare,
   Pause,
   Pencil,
   Play,
@@ -12,13 +17,16 @@ import { formatPlanned, formatTime } from '@/lib/time'
 import { Button } from '@/components/ui/Button'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { AssigneePicker } from '@/components/workspaces/AssigneePicker'
-import { GoalProgress } from '@/components/goals/GoalProgress'
+import { ProgressLabel } from '@/components/tasks/ProgressLabel'
+import { TaskNotesPanel } from '@/components/tasks/TaskNotesPanel'
+import type { AuthUser } from '@/hooks/useAuth'
 
 export function WorkspaceTaskCard({
   task,
   index,
   workedSeconds,
   members,
+  user,
   onStart,
   onPause,
   onFinish,
@@ -31,11 +39,14 @@ export function WorkspaceTaskCard({
   onDragStart,
   onDragOver,
   onDrop,
+  blockedBy,
+  onManageDependencies,
 }: {
   task: WorkspaceTask
   index?: number
   workedSeconds: number
   members: WorkspaceMember[]
+  user: AuthUser | null
   onStart: () => void
   onPause: () => void
   onFinish: () => void
@@ -48,15 +59,22 @@ export function WorkspaceTaskCard({
   onDragStart?: (event: React.DragEvent<HTMLElement>) => void
   onDragOver?: (event: React.DragEvent<HTMLElement>) => void
   onDrop?: (event: React.DragEvent<HTMLElement>) => void
+  // Only meaningful for a goal task (see GoalCard/DependencyPicker)
+  // — flat tasks never have dependencies, so both stay undefined there.
+  blockedBy?: string[]
+  onManageDependencies?: () => void
 }) {
+  const [notesOpen, setNotesOpen] = useState(false)
   const completed = task.status === 'completed' || task.status === 'skipped'
+  const blocked = Boolean(blockedBy && blockedBy.length > 0) && !completed
   const draggable = index !== undefined && Boolean(onDragStart)
   const taskProgress = Math.min(
     100,
     (workedSeconds / (task.plannedMinutes * 60)) * 100,
   )
-  const statusLabel =
-    task.status === 'working'
+  const statusLabel = blocked
+    ? 'Blocked'
+    : task.status === 'working'
       ? 'In focus'
       : completed
         ? task.status === 'skipped'
@@ -103,7 +121,7 @@ export function WorkspaceTaskCard({
           {task.name}
         </h3>
         <span
-          className={`shrink-0 rounded-full px-2.5 py-1 font-mono text-[9px] uppercase ${task.status === 'working' ? 'bg-[var(--ws-accent-soft,#e9f0ec)] text-[var(--ws-accent,#375b4b)]' : completed ? 'bg-coral/10 text-coral' : 'bg-slate-100 text-muted'}`}
+          className={`shrink-0 rounded-full px-2.5 py-1 font-mono text-[9px] uppercase ${blocked ? 'bg-coral/10 text-coral' : task.status === 'working' ? 'bg-[var(--ws-accent-soft,#e9f0ec)] text-[var(--ws-accent,#375b4b)]' : completed ? 'bg-coral/10 text-coral' : 'bg-slate-100 text-muted'}`}
         >
           {statusLabel}
         </span>
@@ -141,11 +159,21 @@ export function WorkspaceTaskCard({
           />
         </div>
 
-        {task.goalName && (
-          <GoalProgress
-            name={task.goalName}
-            progress={task.goalProgress || 0}
+        {task.progressLabel && (
+          <ProgressLabel
+            name={task.progressLabel}
+            progress={task.progressPercentage || 0}
           />
+        )}
+
+        {blocked && (
+          <p className="rounded-lg border border-coral/20 bg-coral/5 px-3 py-2 text-[11px] font-semibold text-coral">
+            Blocked by: {blockedBy!.join(', ')}
+          </p>
+        )}
+
+        {notesOpen && (
+          <TaskNotesPanel taskId={task.id} user={user} members={members} />
         )}
       </div>
 
@@ -178,6 +206,21 @@ export function WorkspaceTaskCard({
               <CirclePlus size={13} /> Subtask
             </button>
           )}
+          {onManageDependencies && (
+            <button onClick={onManageDependencies} className={ghostChip}>
+              <Link2 size={13} />
+              Dependencies
+              {blockedBy && blockedBy.length > 0
+                ? ` (${blockedBy.length})`
+                : ''}
+            </button>
+          )}
+          <button
+            onClick={() => setNotesOpen(open => !open)}
+            className={ghostChip}
+          >
+            <MessageSquare size={13} /> Notes
+          </button>
           {!completed && (
             <button onClick={onFinish} className={ghostChip}>
               Finish
@@ -187,6 +230,10 @@ export function WorkspaceTaskCard({
             <Button
               variant={task.status === 'working' ? 'danger' : 'primary'}
               onClick={task.status === 'working' ? onPause : onStart}
+              disabled={blocked}
+              title={
+                blocked ? 'Blocked by an incomplete dependency' : undefined
+              }
             >
               {task.status === 'working' ? (
                 <>

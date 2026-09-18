@@ -1,5 +1,6 @@
 import { WorkspaceMember } from '@/types/workspace'
 import { ActivityEvent } from '@/hooks/useWorkspaceActivity'
+import { timeAgo } from '@/lib/time'
 
 function describeEvent(event: ActivityEvent, actorName: string): string {
   const title = (event.metadata.title as string) || 'a task'
@@ -53,19 +54,41 @@ function describeEvent(event: ActivityEvent, actorName: string): string {
       return event.metadata.self_removed
         ? `${actorName} left the workspace`
         : `${actorName} removed ${event.metadata.removed_display_name} from the workspace`
+    case 'goal_created':
+      return `${actorName} created the goal "${event.metadata.name}"`
+    case 'goal_updated':
+      return `${actorName} updated the goal "${event.metadata.name}"`
+    case 'goal_completed':
+      return `${actorName} marked the goal "${event.metadata.name}" complete`
+    case 'goal_archived':
+      return `${actorName} archived the goal "${event.metadata.name}"`
+    case 'goal_task_created':
+      return `${actorName} added "${title}" to ${event.metadata.goal_name ? `the goal "${event.metadata.goal_name}"` : 'a goal'}`
+    case 'goal_subtask_created':
+      return `${actorName} added subtask "${title}"${under}`
+    case 'dependency_added':
+      return `${actorName} marked "${event.metadata.blocking_title}" as required before "${title}"`
+    case 'dependency_removed':
+      return `${actorName} removed a dependency on "${title}"`
+    case 'task_blocked':
+      return `"${title}" is now blocked by "${event.metadata.blocking_title}"`
+    case 'task_unblocked':
+      return `"${title}" is now unblocked — "${event.metadata.unblocked_by_title}" finished`
+    case 'note_added':
+      return `${actorName} added a note to "${title}"`
+    case 'note_updated':
+      return `${actorName} edited a note on "${title}"`
+    case 'note_deleted':
+      return `${actorName} removed a note from "${title}"`
+    case 'resource_uploaded':
+      return `${actorName} uploaded "${event.metadata.file_name}"`
+    case 'resource_updated':
+      return `${actorName} updated "${event.metadata.file_name}"`
+    case 'resource_deleted':
+      return `${actorName} deleted "${event.metadata.file_name}"`
     default:
       return `${actorName} updated "${title}"${under}`
   }
-}
-
-function timeAgo(iso: string): string {
-  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000)
-  if (seconds < 60) return 'just now'
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
 }
 
 // Renders task_events as plain sentences with parent context preserved —
@@ -93,7 +116,7 @@ export function WorkspaceActivityFeed({
         return (
           <div
             key={event.id}
-            className="flex items-center justify-between gap-3 px-5 py-3"
+            className="flex items-center justify-between gap-3 px-5 py-3 animate-[slideInFade_260ms_ease-out]"
           >
             <p className="text-xs leading-5 text-ink">
               {describeEvent(event, actorName)}
