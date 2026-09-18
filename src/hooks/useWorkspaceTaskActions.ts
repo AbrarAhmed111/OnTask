@@ -239,9 +239,8 @@ export function useWorkspaceTaskActions({
     if (!target || !canControlTimer(target, timerActor)) return
     const isParent = tasks.some(task => task.parentTaskId === id)
     if (isParent) return
-    // Starting a task only ever ends the caller's OWN running timer (one
-    // active timer per person) — never a teammate's task that happens to be
-    // in the same list.
+    // Starting a task only ever ends the caller's OWN running timer in this
+    // workspace — never a teammate's task that happens to be in the same list.
     const isMyRunningTimer = (task: WorkspaceTask) =>
       task.status === 'working' && canControlTimer(task, timerActor)
     const touched = tasks.filter(
