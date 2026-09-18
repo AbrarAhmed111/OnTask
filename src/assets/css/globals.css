@@ -19,6 +19,16 @@
   100% { opacity: 1; transform: scale(1); }
 }
 
+/* Realtime "new item" entrance -- applied unconditionally to every row in a
+   live list (activity feed, notes, resources, notifications). Since it's a
+   plain mount animation, it only ever plays once for a genuinely new DOM
+   node (a new React key) and never replays for an item that's merely
+   updated in place -- see src/lib/realtime/mergeById.ts. */
+@keyframes slideInFade {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @layer base {
   body {
     @apply bg-paper font-sans text-ink antialiased;

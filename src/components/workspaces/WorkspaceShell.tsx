@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { PresenceDot } from '@/components/workspaces/PresenceDot'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { getWorkspaceTheme } from '@/lib/workspaceThemes'
 import { useAppSelector } from '@/lib/redux/hooks'
 import type { AuthUser } from '@/hooks/useAuth'
@@ -286,6 +287,7 @@ export function WorkspaceShell({
                   <UserPlus size={13} /> Invite
                 </button>
               )}
+              <NotificationBell className="border-line bg-white/60 text-[var(--ws-accent,#375b4b)] hover:border-[var(--ws-accent,#375b4b)]" />
               <div className="relative">
                 <button
                   aria-label="Account menu"

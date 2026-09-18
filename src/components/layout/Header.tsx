@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import fullLogo from '@/assets/img/Full-logo.png'
 import { Home, LogOut, Settings2, Users } from 'lucide-react'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
 import type { AuthUser } from '@/hooks/useAuth'
 
 export function Header({
@@ -83,6 +84,7 @@ export function Header({
             </span>
           )}
         </button>
+        {authReady && user && <NotificationBell />}
         {authReady && user ? (
           <div className="relative">
             <button
