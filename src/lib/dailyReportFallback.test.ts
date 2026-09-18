@@ -142,6 +142,59 @@ describe('buildFallbackNarrative', () => {
   })
 })
 
+describe('buildFallbackNarrative with task blockers', () => {
+  const blocker = {
+    blocker_id: 'b-1',
+    task_id: 'task-1',
+    task_title: 'Student API',
+    parent_title: null,
+    goal_id: null,
+    goal_name: null,
+    reason: 'Waiting for API credentials from Araysh.',
+    blocked_by_user_id: 'abrar',
+    blocked_by_name: 'Abrar Ahmed',
+    blocked_at: '2026-09-18T09:00:00Z',
+    mentioned: [{ user_id: 'araysh', display_name: 'Araysh' }],
+    resolved_at: null,
+    resolved_by_user_id: null,
+    resolved_by_name: null,
+    resolution_note: null,
+    still_blocked_at_report_end: true,
+    blocked_seconds: 7200,
+  }
+
+  it('treats a blockers-only window as activity, not an idle one', () => {
+    const narrative = buildFallbackNarrative(
+      snapshot({
+        total_focused_seconds: 0,
+        members: [],
+        blockers: [blocker],
+      }),
+    )
+    expect(narrative.overall_summary).not.toContain(
+      'No significant workspace activity',
+    )
+    expect(narrative.workspace_changes_summary).toContain(
+      '1 task blocker(s) recorded',
+    )
+  })
+
+  it('mentions blockers alongside the other workspace changes', () => {
+    const narrative = buildFallbackNarrative(
+      snapshot({ blockers: [blocker, { ...blocker, blocker_id: 'b-2' }] }),
+    )
+    expect(narrative.workspace_changes_summary).toContain(
+      '2 task blocker(s) recorded',
+    )
+  })
+
+  it('leaves reports from before blockers existed exactly as they were', () => {
+    // No `blockers` key at all, as on a stored pre-feature snapshot.
+    const narrative = buildFallbackNarrative(snapshot())
+    expect(narrative.workspace_changes_summary).toBe('')
+  })
+})
+
 describe('buildUnreachableFallbackMeta', () => {
   it('flags the report as a fallback with the failure reason recorded', () => {
     const meta = buildUnreachableFallbackMeta('fetch failed: ECONNREFUSED')

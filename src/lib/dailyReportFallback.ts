@@ -29,6 +29,7 @@ function hasActivity(snapshot: WorkspaceStructuredSnapshot): boolean {
     snapshot.members.some(
       m => m.events.length > 0 || m.task_activity.length > 0,
     ) ||
+    (snapshot.blockers?.length ?? 0) > 0 ||
     changes.invitations.length > 0 ||
     changes.members_joined.length > 0 ||
     changes.members_removed.length > 0 ||
@@ -41,8 +42,10 @@ function hasActivity(snapshot: WorkspaceStructuredSnapshot): boolean {
 
 function fallbackWorkspaceChangesSummary(
   changes: StructuredSnapshotWorkspaceChanges,
+  blockerCount = 0,
 ): string {
   const bits: string[] = []
+  if (blockerCount > 0) bits.push(`${blockerCount} task blocker(s) recorded`)
   if (changes.invitations.length > 0)
     bits.push(`${changes.invitations.length} invitation(s) sent or updated`)
   if (changes.members_joined.length > 0)
@@ -118,6 +121,7 @@ export function buildFallbackNarrative(
     members,
     workspace_changes_summary: fallbackWorkspaceChangesSummary(
       snapshot.workspace_changes,
+      snapshot.blockers?.length ?? 0,
     ),
     highlights: [],
   }
