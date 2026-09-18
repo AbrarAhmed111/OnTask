@@ -58,8 +58,13 @@ export type WorkspaceInvitation = {
   expiresAt: string
 }
 
+// 'blocked' means the task has an ACTIVE blocker (see TaskBlocker below) —
+// something is preventing the assignee from continuing. It is not 'paused'
+// (an intentional stop) and not a Goal dependency (a derived edge between two
+// tasks, never stored here). It is entered only by block_workspace_task and
+// left only by resolve_task_blocker (supabase/migrations/0041_task_blockers.sql).
 export type WorkspaceTaskStatus =
-  'queued' | 'working' | 'paused' | 'completed' | 'skipped'
+  'queued' | 'working' | 'paused' | 'blocked' | 'completed' | 'skipped'
 
 export type WorkspaceTask = {
   id: string
@@ -112,6 +117,27 @@ export type TaskDependency = {
   createdAt: string
 }
 
+export type TaskBlockerStatus = 'active' | 'resolved'
+
+// One reason a task can't move forward. A task may have many over its life
+// (all kept as history) but only one active at a time. `mentionedUserIds` are
+// the workspace members explicitly asked to help — stable user ids, never
+// display names — and, together with the current assignee, the only people who
+// may resolve an active blocker.
+export type TaskBlocker = {
+  id: string
+  taskId: string
+  workspaceId: string
+  createdBy: string
+  reason: string
+  status: TaskBlockerStatus
+  createdAt: string
+  resolvedAt: string | null
+  resolvedBy: string | null
+  resolutionNote: string | null
+  mentionedUserIds: string[]
+}
+
 export type TaskNote = {
   id: string
   taskId: string
@@ -136,6 +162,10 @@ export type NotificationType =
   | 'daily_report_ready'
   // The workspace owner emergency-stopped this member's running task timer.
   | 'timer_stopped'
+  // Named in a task blocker, so able to resolve it — and someone else
+  // resolved a blocker on a task this member is assigned to.
+  | 'blocker_mention'
+  | 'blocker_resolved'
 
 export type NotificationEntityType =
   'task' | 'goal' | 'resource' | 'note' | 'workspace'
@@ -253,6 +283,38 @@ export type StructuredSnapshotWorkspaceChanges = {
   tasks_deleted: number
 }
 
+export type StructuredSnapshotBlockerMember = {
+  user_id: string
+  display_name: string
+}
+
+// One task blocker that overlapped the reporting window, as
+// generate_workspace_daily_snapshot assembled it (supabase/migrations/
+// 0041_task_blockers.sql) — every field straight from the blocker tables, the
+// reason and note exactly as the members wrote them. `resolved_*` are only set
+// when the blocker was resolved INSIDE the window; one resolved later reads as
+// still blocked at the end of it, so a regenerated report can't leak a future
+// resolution. `blocked_seconds` is time blocked within the window only.
+export type StructuredSnapshotBlocker = {
+  blocker_id: string
+  task_id: string
+  task_title: string
+  parent_title: string | null
+  goal_id: string | null
+  goal_name: string | null
+  reason: string
+  blocked_by_user_id: string
+  blocked_by_name: string
+  blocked_at: string
+  mentioned: StructuredSnapshotBlockerMember[]
+  resolved_at: string | null
+  resolved_by_user_id: string | null
+  resolved_by_name: string | null
+  resolution_note: string | null
+  still_blocked_at_report_end: boolean
+  blocked_seconds: number
+}
+
 export type WorkspaceStructuredSnapshot = {
   workspace_id: string
   workspace_name: string
@@ -262,6 +324,8 @@ export type WorkspaceStructuredSnapshot = {
   total_focused_seconds: number
   members: StructuredSnapshotMember[]
   workspace_changes: StructuredSnapshotWorkspaceChanges
+  // Absent on reports generated before task blockers existed.
+  blockers?: StructuredSnapshotBlocker[]
 }
 
 export type SummaryMemberNarrative = {
