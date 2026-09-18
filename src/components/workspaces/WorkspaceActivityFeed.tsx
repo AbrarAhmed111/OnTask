@@ -2,6 +2,28 @@ import { WorkspaceMember } from '@/types/workspace'
 import { ActivityEvent } from '@/hooks/useWorkspaceActivity'
 import { timeAgo } from '@/lib/time'
 
+// " — text" when there is some, nothing otherwise.
+function withDetail(value: unknown): string {
+  return typeof value === 'string' && value.trim() ? ` — ${value.trim()}` : ''
+}
+
+type NamedMember = { name?: string }
+
+// What an edit to a blocker changed, in words: who was added or removed. A
+// wording-only edit adds nothing after the sentence.
+function describeBlockerUpdate(metadata: Record<string, unknown>): string {
+  const names = (value: unknown) =>
+    Array.isArray(value)
+      ? (value as NamedMember[]).map(member => member.name || 'a member')
+      : []
+  const parts: string[] = []
+  const added = names(metadata.added)
+  const removed = names(metadata.removed)
+  if (added.length > 0) parts.push(`added ${added.join(', ')}`)
+  if (removed.length > 0) parts.push(`removed ${removed.join(', ')}`)
+  return parts.length > 0 ? ` (${parts.join('; ')})` : ''
+}
+
 function describeEvent(event: ActivityEvent, actorName: string): string {
   const title = (event.metadata.title as string) || 'a task'
   const parentTitle = event.metadata.parent_title as string | undefined
@@ -80,6 +102,17 @@ function describeEvent(event: ActivityEvent, actorName: string): string {
       return `"${title}" is now blocked by "${event.metadata.blocking_title}"`
     case 'task_unblocked':
       return `"${title}" is now unblocked — "${event.metadata.unblocked_by_title}" finished`
+    // Task blockers (someone reported something in the way of a task) — not to
+    // be confused with task_blocked/task_unblocked above, which are about an
+    // unfinished Goal dependency.
+    case 'task_blocker_added':
+      return `${actorName} blocked "${title}"${under}${withDetail(event.metadata.reason)}`
+    case 'task_blocker_mention':
+      return `${actorName} mentioned ${event.metadata.mentioned_name || 'a member'} in the blocker for "${title}"${under}`
+    case 'task_blocker_updated':
+      return `${actorName} updated the blocker on "${title}"${under}${describeBlockerUpdate(event.metadata)}`
+    case 'task_blocker_resolved':
+      return `${actorName} resolved the blocker on "${title}"${under}${withDetail(event.metadata.resolution_note)}`
     case 'note_added':
       return `${actorName} added a note to "${title}"`
     case 'note_updated':

@@ -70,6 +70,28 @@ export function formatMemberEvent(event: StructuredSnapshotEvent): string {
       }
       return withParent(`Updated progress on "${title}"`)
     }
+    // Task blockers. The reason and note are the members' own words, shown
+    // as written — never rephrased.
+    case 'task_blocker_added': {
+      const reason = str('reason')
+      return withParent(
+        reason ? `Blocked "${title}" — ${reason}` : `Blocked "${title}"`,
+      )
+    }
+    case 'task_blocker_mention':
+      return withParent(
+        `Mentioned ${str('mentioned_name') ?? 'a member'} in the blocker for "${title}"`,
+      )
+    case 'task_blocker_updated':
+      return withParent(`Updated the blocker on "${title}"`)
+    case 'task_blocker_resolved': {
+      const note = str('resolution_note')
+      return withParent(
+        note
+          ? `Resolved the blocker on "${title}" — ${note}`
+          : `Resolved the blocker on "${title}"`,
+      )
+    }
     case 'parent_changed': {
       const to = str('to')
       return to && to !== 'Standalone'
