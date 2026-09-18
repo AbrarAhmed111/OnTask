@@ -38,3 +38,4 @@ next-env.d.ts
 /supabase/migrations
 /supabase/.temp
 /ontask-llm
+/supabase/tests
