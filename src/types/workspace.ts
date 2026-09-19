@@ -426,3 +426,30 @@ export type WorkspaceDailySummary = {
   regeneratedAt: string | null
   createdAt: string
 }
+
+export type SlackNotificationSettings = {
+  assigned: boolean
+  completed: boolean
+  blockers: boolean
+  resolutions: boolean
+  mentions: boolean
+  daily_reports: boolean
+}
+
+export type SlackStatusData = {
+  connected: boolean
+  connection_status?:
+    | 'connected'
+    | 'disconnected'
+    | 'invalid_token'
+    | 'channel_missing'
+    | 'configuration_incomplete'
+    | string
+  id?: string
+  slack_team_id?: string
+  slack_team_name?: string
+  channel_id?: string
+  channel_name?: string
+  notification_settings?: SlackNotificationSettings
+  can_manage?: boolean
+}
