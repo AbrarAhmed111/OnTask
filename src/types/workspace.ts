@@ -82,7 +82,8 @@ export type WorkspaceTask = {
   createdBy: string
   assignedTo: string | null
   name: string
-  plannedMinutes: number
+  description?: string | null
+  plannedMinutes: number | null
   workedSeconds: number
   status: WorkspaceTaskStatus
   // A free-text label + manual percent a member can track on any task —

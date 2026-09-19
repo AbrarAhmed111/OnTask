@@ -19,6 +19,8 @@ export type Task = {
 
 export type TaskFormValues = {
   name: string
+  description?: string
+  hasPlannedTime?: boolean
   hours: string
   minutes: string
   goal: string

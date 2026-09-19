@@ -8,7 +8,8 @@ export type WorkspaceTaskRow = {
   created_by: string
   assigned_to: string | null
   title: string
-  planned_seconds: number
+  description?: string | null
+  planned_seconds: number | null
   actual_seconds: number
   status: WorkspaceTaskStatus
   progress_label: string | null
@@ -26,7 +27,11 @@ export function rowToTask(row: WorkspaceTaskRow): WorkspaceTask {
     createdBy: row.created_by,
     assignedTo: row.assigned_to,
     name: row.title,
-    plannedMinutes: Math.round(row.planned_seconds / 60),
+    description: row.description ?? null,
+    plannedMinutes:
+      row.planned_seconds !== null && row.planned_seconds !== undefined
+        ? Math.round(row.planned_seconds / 60)
+        : null,
     workedSeconds: row.actual_seconds,
     status: row.status,
     progressLabel: row.progress_label ?? undefined,

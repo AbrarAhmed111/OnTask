@@ -53,7 +53,8 @@ const isTask = isShape<WorkspaceTask>({
   createdBy: field.string,
   assignedTo: field.nullableString,
   name: field.string,
-  plannedMinutes: field.number,
+  description: field.nullableString,
+  plannedMinutes: field.nullableNumber,
   workedSeconds: field.number,
   status: field.oneOf(
     'queued',
