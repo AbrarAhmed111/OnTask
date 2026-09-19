@@ -5,18 +5,34 @@
 @tailwind utilities;
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes modalIn {
-  from { opacity: 0; transform: scale(.97) translateY(8px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 @keyframes complete {
-  0% { opacity: .65; transform: scale(.99); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 0.65;
+    transform: scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Realtime "new item" entrance -- applied unconditionally to every row in a
@@ -25,8 +41,14 @@
    node (a new React key) and never replays for an item that's merely
    updated in place -- see src/lib/realtime/mergeById.ts. */
 @keyframes slideInFade {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @layer base {

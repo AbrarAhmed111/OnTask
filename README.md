@@ -17,14 +17,13 @@ Built by **[Abrar Ahmed](https://www.abrarahmed.pro)**
 
 ---
 
-OnTask started as an intentionally simple personal timer: open the
-dashboard, add today's work, start one task, pause when needed, keep
-moving. It's grown from there into two cooperating services — this Next.js
-app and a companion AI microservice ([`ontask-llm`](ontask-llm)) — that add
-authenticated accounts, Personal and Shared Workspaces with Goals, blockers,
-notes, files and live presence, and a daily AI-generated narrative of a
-workspace's work, without giving up the original single-dashboard simplicity
-for solo use.
+OnTask started as an intentionally simple personal timer: open the dashboard,
+add today's work, start one task, pause when needed, keep moving. It's grown
+from there into two cooperating services — this Next.js app and a companion AI
+microservice ([`ontask-llm`](ontask-llm)) — that add authenticated accounts,
+Personal and Shared Workspaces with Goals, blockers, notes, files and live
+presence, and a daily AI-generated narrative of a workspace's work, without
+giving up the original single-dashboard simplicity for solo use.
 
 ## Core Concepts
 
@@ -47,11 +46,11 @@ OnTask has three clear places to work:
 > Guest → try OnTask · Personal Workspace → work privately · Shared Workspace →
 > work collaboratively
 
-| | Where | Who | What you get |
-| --- | --- | --- | --- |
-| **Guest** | `/` | Anyone, no account | The local-first dashboard below. Data stays in the browser. |
+|                        | Where                            | Who                                  | What you get                                                                                                                                                                                                       |
+| ---------------------- | -------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Guest**              | `/`                              | Anyone, no account                   | The local-first dashboard below. Data stays in the browser.                                                                                                                                                        |
 | **Personal Workspace** | `/workspaces/personal-workspace` | Every registered user, automatically | A private, owner-only workspace: goals, tasks and subtasks, focused time, progress, activity/history, resources, and an optional AI Daily Report (off until you turn it on). Nothing to create, nothing to invite. |
-| **Shared Workspaces** | `/workspaces/<slug>` | Invited members | The same workspace features plus members, invitations, assignments and team activity. |
+| **Shared Workspaces**  | `/workspaces/<slug>`             | Invited members                      | The same workspace features plus members, invitations, assignments and team activity.                                                                                                                              |
 
 `/workspaces` is a signed-in user's hub: their pending invitations, their
 Personal Workspace, and their shared workspaces — "which workspace do I want to
@@ -65,26 +64,26 @@ work in?".
   invitation waits for an explicit Accept or Reject. Nothing is ever
   auto-accepted.
 - Every later login → `/workspaces`.
-- A signed-in user who opens `/` is sent to their Personal Workspace (by
-  the middleware, not by client-side JS). A signed-out visitor who opens
-  anything under `/workspaces` is sent to the sign-in prompt.
+- A signed-in user who opens `/` is sent to their Personal Workspace (by the
+  middleware, not by client-side JS). A signed-out visitor who opens anything
+  under `/workspaces` is sent to the sign-in prompt.
 
 **One implementation, two workspace types.** A Personal Workspace is a row in
 the same `workspaces` table as a shared one, with `type = 'personal'`. Goals,
 tasks, time entries, activity, resources, notifications and Daily Reports all
-key off `workspace_id`, so it reuses every one of them — it just has one
-member, its owner. The rules are enforced in Postgres, not only in the UI
+key off `workspace_id`, so it reuses every one of them — it just has one member,
+its owner. The rules are enforced in Postgres, not only in the UI
 ([`0028_personal_workspaces.sql`](supabase/migrations/0028_personal_workspaces.sql)):
 one personal workspace per user (unique index), no invitations and no other
 members (triggers), `type` never changes, it can't be deleted or left through
 the API, and row-level security keeps it invisible to everyone else. Because
 `/workspaces/personal-workspace` is the same URL for every user, it's an alias
-that resolves to *the signed-in user's own* personal workspace — it can never
+that resolves to _the signed-in user's own_ personal workspace — it can never
 reach anyone else's — and the slug is reserved so a shared workspace can't take
 it.
 
 **Guest work carries over.** When a guest signs in with tasks on their device
-they're asked *"Save it to your Personal Workspace?"* — **Save My Work** imports
+they're asked _"Save it to your Personal Workspace?"_ — **Save My Work** imports
 them (subtasks become a Goal, recorded time is kept) in one atomic database
 call; **Start Fresh** leaves them on the device untouched.
 
@@ -99,21 +98,21 @@ users, while Shared Workspace tours are available through manual replay.
 Everything below lives in one of the three places above. Here is what each one
 includes:
 
-| Feature | Guest | Personal | Shared |
-| --- | :---: | :---: | :---: |
-| Where your data lives | Browser | Supabase | Supabase |
-| Tasks with planned durations and a one-at-a-time focus timer | ✓ | ✓ | ✓ |
-| Subtasks | Under any task | Inside Goals | Inside Goals |
-| Daily focus target | ✓ | — | — |
-| Goals and task dependencies | — | ✓ | ✓ |
-| Shared notes on tasks | — | ✓ | ✓ |
-| Resources (file uploads) | — | ✓ | ✓ |
-| Activity feed | — | ✓ | ✓ |
-| Notifications | — | Own + every shared workspace's | That workspace's |
-| Automatic AI Daily Report | — | Opt-in; days with activity | ✓ (owner can turn off) |
-| Members, invitations, assignments, live presence | — | — | ✓ |
-| Task blockers | — | — | ✓ |
-| Guided tour | — | Once on sign-up, then replay | Replay from Settings |
+| Feature                                                      |     Guest      |            Personal            |         Shared         |
+| ------------------------------------------------------------ | :------------: | :----------------------------: | :--------------------: |
+| Where your data lives                                        |    Browser     |            Supabase            |        Supabase        |
+| Tasks with planned durations and a one-at-a-time focus timer |       ✓        |               ✓                |           ✓            |
+| Subtasks                                                     | Under any task |          Inside Goals          |      Inside Goals      |
+| Daily focus target                                           |       ✓        |               —                |           —            |
+| Goals and task dependencies                                  |       —        |               ✓                |           ✓            |
+| Shared notes on tasks                                        |       —        |               ✓                |           ✓            |
+| Resources (file uploads)                                     |       —        |               ✓                |           ✓            |
+| Activity feed                                                |       —        |               ✓                |           ✓            |
+| Notifications                                                |       —        | Own + every shared workspace's |    That workspace's    |
+| Automatic AI Daily Report                                    |       —        |   Opt-in; days with activity   | ✓ (owner can turn off) |
+| Members, invitations, assignments, live presence             |       —        |               —                |           ✓            |
+| Task blockers                                                |       —        |               —                |           ✓            |
+| Guided tour                                                  |       —        |  Once on sign-up, then replay  |  Replay from Settings  |
 
 ### Guest Dashboard
 
@@ -123,19 +122,19 @@ includes:
 - Finish a task early when the planned duration is not needed.
 - Automatically mark a task complete when its planned duration is reached.
 - See actual work for each task and total focused work for the day.
-- Track the day against a daily focus target (8 hours by default), with the
-  time still remaining.
-- Drag tasks to reorder them, or move a task under a parent task (or back out
-  to the top level). Deleting a parent lets you keep its subtasks as standalone
+- Track the day against a daily focus target (8 hours by default), with the time
+  still remaining.
+- Drag tasks to reorder them, or move a task under a parent task (or back out to
+  the top level). Deleting a parent lets you keep its subtasks as standalone
   tasks or delete them along with it.
 - Restart a finished task as a new task.
 - Edit task names, durations, goal details, and goal percentages.
 - Attach an optional long-term goal to a task and track its percentage
   independently from tracked time.
 - Desktop notifications and a completion sound when a task finishes.
-- Works immediately as a guest (data kept in the browser) — no account
-  required to try it, and it stays fully usable without one. An inline prompt
-  offers to create an account to keep your progress.
+- Works immediately as a guest (data kept in the browser) — no account required
+  to try it, and it stays fully usable without one. An inline prompt offers to
+  create an account to keep your progress.
 
 ### Goals and Dependencies
 
@@ -160,20 +159,20 @@ includes:
 - Assigned members control Shared Workspace timers; owners can emergency-stop a
   member's running timer without taking ownership of the work.
 - Working Now excludes paused, blocked, completed, and skipped tasks.
-- Reassigning a running task stops its timer and keeps the time already
-  recorded with whoever worked it; the new assignee resumes it. A Shared
-  Workspace task needs an assignee before its timer can start.
-- Raising a completed task's planned time above the time already worked
-  reopens it as paused, ready to resume. Nothing ever starts on its own, and a
-  skipped task stays skipped.
-- When a running task's planned time runs out it is completed automatically —
-  by the assigned member's open browser, and only on the database's say-so: the
-  app names the timer run it saw and the database, on its own clock and holding
-  the task's row lock, completes it only if that run is still going and really
-  is out of time. A task paused, restarted, extended or already completed
-  elsewhere is left alone, and a repeated request never logs the completion
-  twice. Nothing is completed from data the app has only cached; it waits for
-  the server's answer first.
+- Reassigning a running task stops its timer and keeps the time already recorded
+  with whoever worked it; the new assignee resumes it. A Shared Workspace task
+  needs an assignee before its timer can start.
+- Raising a completed task's planned time above the time already worked reopens
+  it as paused, ready to resume. Nothing ever starts on its own, and a skipped
+  task stays skipped.
+- When a running task's planned time runs out it is completed automatically — by
+  the assigned member's open browser, and only on the database's say-so: the app
+  names the timer run it saw and the database, on its own clock and holding the
+  task's row lock, completes it only if that run is still going and really is
+  out of time. A task paused, restarted, extended or already completed elsewhere
+  is left alone, and a repeated request never logs the completion twice. Nothing
+  is completed from data the app has only cached; it waits for the server's
+  answer first.
 
 ### Shared Notes and Resources
 
@@ -187,9 +186,8 @@ includes:
   Excel, PowerPoint, and PDF files with a type badge.
 - Download files through short-lived signed links. Only the uploader or the
   workspace owner can delete a file, and deleting removes the stored file too.
-- Files sit in a private Supabase Storage bucket and are isolated per
-  workspace by storage policies, so Personal and Shared Workspaces never see
-  each other's.
+- Files sit in a private Supabase Storage bucket and are isolated per workspace
+  by storage policies, so Personal and Shared Workspaces never see each other's.
 
 ### Accounts & Sign-in
 
@@ -209,10 +207,10 @@ includes:
   (`/workspaces/<slug>`) with separate Overview, Members, and Settings pages.
 - Invite teammates by email (owners only). Invitations move through pending,
   accepted, rejected, expired, and cancelled, expire after 14 days, and arrive
-  as an email whose link picks up where the invitee left off once they sign
-  in. Invitees accept or reject from **All workspaces**, optionally giving the
-  owner a reason; owners can cancel or clear invitations, and other members
-  only see the pending ones.
+  as an email whose link picks up where the invitee left off once they sign in.
+  Invitees accept or reject from **All workspaces**, optionally giving the owner
+  a reason; owners can cancel or clear invitations, and other members only see
+  the pending ones.
 - Owner and member roles per workspace. Owners can remove members; members can
   leave.
 - Flat workspace tasks, each with a planned duration, an assignee, and an
@@ -220,22 +218,22 @@ includes:
   [Goals](#goals-and-dependencies).
 - An overview that leads with live counts (members, working, queued, completed
   today), a **Working now** panel showing who is on what, and a **Blocked**
-  panel, then the task queue and completed tasks — followed by Goals,
-  Resources, the Daily Report, and Activity.
-- Shared timers sync in real time via Supabase Realtime — teammates see a
-  task move between queued, working, paused, blocked, completed, and skipped
-  as it happens.
-- Live presence: a status dot on each member's avatar shows who currently
-  has the workspace open, with a brief animation on the moment someone comes
-  online or goes offline.
-- An activity feed of what happened across the workspace: tasks created,
-  edited, started, paused, resumed, finished, reopened, deleted, assigned,
-  reassigned, and moved; progress changes; Goals and dependencies; blockers;
-  notes; resources; and invitations and membership changes.
+  panel, then the task queue and completed tasks — followed by Goals, Resources,
+  the Daily Report, and Activity.
+- Shared timers sync in real time via Supabase Realtime — teammates see a task
+  move between queued, working, paused, blocked, completed, and skipped as it
+  happens.
+- Live presence: a status dot on each member's avatar shows who currently has
+  the workspace open, with a brief animation on the moment someone comes online
+  or goes offline.
+- An activity feed of what happened across the workspace: tasks created, edited,
+  started, paused, resumed, finished, reopened, deleted, assigned, reassigned,
+  and moved; progress changes; Goals and dependencies; blockers; notes;
+  resources; and invitations and membership changes.
 
 ### Task Blockers
 
-A blocker answers *why can't this task move forward?* It is not a paused task
+A blocker answers _why can't this task move forward?_ It is not a paused task
 (stopped on purpose) and not a Goal dependency (a derived link between two
 tasks). It is a shared-workspace feature — a Personal Workspace has no one to
 wait on.
@@ -253,8 +251,8 @@ wait on.
 - A mentioned member gets an in-app notification that opens the task (once per
   new mention, never for a wording edit); the assignee is told when someone else
   resolves their blocker.
-- Blockers appear in the activity feed and in the Daily Report as recorded
-  facts (the reason, who was asked, who resolved it); the AI narration can only
+- Blockers appear in the activity feed and in the Daily Report as recorded facts
+  (the reason, who was asked, who resolved it); the AI narration can only
   describe them.
 
 The rules are enforced in Postgres, not just the UI
@@ -275,7 +273,7 @@ against a scratch project.
 ### Notifications
 
 In-app notifications live in one `notifications` table keyed by `workspace_id`
-and are scoped by where you are — the bell only appears *inside* a workspace,
+and are scoped by where you are — the bell only appears _inside_ a workspace,
 never on the guest page or the `/workspaces` hub:
 
 - **A shared workspace** shows only that workspace's notifications. Another
@@ -284,9 +282,9 @@ never on the guest page or the `/workspaces` hub:
   grouped by workspace, with the workspace's name (in its accent colour) on
   every entry.
 
-Access is enforced in Postgres, not just the UI: a user can read a
-notification only while they are a member of its workspace, and can update only
-its read state
+Access is enforced in Postgres, not just the UI: a user can read a notification
+only while they are a member of its workspace, and can update only its read
+state
 ([`0034_notifications_workspace_scoped_access.sql`](supabase/migrations/0034_notifications_workspace_scoped_access.sql)).
 
 Notifications are in-app only and are created by database triggers reacting to
@@ -306,8 +304,8 @@ small card says what it is and what to do there.
 - **Personal Workspace tour** — daily tasks, goals, resources and settings.
   Opens once as part of initial user onboarding, after the one-time welcome.
 - **Shared Workspace tour** — members, who is working now, tasks, task notes,
-  goals, resources and activity. It does not open automatically when you join
-  or visit a shared workspace; use **Settings → Help & guidance** to replay it.
+  goals, resources and activity. It does not open automatically when you join or
+  visit a shared workspace; use **Settings → Help & guidance** to replay it.
 - Every tour has Back, Next, Skip and Close, a progress indicator, Escape to
   skip and Left/Right to step. Skipping or finishing is remembered, so a tour
   never comes back on its own; **Settings → Help & guidance** replays it.
@@ -317,28 +315,28 @@ small card says what it is and what to do there.
 Progress is stored in Supabase per user, workspace and tour
 ([`0039_user_tour_progress.sql`](supabase/migrations/0039_user_tour_progress.sql)),
 so it follows you across devices. The Personal Workspace row is the user's
-initial onboarding checkpoint; existing members are backfilled as onboarded
-when that migration runs.
+initial onboarding checkpoint; existing members are backfilled as onboarded when
+that migration runs.
 
 ### Automatic Daily Report
 
-- A workspace's **Daily Report** is written automatically **at a configured
-  time of day (12:00 PM by default) in its own configured timezone**, covering
-  the exact previous rolling 24 hours (not a calendar day) — no one has to click
-  "Generate," and OnTask doesn't need to be open. The owner can change both
-  the timezone and the report time per workspace at any time (workspace
-  settings). A Supabase `pg_cron` job ticks every 5 minutes, finds workspaces
-  whose configured local time has arrived, and calls the Next.js app
-  server-side to build and save the report; a secondary "Regenerate" action
-  stays available to any workspace member for the current report.
+- A workspace's **Daily Report** is written automatically **at a configured time
+  of day (12:00 PM by default) in its own configured timezone**, covering the
+  exact previous rolling 24 hours (not a calendar day) — no one has to click
+  "Generate," and OnTask doesn't need to be open. The owner can change both the
+  timezone and the report time per workspace at any time (workspace settings). A
+  Supabase `pg_cron` job ticks every 5 minutes, finds workspaces whose
+  configured local time has arrived, and calls the Next.js app server-side to
+  build and save the report; a secondary "Regenerate" action stays available to
+  any workspace member for the current report.
 - **Daily Reports can be turned On or Off per workspace** (Settings → Daily
   Reports, owner only). A Shared Workspace starts **On**; a Personal Workspace
   starts **Off**, so nobody gets an AI report they didn't ask for. Off means no
-  new reports are generated (the scheduler skips the workspace, so no AI call
-  is made), the Daily Report section is hidden — no empty card, no "no reports
-  yet" placeholder — and reports already written are kept. Turning it back On
-  resumes future reports; it doesn't back-fill the one missed while it was off.
-  It is enforced in the database, not just hidden in the UI.
+  new reports are generated (the scheduler skips the workspace, so no AI call is
+  made), the Daily Report section is hidden — no empty card, no "no reports yet"
+  placeholder — and reports already written are kept. Turning it back On resumes
+  future reports; it doesn't back-fill the one missed while it was off. It is
+  enforced in the database, not just hidden in the UI.
 - The report reads as a **short narrative, not an activity log**: the AI turns
   the verified facts into one short paragraph (Personal) or one to three
   (Shared) about what actually got done — the tasks worked on, by their real
@@ -348,27 +346,24 @@ when that migration runs.
   deterministic, straight from the database: focused time, tasks completed
   (distinct tasks still completed at the end), each task's current status, and
   the report period; the AI never states or recalculates them. The details view
-  adds the tasks and their status, workspace changes and blockers; the raw
-  event list stays in the Activity feed. If AI narration is unavailable the
-  report says so and falls back to a short summary written from those same
-  facts.
+  adds the tasks and their status, workspace changes and blockers; the raw event
+  list stays in the Activity feed. If AI narration is unavailable the report
+  says so and falls back to a short summary written from those same facts.
 - Personal Workspaces that have turned reports on get one only on days with
   recorded activity, so idle accounts never trigger an AI call. Shared
   Workspaces get one every day, even if it just says nothing was recorded.
   Members are notified when a report is ready.
-- Generation is structured-first: the app aggregates the window's task
-  events into a factual snapshot, hands it to the separate
-  [`ontask-llm`](ontask-llm) service, and validates the returned narrative
-  against that snapshot before saving it — so the AI can narrate the window
-  but can't invent facts.
+- Generation is structured-first: the app aggregates the window's task events
+  into a factual snapshot, hands it to the separate [`ontask-llm`](ontask-llm)
+  service, and validates the returned narrative against that snapshot before
+  saving it — so the AI can narrate the window but can't invent facts.
 - Idempotent by construction: a database uniqueness constraint on
-  `(workspace_id, report_end)` plus an atomic claim means the scheduler can
-  run concurrently with itself without ever producing duplicate reports; a
-  failed generation is retried automatically on the next tick.
-- `ontask-llm` is a stateless FastAPI service with a multi-provider LLM
-  gateway (Gemini, Groq, OpenAI, Mistral, Cerebras via LangChain) with
-  automatic failover and a deterministic non-AI fallback if every provider
-  is unavailable.
+  `(workspace_id, report_end)` plus an atomic claim means the scheduler can run
+  concurrently with itself without ever producing duplicate reports; a failed
+  generation is retried automatically on the next tick.
+- `ontask-llm` is a stateless FastAPI service with a multi-provider LLM gateway
+  (Gemini, Groq, OpenAI, Mistral, Cerebras via LangChain) with automatic
+  failover and a deterministic non-AI fallback if every provider is unavailable.
 
 ### Settings
 
@@ -382,8 +377,8 @@ when that migration runs.
 **Workspaces.** Every Personal and Shared Workspace has its own Settings page:
 
 - **Workspace details** — name, description (Shared Workspaces only), timezone,
-  Daily Report time, and accent theme. Only the owner can edit them; members
-  see them read-only. A Personal Workspace keeps its fixed name.
+  Daily Report time, and accent theme. Only the owner can edit them; members see
+  them read-only. A Personal Workspace keeps its fixed name.
 - **Daily Reports** — an On/Off switch for the workspace's automatic Daily
   Report. Only the owner can change it; it saves immediately.
 - **Your preferences** — the completion sound, saved on this device.
@@ -410,8 +405,8 @@ include:
 - Tailwind CSS, Lucide React / React Icons
 - Redux Toolkit + React Redux for client-side workspace cache/state
 - Supabase (Postgres, Auth, Realtime, Storage, Row Level Security, `pg_cron`)
-  for accounts, workspaces, tasks, Goals, notes, files, presence,
-  notifications, and activity
+  for accounts, workspaces, tasks, Goals, notes, files, presence, notifications,
+  and activity
 - Google One Tap for one-click Google Sign-In
 - Nodemailer for workspace invitation emails
 - Browser `localStorage` for the guest dashboard, device preferences, and a
@@ -423,10 +418,10 @@ include:
 - Python, FastAPI, LangChain
 - Multi-provider LLM gateway with automatic failover between providers
 
-The guest dashboard is local-first and works without any backend
-configured. Signing in, workspaces, and the Daily Report require a
-configured Supabase project (and, for the Daily Report specifically, a
-running `ontask-llm` instance plus the scheduler env vars above).
+The guest dashboard is local-first and works without any backend configured.
+Signing in, workspaces, and the Daily Report require a configured Supabase
+project (and, for the Daily Report specifically, a running `ontask-llm` instance
+plus the scheduler env vars above).
 
 ## Project Structure
 
@@ -499,22 +494,21 @@ SUPABASE_SERVICE_ROLE_KEY=
 CRON_SECRET=
 ```
 
-The guest dashboard runs with none of these set. Supabase variables are
-required for sign-in and workspaces; the `SMTP_*` variables are required to
-send workspace invitation emails; `ONTASK_LLM_SERVICE_URL` should point at a
-running [`ontask-llm`](ontask-llm) instance to enable the automatic Daily
-Report. `SUPABASE_SERVICE_ROLE_KEY` (from your Supabase project's API
-settings — **server-only, never expose it to the browser**) and
-`CRON_SECRET` (any random string you generate) are required for the
-automatic scheduler (`/api/cron/daily-reports`); without them the Daily
-Report feature falls back to being unavailable rather than insecure.
-`SMTP_REPLY_TO` is optional: it sets the reply-to address on invitation emails
-and defaults to `SMTP_FROM_EMAIL`.
+The guest dashboard runs with none of these set. Supabase variables are required
+for sign-in and workspaces; the `SMTP_*` variables are required to send
+workspace invitation emails; `ONTASK_LLM_SERVICE_URL` should point at a running
+[`ontask-llm`](ontask-llm) instance to enable the automatic Daily Report.
+`SUPABASE_SERVICE_ROLE_KEY` (from your Supabase project's API settings —
+**server-only, never expose it to the browser**) and `CRON_SECRET` (any random
+string you generate) are required for the automatic scheduler
+(`/api/cron/daily-reports`); without them the Daily Report feature falls back to
+being unavailable rather than insecure. `SMTP_REPLY_TO` is optional: it sets the
+reply-to address on invitation emails and defaults to `SMTP_FROM_EMAIL`.
 
 Apply the SQL migrations in [`supabase/migrations`](supabase/migrations), in
 order, to your Supabase project before using auth, workspaces, or the Daily
-Report —
-including [`0018_automatic_daily_reports.sql`](supabase/migrations/0018_automatic_daily_reports.sql),
+Report — including
+[`0018_automatic_daily_reports.sql`](supabase/migrations/0018_automatic_daily_reports.sql),
 which also schedules the `pg_cron` job that drives the automatic scheduler.
 After applying it (and deploying the app), set the job's target once:
 
@@ -527,12 +521,12 @@ set target_url = 'https://<your-deployed-app>/api/cron/daily-reports',
 Migration `0026` also creates the private `workspace-resources` Storage bucket
 that Resources uploads go into.
 
-Migrations `0028`–`0032` introduce Personal Workspaces. They give every
-existing account a Personal Workspace, add the first-login state and the
-invitation display data the sign-in flow needs, and copy existing signed-in
-users' personal tasks into their new Personal Workspace (non-destructively —
-the old `personal_tasks` table is left untouched). To check them,
-run [`supabase/tests/0028_personal_workspaces.sql`](supabase/tests/0028_personal_workspaces.sql)
+Migrations `0028`–`0032` introduce Personal Workspaces. They give every existing
+account a Personal Workspace, add the first-login state and the invitation
+display data the sign-in flow needs, and copy existing signed-in users' personal
+tasks into their new Personal Workspace (non-destructively — the old
+`personal_tasks` table is left untouched). To check them, run
+[`supabase/tests/0028_personal_workspaces.sql`](supabase/tests/0028_personal_workspaces.sql)
 against a scratch project.
 
 Migration `0043` adds `auto_complete_workspace_task`, the guarded completion
@@ -581,8 +575,8 @@ welcome was answered on this device. `ontask-workspace-cache-v1` is a
 paint-first cache of a signed-in user's workspace name, accent, and timezone, so
 a refresh doesn't flash defaults; Supabase overwrites it on every load.
 
-Use **Settings → Reset local data** to remove the three guest keys and return
-to the initial empty state (the welcome flag stays, so the welcome doesn't come
+Use **Settings → Reset local data** to remove the three guest keys and return to
+the initial empty state (the welcome flag stays, so the welcome doesn't come
 back). Signed-in users' Personal Workspace and shared workspace data instead
 lives in Supabase, guarded by Row Level Security, and so does their guided-tour
 progress.
