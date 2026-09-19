@@ -1,5 +1,7 @@
 'use client'
 
+import { clearAllCache } from '@/lib/cache/cacheStore'
+
 // Clear browser storage (localStorage, sessionStorage, cookies)
 async function clearBrowserStorage(): Promise<void> {
   if (typeof window !== 'undefined') {
@@ -41,6 +43,9 @@ async function clearBrowserStorage(): Promise<void> {
 export async function clientSignout() {
   try {
     await clearBrowserStorage()
+    // The signed-in user's cached workspaces/tasks are theirs alone: they don't
+    // outlive the session on a device someone else may sign in on next.
+    await clearAllCache()
     // Prevent Google One Tap from silently re-selecting the same account on
     // the next page load right after an explicit sign-out.
     window.google?.accounts.id.disableAutoSelect()
