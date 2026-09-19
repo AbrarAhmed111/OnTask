@@ -13,9 +13,10 @@ const DB_NAME = 'ontask-cache'
 // old store and rebuilds it empty, which is always safe for a cache. The shape
 // of what is *stored* is versioned separately, per record (CACHE_SCHEMA_VERSION
 // in cacheStore.ts), so a payload change doesn't need a database upgrade.
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE = 'entries'
 const BY_USER = 'byUser'
+const BY_WORKSPACE = 'byWorkspace'
 
 export type CacheRecord = {
   // `${userId}:${entity}:${scopeId}` -- see cacheKey().
@@ -23,6 +24,12 @@ export type CacheRecord = {
   // Indexed, so one account's records can be found (and removed) without
   // reading everyone's.
   userId: string
+  // The workspace this record belongs to, or null for something that isn't
+  // scoped to one (the hub's workspace list). Indexed together with userId, so
+  // everything cached for one workspace can be dropped at once when the user
+  // loses access to it. A null is not a valid index key, so those records are
+  // simply left out of that index.
+  workspaceId: string | null
   entity: string
   scopeId: string
   schemaVersion: number
@@ -45,6 +52,7 @@ function openDb(): Promise<IDBDatabase | null> {
         if (db.objectStoreNames.contains(STORE)) db.deleteObjectStore(STORE)
         const store = db.createObjectStore(STORE, { keyPath: 'key' })
         store.createIndex(BY_USER, 'userId')
+        store.createIndex(BY_WORKSPACE, ['userId', 'workspaceId'])
       }
       request.onsuccess = () => {
         const db = request.result
@@ -126,6 +134,29 @@ export async function deleteRecordsExceptUser(userId: string): Promise<void> {
         const cursor = cursorRequest.result
         if (!cursor) return
         if (cursor.key !== userId) store.delete(cursor.primaryKey)
+        cursor.continue()
+      }
+    },
+    undefined,
+  )
+}
+
+// Deletes everything one user has cached for one workspace -- and nothing of
+// theirs for any other workspace, nor of anyone else's for this one.
+export async function deleteRecordsForWorkspace(
+  userId: string,
+  workspaceId: string,
+): Promise<void> {
+  await run<unknown>(
+    'readwrite',
+    store => {
+      const cursorRequest = store
+        .index(BY_WORKSPACE)
+        .openKeyCursor(IDBKeyRange.only([userId, workspaceId]))
+      cursorRequest.onsuccess = () => {
+        const cursor = cursorRequest.result
+        if (!cursor) return
+        store.delete(cursor.primaryKey)
         cursor.continue()
       }
     },

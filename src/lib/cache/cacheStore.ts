@@ -2,6 +2,7 @@ import {
   clearRecords,
   deleteRecord,
   deleteRecordsExceptUser,
+  deleteRecordsForWorkspace,
   getRecord,
   putRecord,
 } from '@/lib/cache/idb'
@@ -68,22 +69,52 @@ export async function readCache<T>(
   return { data: record.data as T, cachedAt: record.cachedAt }
 }
 
+// `workspaceId` says which workspace the record belongs to (when it belongs to
+// one), so clearWorkspaceCache can drop it with the rest. It is bookkeeping for
+// invalidation, separate from `scopeId`, which is only part of the lookup key.
 export async function writeCache<T>(
   userId: string,
   entity: string,
   scopeId: string,
   data: T,
+  workspaceId: string | null = null,
 ): Promise<void> {
   if (!userId) return
   await putRecord({
     key: cacheKey(userId, entity, scopeId),
     userId,
+    workspaceId,
     entity,
     scopeId,
     schemaVersion: CACHE_SCHEMA_VERSION,
     cachedAt: Date.now(),
     data,
   })
+}
+
+// Removes one entry. Moves the epoch like every other removal, so a write that
+// was already scheduled for it cannot put it back.
+export async function deleteCache(
+  userId: string,
+  entity: string,
+  scopeId = 'all',
+): Promise<void> {
+  if (!userId) return
+  epoch += 1
+  await deleteRecord(cacheKey(userId, entity, scopeId))
+}
+
+// The user no longer has access to this workspace (it was deleted, they left
+// or were removed, or the server says they can't see it): everything cached
+// for it goes, so it can't be shown again from disk. Moves the epoch like any
+// other wipe, so a response that was already in flight can't write it back.
+export async function clearWorkspaceCache(
+  userId: string,
+  workspaceId: string,
+): Promise<void> {
+  if (!userId || !workspaceId) return
+  epoch += 1
+  await deleteRecordsForWorkspace(userId, workspaceId)
 }
 
 // Signed out: nothing of the previous session's is left on the device.

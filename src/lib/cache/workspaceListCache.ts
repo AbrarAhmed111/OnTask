@@ -20,7 +20,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function isWorkspace(value: unknown): value is Workspace {
+export function isWorkspace(value: unknown): value is Workspace {
   return (
     isRecord(value) &&
     typeof value.id === 'string' &&

@@ -75,6 +75,7 @@ describe('readCache / writeCache', () => {
     await idb.putRecord({
       key: 'user-a:things:all',
       userId: 'user-b',
+      workspaceId: null,
       entity: 'things',
       scopeId: 'all',
       schemaVersion: store.CACHE_SCHEMA_VERSION,
@@ -89,6 +90,7 @@ describe('readCache / writeCache', () => {
     await idb.putRecord({
       key: 'user-a:things:all',
       userId: 'user-a',
+      workspaceId: null,
       entity: 'things',
       scopeId: 'all',
       schemaVersion: store.CACHE_SCHEMA_VERSION + 1,
@@ -111,6 +113,92 @@ describe('clearAllCache', () => {
 
     expect(await store.readCache('user-a', 'things')).toBeUndefined()
     expect(await store.readCache('user-b', 'things')).toBeUndefined()
+  })
+})
+
+describe('deleteCache', () => {
+  it('removes just that entry', async () => {
+    await store.writeCache('user-a', 'things', 'a', 1)
+    await store.writeCache('user-a', 'things', 'b', 2)
+
+    await store.deleteCache('user-a', 'things', 'a')
+
+    expect(await store.readCache('user-a', 'things', 'a')).toBeUndefined()
+    expect((await store.readCache('user-a', 'things', 'b'))?.data).toBe(2)
+  })
+
+  it("cannot remove another account's entry", async () => {
+    await store.writeCache('user-b', 'things', 'a', 1)
+
+    await store.deleteCache('user-a', 'things', 'a')
+
+    expect(await store.readCache('user-b', 'things', 'a')).toBeDefined()
+  })
+
+  it('moves the epoch, so a write already scheduled cannot restore it', async () => {
+    const before = store.getCacheEpoch()
+
+    await store.deleteCache('user-a', 'things', 'a')
+
+    expect(store.getCacheEpoch()).toBeGreaterThan(before)
+  })
+})
+
+describe('clearWorkspaceCache', () => {
+  it('removes everything the user cached for that workspace, and only that', async () => {
+    await store.writeCache('user-a', 'tasks', 'ws-1', ['t'], 'ws-1')
+    await store.writeCache('user-a', 'goals', 'ws-1', ['g'], 'ws-1')
+    // Notes are scoped further (per task) but still belong to the workspace.
+    await store.writeCache('user-a', 'notes', 'ws-1/task-9', ['n'], 'ws-1')
+    await store.writeCache('user-a', 'tasks', 'ws-2', ['other'], 'ws-2')
+
+    await store.clearWorkspaceCache('user-a', 'ws-1')
+
+    expect(await store.readCache('user-a', 'tasks', 'ws-1')).toBeUndefined()
+    expect(await store.readCache('user-a', 'goals', 'ws-1')).toBeUndefined()
+    expect(
+      await store.readCache('user-a', 'notes', 'ws-1/task-9'),
+    ).toBeUndefined()
+    expect((await store.readCache('user-a', 'tasks', 'ws-2'))?.data).toEqual([
+      'other',
+    ])
+  })
+
+  it("never touches another account's copy of the same workspace", async () => {
+    await store.writeCache('user-a', 'tasks', 'ws-1', ['a'], 'ws-1')
+    await store.writeCache('user-b', 'tasks', 'ws-1', ['b'], 'ws-1')
+
+    await store.clearWorkspaceCache('user-a', 'ws-1')
+
+    expect(await store.readCache('user-a', 'tasks', 'ws-1')).toBeUndefined()
+    expect((await store.readCache('user-b', 'tasks', 'ws-1'))?.data).toEqual([
+      'b',
+    ])
+  })
+
+  it('leaves records that belong to no workspace alone', async () => {
+    await store.writeCache('user-a', 'workspace-list', 'all', ['list'])
+
+    await store.clearWorkspaceCache('user-a', 'ws-1')
+
+    expect(await store.readCache('user-a', 'workspace-list')).toBeDefined()
+  })
+
+  it('moves the epoch, so a write already in flight cannot restore it', async () => {
+    const before = store.getCacheEpoch()
+
+    await store.clearWorkspaceCache('user-a', 'ws-1')
+
+    expect(store.getCacheEpoch()).toBeGreaterThan(before)
+  })
+
+  it('ignores a missing user or workspace instead of matching everything', async () => {
+    await store.writeCache('user-a', 'tasks', 'ws-1', ['t'], 'ws-1')
+
+    await store.clearWorkspaceCache('', 'ws-1')
+    await store.clearWorkspaceCache('user-a', '')
+
+    expect(await store.readCache('user-a', 'tasks', 'ws-1')).toBeDefined()
   })
 })
 
