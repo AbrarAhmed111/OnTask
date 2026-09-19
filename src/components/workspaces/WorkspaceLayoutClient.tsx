@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useCallback, useEffect, useState } from 'react'
+import { ReactNode, Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -12,6 +12,7 @@ import { usePersonalWelcome } from '@/hooks/usePersonalWelcome'
 import { InviteMemberModal } from '@/components/workspaces/InviteMemberModal'
 import { PersonalWelcomeModal } from '@/components/workspaces/PersonalWelcomeModal'
 import { GuestWorkPrompt } from '@/components/auth/GuestWorkPrompt'
+import { SlackToastFromUrl } from '@/components/workspaces/SlackToastFromUrl'
 import { TourProvider } from '@/components/tour/TourProvider'
 import {
   WorkspaceShell,
@@ -270,6 +271,9 @@ export function WorkspaceLayout({
           {isPersonal && ready && (
             <GuestWorkPrompt suppressed={!welcome.checked || welcome.open} />
           )}
+          <Suspense fallback={null}>
+            <SlackToastFromUrl />
+          </Suspense>
         </TourProvider>
       </WorkspaceThemeScope>
     </WorkspaceDetailContext.Provider>

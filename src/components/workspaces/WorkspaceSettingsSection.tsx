@@ -15,6 +15,7 @@ import { formatTimeOfDay } from '@/lib/dailyReportWindow'
 import { getWorkspaceTheme } from '@/lib/workspaceThemes'
 import { PERSONAL_WORKSPACE_NAME } from '@/lib/workspaces'
 import { Workspace } from '@/types/workspace'
+import { SlackIntegrationCard } from '@/components/settings/SlackIntegrationCard'
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -176,6 +177,10 @@ export function WorkspaceSettingsSection({
             </p>
           </div>
         </SettingsCard>
+      )}
+
+      {!isPersonal && workspace && (
+        <SlackIntegrationCard workspaceId={workspace.id} canManage={canManage} />
       )}
 
       <SettingsCard icon={SlidersHorizontal} title="Your preferences">
