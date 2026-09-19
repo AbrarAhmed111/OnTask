@@ -146,17 +146,21 @@ async function processCandidate(
   }
 
   try {
-    const { error: finishError } = await supabase.rpc('finish_daily_report', {
-      p_workspace_id: candidate.workspace_id,
-      p_report_end: candidate.report_end,
-      p_structured_snapshot: snapshot,
-      p_narrative: narrative,
-      p_meta: meta,
-    })
+    const { data: finished, error: finishError } = await supabase.rpc(
+      'finish_daily_report',
+      {
+        p_workspace_id: candidate.workspace_id,
+        p_report_end: candidate.report_end,
+        p_structured_snapshot: snapshot,
+        p_narrative: narrative,
+        p_meta: meta,
+      },
+    )
     if (finishError) throw new Error(finishError.message)
     void dispatchSlackNotification({
       workspaceId: candidate.workspace_id,
       eventType: 'daily_report_ready',
+      reportId: (finished as { id?: string } | null)?.id,
     })
     return 'completed'
   } catch (err) {

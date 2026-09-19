@@ -234,6 +234,62 @@ export function buildSlackEventMessage(
       }
     }
 
+    case 'mentioned': {
+      const fallbackText = recipientName
+        ? `[${workspaceName}] ${actorName} mentioned ${recipientName} on "${taskTitle}"`
+        : `[${workspaceName}] ${actorName} mentioned someone on "${taskTitle}"`
+      const recipientText = recipientName
+        ? `*${escapeSlackText(recipientName)}*`
+        : 'someone'
+      const reasonText = blockerReason
+        ? `\n\n*Reason:* _${escapeSlackText(blockerReason)}_`
+        : ''
+      return {
+        fallbackText,
+        blocks: [
+          {
+            type: 'header',
+            text: {
+              type: 'plain_text',
+              text: '👋 Mentioned in a Blocker',
+              emoji: true,
+            },
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `*${escapeSlackText(actorName)}* mentioned ${recipientText} on *<${taskUrl}|${escapeSlackText(taskTitle)}>*.${reasonText}`,
+            },
+          },
+          {
+            type: 'context',
+            elements: [
+              {
+                type: 'mrkdwn',
+                text: `*Workspace:* ${escapeSlackText(workspaceName)}`,
+              },
+            ],
+          },
+          {
+            type: 'actions',
+            elements: [
+              {
+                type: 'button',
+                text: {
+                  type: 'plain_text',
+                  text: 'Open in OnTask',
+                  emoji: true,
+                },
+                url: taskUrl,
+                style: 'primary',
+              },
+            ],
+          },
+        ],
+      }
+    }
+
     case 'blocker_resolved':
     case 'task_unblocked': {
       const fallbackText = `[${workspaceName}] Blocker Resolved on "${taskTitle}"`

@@ -60,6 +60,26 @@ describe('buildSlackEventMessage', () => {
     expect(JSON.stringify(message.blocks)).toContain('*Workspace:* DevAbby')
   })
 
+  it('formats mention message correctly', () => {
+    const message = buildSlackEventMessage({
+      workspaceName: 'DevAbby',
+      workspaceSlug: 'devabby',
+      eventType: 'mentioned',
+      taskTitle: 'Payment Integration',
+      taskId: 'task-456',
+      actorName: 'Abrar',
+      recipientName: 'Araysh',
+      blockerReason: 'Waiting for Stripe credentials',
+    })
+
+    expect(message.fallbackText).toContain('Abrar mentioned Araysh')
+    expect(JSON.stringify(message.blocks)).toContain('Mentioned in a Blocker')
+    expect(JSON.stringify(message.blocks)).toContain(
+      'Waiting for Stripe credentials',
+    )
+    expect(JSON.stringify(message.blocks)).toContain('*Workspace:* DevAbby')
+  })
+
   it('formats Daily Report message correctly', () => {
     const message = buildSlackEventMessage({
       workspaceName: 'DevAbby',

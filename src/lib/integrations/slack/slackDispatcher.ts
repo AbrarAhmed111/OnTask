@@ -91,6 +91,8 @@ export async function dispatchSlackNotification(
       eventType === 'task_unblocked'
     ) {
       isEnabled = settings.resolutions !== false
+    } else if (eventType === 'mentioned') {
+      isEnabled = settings.mentions !== false
     } else if (eventType === 'daily_report_ready') {
       isEnabled = settings.daily_reports !== false
     }

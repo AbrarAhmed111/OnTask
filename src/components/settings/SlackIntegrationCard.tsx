@@ -22,6 +22,7 @@ export interface SlackNotificationSettings {
   completed: boolean
   blockers: boolean
   resolutions: boolean
+  mentions: boolean
   daily_reports: boolean
 }
 
@@ -90,6 +91,7 @@ export function SlackIntegrationCard({
     completed: true,
     blockers: true,
     resolutions: true,
+    mentions: true,
     daily_reports: true,
   })
   const [saving, setSaving] = useState(false)
@@ -473,6 +475,7 @@ export function SlackIntegrationCard({
                       key: 'resolutions',
                       label: 'Blocker resolutions & unblocks',
                     },
+                    { key: 'mentions', label: 'Mentions in blockers' },
                     { key: 'daily_reports', label: 'Daily Reports' },
                   ].map(({ key, label }) => (
                     <label
