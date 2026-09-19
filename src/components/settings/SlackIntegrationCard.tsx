@@ -1,7 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Check, Hash, Loader2, MessageSquare, RefreshCw, LogOut } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  Check,
+  Hash,
+  Loader2,
+  MessageSquare,
+  RefreshCw,
+  LogOut,
+} from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -17,7 +24,13 @@ export interface SlackNotificationSettings {
 
 interface SlackStatusData {
   connected: boolean
-  connection_status?: 'connected' | 'disconnected' | 'invalid_token' | 'channel_missing' | 'configuration_incomplete' | string
+  connection_status?:
+    | 'connected'
+    | 'disconnected'
+    | 'invalid_token'
+    | 'channel_missing'
+    | 'configuration_incomplete'
+    | string
   id?: string
   slack_team_id?: string
   slack_team_name?: string
@@ -53,11 +66,13 @@ export function SlackIntegrationCard({
   const [savedSuccess, setSavedSuccess] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/integrations/slack/status?workspace_id=${workspaceId}`)
+      const res = await fetch(
+        `/api/integrations/slack/status?workspace_id=${workspaceId}`,
+      )
       if (!res.ok) {
         throw new Error('Failed to load Slack integration status.')
       }
@@ -74,13 +89,15 @@ export function SlackIntegrationCard({
     } finally {
       setLoading(false)
     }
-  }
+  }, [workspaceId])
 
-  const fetchChannels = async () => {
+  const fetchChannels = useCallback(async () => {
     if (!status?.connected) return
     setLoadingChannels(true)
     try {
-      const res = await fetch(`/api/integrations/slack/channels?workspace_id=${workspaceId}`)
+      const res = await fetch(
+        `/api/integrations/slack/channels?workspace_id=${workspaceId}`,
+      )
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || 'Failed to fetch Slack channels.')
@@ -92,19 +109,19 @@ export function SlackIntegrationCard({
     } finally {
       setLoadingChannels(false)
     }
-  }
+  }, [status?.connected, workspaceId])
 
   useEffect(() => {
     if (workspaceId) {
       void fetchStatus()
     }
-  }, [workspaceId])
+  }, [workspaceId, fetchStatus])
 
   useEffect(() => {
     if (status?.connected) {
       void fetchChannels()
     }
-  }, [status?.connected])
+  }, [status?.connected, fetchChannels])
 
   const handleConnect = () => {
     window.location.href = `/api/integrations/slack/oauth/authorize?workspace_id=${workspaceId}`
@@ -122,7 +139,9 @@ export function SlackIntegrationCard({
         body: JSON.stringify({
           workspaceId,
           channelId: selectedChannelId,
-          channelName: selectedChannel ? selectedChannel.name : status?.channel_name || '',
+          channelName: selectedChannel
+            ? selectedChannel.name
+            : status?.channel_name || '',
           notificationSettings: settings,
         }),
       })
@@ -143,7 +162,10 @@ export function SlackIntegrationCard({
   }
 
   const handleDisconnect = async () => {
-    if (!confirm('Are you sure you want to disconnect Slack from this workspace?')) return
+    if (
+      !confirm('Are you sure you want to disconnect Slack from this workspace?')
+    )
+      return
     setDisconnecting(true)
     setError(null)
     try {
@@ -174,7 +196,8 @@ export function SlackIntegrationCard({
     <div className="rounded-2xl border border-line bg-panel shadow-sm">
       <div className="flex min-h-[57px] items-center justify-between border-b border-line/70 px-5 py-3">
         <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight text-ink">
-          <MessageSquare size={15} className="text-[#4A154B]" /> Slack Integration
+          <MessageSquare size={15} className="text-[#4A154B]" /> Slack
+          Integration
         </h2>
         {status?.connected && (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
@@ -194,7 +217,9 @@ export function SlackIntegrationCard({
       ) : !status?.connected ? (
         <div className="space-y-4 px-5 py-5">
           <p className="text-xs leading-5 text-muted">
-            Connect your Slack workspace to receive automatic OnTask notifications for task assignments, completions, blockers, and Daily Reports.
+            Connect your Slack workspace to receive automatic OnTask
+            notifications for task assignments, completions, blockers, and Daily
+            Reports.
           </p>
           {canManage ? (
             <Button
@@ -213,9 +238,15 @@ export function SlackIntegrationCard({
         <div className="space-y-5 px-5 py-5">
           {status.connection_status === 'invalid_token' && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between gap-3">
-              <span>Authorization expired or revoked. Please reconnect Slack to continue receiving updates.</span>
+              <span>
+                Authorization expired or revoked. Please reconnect Slack to
+                continue receiving updates.
+              </span>
               {canManage && (
-                <Button onClick={handleConnect} className="shrink-0 text-xs py-1 px-2.5 bg-amber-600 hover:bg-amber-700 text-white">
+                <Button
+                  onClick={handleConnect}
+                  className="shrink-0 text-xs py-1 px-2.5 bg-amber-600 hover:bg-amber-700 text-white"
+                >
                   Reconnect
                 </Button>
               )}
@@ -224,13 +255,15 @@ export function SlackIntegrationCard({
 
           {status.connection_status === 'channel_missing' && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-800 dark:text-amber-200">
-              Selected channel is no longer accessible. Please choose a valid Slack channel below.
+              Selected channel is no longer accessible. Please choose a valid
+              Slack channel below.
             </div>
           )}
 
           {status.connection_status === 'configuration_incomplete' && (
             <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3.5 text-xs text-blue-800 dark:text-blue-200">
-              Slack is connected! Select a destination channel below to activate notifications.
+              Slack is connected! Select a destination channel below to activate
+              notifications.
             </div>
           )}
 
@@ -239,7 +272,9 @@ export function SlackIntegrationCard({
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">
                 Connected Workspace
               </p>
-              <p className="text-sm font-bold text-ink">{status.slack_team_name || 'Slack Workspace'}</p>
+              <p className="text-sm font-bold text-ink">
+                {status.slack_team_name || 'Slack Workspace'}
+              </p>
             </div>
             {canManage && (
               <Button
@@ -248,7 +283,11 @@ export function SlackIntegrationCard({
                 disabled={disconnecting}
                 className="text-red-500 hover:bg-red-500/10 hover:text-red-600 gap-1.5 text-xs py-1 px-2"
               >
-                {disconnecting ? <Loader2 size={13} className="animate-spin" /> : <LogOut size={13} />}
+                {disconnecting ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <LogOut size={13} />
+                )}
                 Disconnect
               </Button>
             )}
@@ -258,7 +297,9 @@ export function SlackIntegrationCard({
           <div className="space-y-2">
             <label className="flex items-center justify-between text-xs font-semibold text-ink">
               <span>Destination Channel</span>
-              {loadingChannels && <Loader2 size={12} className="animate-spin text-muted" />}
+              {loadingChannels && (
+                <Loader2 size={12} className="animate-spin text-muted" />
+              )}
             </label>
             <div className="relative">
               <select
@@ -276,7 +317,9 @@ export function SlackIntegrationCard({
               </select>
             </div>
             {status.channel_name && !selectedChannelId && (
-              <p className="text-[11px] text-muted">Currently posting to #{status.channel_name}</p>
+              <p className="text-[11px] text-muted">
+                Currently posting to #{status.channel_name}
+              </p>
             )}
           </div>
 
@@ -298,7 +341,9 @@ export function SlackIntegrationCard({
                   <input
                     type="checkbox"
                     checked={settings[key as keyof SlackNotificationSettings]}
-                    onChange={() => toggleSetting(key as keyof SlackNotificationSettings)}
+                    onChange={() =>
+                      toggleSetting(key as keyof SlackNotificationSettings)
+                    }
                     disabled={!canManage}
                     className="h-4 w-4 rounded border-line text-accent focus:ring-ring"
                   />
