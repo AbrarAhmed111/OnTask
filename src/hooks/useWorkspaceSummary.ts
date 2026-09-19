@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useWorkspaceSnapshot } from '@/hooks/useWorkspaceSnapshot'
+import { useFetchStatus } from '@/hooks/useFetchStatus'
+import { SNAPSHOTS } from '@/lib/cache/workspaceSnapshots'
 import {
   formatTimeOfDay,
   isLocalToday,
@@ -52,6 +55,7 @@ function rowToSummary(row: SummaryRow): WorkspaceDailySummary {
 }
 
 const HISTORY_LIMIT = 14
+const NO_HISTORY: WorkspaceDailySummary[] = []
 
 // Fetches the workspace's Daily Reports (most recent first), live-synced via
 // postgres_changes. Reports are created server-side by the automatic
@@ -69,17 +73,29 @@ export function useWorkspaceSummary(
   enabled = true,
 ) {
   const userId = user?.id
-  const [history, setHistory] = useState<WorkspaceDailySummary[]>([])
-  const [ready, setReady] = useState(false)
+  // The recent reports (at most HISTORY_LIMIT) are cached per user AND workspace
+  // and shown while the real list is fetched. Off means nothing is read, shown
+  // or kept live, exactly as before.
+  const snapshot = useWorkspaceSnapshot<WorkspaceDailySummary[]>({
+    userId: enabled ? userId : null,
+    workspaceId,
+    descriptor: SNAPSHOTS.summaries,
+    initial: NO_HISTORY,
+  })
+  const { data: history, setData: setHistory, confirm } = snapshot
+  // Only regenerating can fail visibly (it is what the section's banner shows);
+  // a failed background load keeps whatever is already displayed and stays quiet.
   const [error, setError] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
+  const fetchKey =
+    userId && workspaceId && enabled ? `${userId}|${workspaceId}` : null
+  const { ready, succeeded, failed } = useFetchStatus(snapshot, fetchKey, {
+    load: '',
+    refresh: '',
+  })
 
   useEffect(() => {
-    if (!userId || !workspaceId || !enabled) {
-      setHistory([])
-      setReady(true)
-      return
-    }
+    if (!userId || !workspaceId || !enabled || !fetchKey) return
     let cancelled = false
     const supabase = createClient()
 
@@ -89,10 +105,15 @@ export function useWorkspaceSummary(
       .eq('workspace_id', workspaceId)
       .order('report_end', { ascending: false })
       .limit(HISTORY_LIMIT)
-      .then(({ data }) => {
+      .then(({ data, error: fetchError }) => {
         if (cancelled) return
-        setHistory(((data ?? []) as SummaryRow[]).map(rowToSummary))
-        setReady(true)
+        // A failed read is not "no reports": keep what is shown.
+        if (fetchError) {
+          failed()
+          return
+        }
+        confirm(((data ?? []) as SummaryRow[]).map(rowToSummary))
+        succeeded()
       })
 
     const channel = supabase
@@ -124,7 +145,16 @@ export function useWorkspaceSummary(
       cancelled = true
       supabase.removeChannel(channel)
     }
-  }, [userId, workspaceId, enabled])
+  }, [
+    userId,
+    workspaceId,
+    enabled,
+    fetchKey,
+    confirm,
+    setHistory,
+    succeeded,
+    failed,
+  ])
 
   // The most recently due/created report -- automatic generation always
   // produces (at most) one row per rolling window, ordered newest-first.
@@ -161,7 +191,7 @@ export function useWorkspaceSummary(
     } finally {
       setGenerating(false)
     }
-  }, [workspaceId, summary])
+  }, [workspaceId, summary, setHistory])
 
   // Purely a display aid ("Next report: Today/Tomorrow at 12:00 PM") -- the
   // actual window is always computed server-side by the scheduler, never

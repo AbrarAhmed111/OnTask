@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useWorkspaceSnapshot } from '@/hooks/useWorkspaceSnapshot'
+import { useFetchStatus } from '@/hooks/useFetchStatus'
+import { SNAPSHOTS } from '@/lib/cache/workspaceSnapshots'
 import type { AuthUser } from '@/hooks/useAuth'
 import { mergeById } from '@/lib/realtime/mergeById'
 import {
@@ -45,6 +48,8 @@ function rowToResource(row: WorkspaceResourceRow): WorkspaceResource {
   }
 }
 
+const NO_RESOURCES: WorkspaceResource[] = []
+
 const BUCKET = 'workspace-resources'
 // A few files at a time: quick for a batch, without opening a connection per
 // file. Each file is independent, so one failing never stops the others.
@@ -81,25 +86,35 @@ export function useWorkspaceResources(
   user: AuthUser | null,
 ) {
   const userId = user?.id
-  const [resources, setResources] = useState<WorkspaceResource[]>([])
-  const [ready, setReady] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // What is cached is the metadata -- name, type, size, storage path -- never the
+  // files: their bytes stay in Supabase Storage and are fetched (as signed URLs)
+  // only when previewed or downloaded.
+  const snapshot = useWorkspaceSnapshot<WorkspaceResource[]>({
+    userId,
+    workspaceId,
+    descriptor: SNAPSHOTS.resources,
+    initial: NO_RESOURCES,
+  })
+  const { data: resources, setData: setResources, confirm } = snapshot
+  const fetchKey = userId && workspaceId ? `${userId}|${workspaceId}` : null
+  const status = useFetchStatus(snapshot, fetchKey, {
+    load: "Couldn't load resources.",
+    refresh:
+      "Couldn't refresh resources — you may be seeing an out-of-date list.",
+  })
+  const { failed: markFailed, succeeded: markSucceeded } = status
+  const { ready, error } = status
   const [uploads, dispatchUploads] = useReducer(uploadQueueReducer, [])
   const signedUrls = useRef(
     new Map<string, { url: string; reuseUntil: number }>(),
   )
 
   useEffect(() => {
-    if (!userId || !workspaceId) {
-      setResources([])
-      setReady(true)
-      return
-    }
+    if (!userId || !workspaceId || !fetchKey) return
     let cancelled = false
     const supabase = createClient()
 
-    const fetchResources = (showLoading: boolean) => {
-      if (showLoading) setReady(false)
+    const fetchResources = () => {
       supabase
         .from('workspace_resources')
         .select('*')
@@ -108,20 +123,17 @@ export function useWorkspaceResources(
         .then(({ data, error: fetchError }) => {
           if (cancelled) return
           if (fetchError) {
-            setError("Couldn't load resources.")
-            setReady(true)
+            markFailed()
             return
           }
-          setResources(
-            ((data ?? []) as WorkspaceResourceRow[]).map(rowToResource),
-          )
-          setReady(true)
+          confirm(((data ?? []) as WorkspaceResourceRow[]).map(rowToResource))
+          markSucceeded()
         })
     }
 
-    fetchResources(true)
+    fetchResources()
 
-    const handleReconnect = () => fetchResources(false)
+    const handleReconnect = () => fetchResources()
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') handleReconnect()
     }
@@ -158,7 +170,15 @@ export function useWorkspaceResources(
       document.removeEventListener('visibilitychange', handleVisibility)
       supabase.removeChannel(channel)
     }
-  }, [userId, workspaceId])
+  }, [
+    userId,
+    workspaceId,
+    fetchKey,
+    confirm,
+    setResources,
+    markFailed,
+    markSucceeded,
+  ])
 
   // Uploads one file: storage object, then its metadata row. Never throws --
   // the outcome goes to the queue -- so it is safe to run several at once.

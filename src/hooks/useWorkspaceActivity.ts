@@ -1,7 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useWorkspaceSnapshot } from '@/hooks/useWorkspaceSnapshot'
+import { useFetchStatus } from '@/hooks/useFetchStatus'
+import { SNAPSHOTS } from '@/lib/cache/workspaceSnapshots'
 import { mergeById } from '@/lib/realtime/mergeById'
 import type { AuthUser } from '@/hooks/useAuth'
 
@@ -37,6 +40,8 @@ function rowToEvent(row: TaskEventRow): ActivityEvent {
   }
 }
 
+const NO_EVENTS: ActivityEvent[] = []
+
 // Recent activity for a workspace — reads task_events (populated by the
 // timer RPCs and the paired client-side inserts in useWorkspaceTasks),
 // live-updated via the same postgres_changes pattern as the task list.
@@ -49,21 +54,29 @@ export function useWorkspaceActivity(
   limit = 30,
 ) {
   const userId = user?.id
-  const [events, setEvents] = useState<ActivityEvent[]>([])
-  const [ready, setReady] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // Only the recent window is ever cached (`limit` events, the same bound the
+  // list itself keeps), never the full history.
+  const snapshot = useWorkspaceSnapshot<ActivityEvent[]>({
+    userId,
+    workspaceId,
+    descriptor: SNAPSHOTS.activity,
+    initial: NO_EVENTS,
+  })
+  const { data: events, setData: setEvents, confirm } = snapshot
+  const fetchKey = userId && workspaceId ? `${userId}|${workspaceId}` : null
+  const status = useFetchStatus(snapshot, fetchKey, {
+    load: "Couldn't load activity.",
+    refresh: "Couldn't refresh activity — you may be seeing older events.",
+  })
+  const { failed: markFailed, succeeded: markSucceeded } = status
+  const { ready, error } = status
 
   useEffect(() => {
-    if (!userId || !workspaceId) {
-      setEvents([])
-      setReady(true)
-      return
-    }
+    if (!userId || !workspaceId || !fetchKey) return
     let cancelled = false
     const supabase = createClient()
 
-    const fetchEvents = (showLoading: boolean) => {
-      if (showLoading) setReady(false)
+    const fetchEvents = () => {
       supabase
         .from('task_events')
         .select('*')
@@ -73,22 +86,21 @@ export function useWorkspaceActivity(
         .then(({ data, error: fetchError }) => {
           if (cancelled) return
           if (fetchError || !data) {
-            setError("Couldn't load activity.")
-            setReady(true)
+            markFailed()
             return
           }
-          setEvents((data as TaskEventRow[]).map(rowToEvent))
-          setReady(true)
+          confirm((data as TaskEventRow[]).map(rowToEvent))
+          markSucceeded()
         })
     }
 
-    fetchEvents(true)
+    fetchEvents()
 
     // A dropped websocket (laptop sleep, network blip) can silently miss
     // postgres_changes events — coming back online or back into the tab
     // always re-derives the recent activity list from the database, the
     // same resilience pattern as useWorkspaceTasks.ts.
-    const handleReconnect = () => fetchEvents(false)
+    const handleReconnect = () => fetchEvents()
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') handleReconnect()
     }
@@ -126,7 +138,16 @@ export function useWorkspaceActivity(
       document.removeEventListener('visibilitychange', handleVisibility)
       supabase.removeChannel(channel)
     }
-  }, [userId, workspaceId, limit])
+  }, [
+    userId,
+    workspaceId,
+    limit,
+    fetchKey,
+    confirm,
+    setEvents,
+    markFailed,
+    markSucceeded,
+  ])
 
   return { events, ready, error }
 }

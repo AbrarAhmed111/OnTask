@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useWorkspaceSnapshot } from '@/hooks/useWorkspaceSnapshot'
+import { useFetchStatus } from '@/hooks/useFetchStatus'
+import { SNAPSHOTS } from '@/lib/cache/workspaceSnapshots'
 import type { AuthUser } from '@/hooks/useAuth'
 import { NotificationWithWorkspace } from '@/types/workspace'
 import {
@@ -10,6 +13,7 @@ import {
 } from '@/lib/workspaceNotifications'
 
 const LIMIT = 50
+const NO_NOTIFICATIONS: NotificationWithWorkspace[] = []
 
 // One hook for both kinds of workspace -- `scope` is the only difference
 // (see NotificationScope). A shared workspace's bell reads just that
@@ -32,26 +36,35 @@ export function useNotifications(
   const userId = user?.id
   const hasScope = scope !== null
   const sharedWorkspaceId = scope?.kind === 'shared' ? scope.workspaceId : null
-  const [loaded, setLoaded] = useState<NotificationWithWorkspace[]>([])
-  const [ready, setReady] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // The most recent notifications (LIMIT) are cached per user and scope -- one
+  // workspace's, or the Personal Workspace's combined set -- and shown while the
+  // real list is fetched. Read/unread comes from the server on every refresh.
+  const snapshot = useWorkspaceSnapshot<NotificationWithWorkspace[]>({
+    userId: hasScope ? userId : null,
+    workspaceId: sharedWorkspaceId,
+    scope: sharedWorkspaceId ? undefined : 'personal',
+    descriptor: SNAPSHOTS.notifications,
+    initial: NO_NOTIFICATIONS,
+  })
+  const { data: loaded, setData: setLoaded, confirm } = snapshot
+  const [actionError, setError] = useState<string | null>(null)
+  const fetchKey =
+    userId && hasScope ? `${userId}|${sharedWorkspaceId ?? 'personal'}` : null
+  const status = useFetchStatus(snapshot, fetchKey, {
+    load: "Couldn't load notifications.",
+    refresh: "Couldn't refresh notifications — you may be seeing older ones.",
+  })
+  const { failed: markFailed, succeeded: markSucceeded } = status
+  // Nothing to load without a user; with one, not ready until there is a scope.
+  const ready = !userId ? true : hasScope ? status.ready : false
+  const error = status.error ?? actionError
 
   useEffect(() => {
-    if (!userId) {
-      setLoaded([])
-      setReady(true)
-      return
-    }
-    if (!hasScope) {
-      setLoaded([])
-      setReady(false)
-      return
-    }
+    if (!userId || !hasScope || !fetchKey) return
     let cancelled = false
     const supabase = createClient()
 
-    const fetchNotifications = (showLoading: boolean) => {
-      if (showLoading) setReady(false)
+    const fetchNotifications = () => {
       let query = supabase
         .from('notifications')
         .select('*, workspaces(slug, type, name, accent)')
@@ -63,18 +76,17 @@ export function useNotifications(
         .then(({ data, error: fetchError }) => {
           if (cancelled) return
           if (fetchError) {
-            setError("Couldn't load notifications.")
-            setReady(true)
+            markFailed()
             return
           }
-          setLoaded(rowsToNotifications((data ?? []) as NotificationRow[]))
-          setReady(true)
+          confirm(rowsToNotifications((data ?? []) as NotificationRow[]))
+          markSucceeded()
         })
     }
 
-    fetchNotifications(true)
+    fetchNotifications()
 
-    const handleReconnect = () => fetchNotifications(false)
+    const handleReconnect = () => fetchNotifications()
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') handleReconnect()
     }
@@ -112,7 +124,7 @@ export function useNotifications(
             changedWorkspaceId !== sharedWorkspaceId
           )
             return
-          fetchNotifications(false)
+          fetchNotifications()
         },
       )
       .subscribe()
@@ -123,7 +135,16 @@ export function useNotifications(
       document.removeEventListener('visibilitychange', handleVisibility)
       supabase.removeChannel(channel)
     }
-  }, [userId, hasScope, sharedWorkspaceId])
+  }, [
+    userId,
+    hasScope,
+    sharedWorkspaceId,
+    fetchKey,
+    confirm,
+    setLoaded,
+    markFailed,
+    markSucceeded,
+  ])
 
   const notifications = useMemo(
     () => (scope ? loaded.filter(n => isInScope(n, scope)) : []),
