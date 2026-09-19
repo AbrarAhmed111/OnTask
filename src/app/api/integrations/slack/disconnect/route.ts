@@ -8,7 +8,10 @@ export async function POST(request: Request) {
     const { workspaceId } = body
 
     if (!workspaceId) {
-      return NextResponse.json({ error: 'workspaceId is required' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'workspaceId is required' },
+        { status: 400 },
+      )
     }
 
     const supabase = await createClient()
@@ -48,7 +51,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Invalid request payload'
+    const message =
+      err instanceof Error ? err.message : 'Invalid request payload'
     return NextResponse.json({ error: message }, { status: 400 })
   }
 }

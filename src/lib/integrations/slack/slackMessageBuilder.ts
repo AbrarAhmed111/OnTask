@@ -22,7 +22,9 @@ export interface SlackMessagePayload {
   blocks: unknown[]
 }
 
-export function buildSlackEventMessage(payload: EventSlackPayload): SlackMessagePayload {
+export function buildSlackEventMessage(
+  payload: EventSlackPayload,
+): SlackMessagePayload {
   const {
     workspaceName,
     workspaceSlug,
@@ -35,7 +37,9 @@ export function buildSlackEventMessage(payload: EventSlackPayload): SlackMessage
     reportId,
   } = payload
 
-  const taskUrl = taskId ? getTaskUrl(workspaceSlug, taskId) : getReportUrl(workspaceSlug)
+  const taskUrl = taskId
+    ? getTaskUrl(workspaceSlug, taskId)
+    : getReportUrl(workspaceSlug)
   const reportUrl = getReportUrl(workspaceSlug, reportId)
 
   switch (eventType) {
@@ -43,7 +47,9 @@ export function buildSlackEventMessage(payload: EventSlackPayload): SlackMessage
     case 'reassigned': {
       const isReassigned = eventType === 'reassigned'
       const verb = isReassigned ? 'reassigned' : 'assigned'
-      const recipientText = recipientName ? ` to *${escapeSlackText(recipientName)}*` : ''
+      const recipientText = recipientName
+        ? ` to *${escapeSlackText(recipientName)}*`
+        : ''
       const fallbackText = `${actorName} ${verb} "${taskTitle}"${recipientName ? ` to ${recipientName}` : ''}`
       return {
         fallbackText: `[${workspaceName}] ${fallbackText}`,
@@ -77,7 +83,11 @@ export function buildSlackEventMessage(payload: EventSlackPayload): SlackMessage
             elements: [
               {
                 type: 'button',
-                text: { type: 'plain_text', text: 'Open in OnTask', emoji: true },
+                text: {
+                  type: 'plain_text',
+                  text: 'Open in OnTask',
+                  emoji: true,
+                },
                 url: taskUrl,
                 style: 'primary',
               },
@@ -94,7 +104,11 @@ export function buildSlackEventMessage(payload: EventSlackPayload): SlackMessage
         blocks: [
           {
             type: 'header',
-            text: { type: 'plain_text', text: '✅ Task Completed', emoji: true },
+            text: {
+              type: 'plain_text',
+              text: '✅ Task Completed',
+              emoji: true,
+            },
           },
           {
             type: 'section',
@@ -117,7 +131,11 @@ export function buildSlackEventMessage(payload: EventSlackPayload): SlackMessage
             elements: [
               {
                 type: 'button',
-                text: { type: 'plain_text', text: 'Open in OnTask', emoji: true },
+                text: {
+                  type: 'plain_text',
+                  text: 'Open in OnTask',
+                  emoji: true,
+                },
                 url: taskUrl,
               },
             ],
@@ -156,7 +174,11 @@ export function buildSlackEventMessage(payload: EventSlackPayload): SlackMessage
             elements: [
               {
                 type: 'button',
-                text: { type: 'plain_text', text: 'Open in OnTask', emoji: true },
+                text: {
+                  type: 'plain_text',
+                  text: 'Open in OnTask',
+                  emoji: true,
+                },
                 url: taskUrl,
               },
             ],
@@ -166,7 +188,9 @@ export function buildSlackEventMessage(payload: EventSlackPayload): SlackMessage
     }
 
     case 'blocker_created': {
-      const reasonText = blockerReason ? `\n\n*Reason:* _${escapeSlackText(blockerReason)}_` : ''
+      const reasonText = blockerReason
+        ? `\n\n*Reason:* _${escapeSlackText(blockerReason)}_`
+        : ''
       const fallbackText = `[${workspaceName}] Task Blocked: "${taskTitle}"`
       return {
         fallbackText,
@@ -196,7 +220,11 @@ export function buildSlackEventMessage(payload: EventSlackPayload): SlackMessage
             elements: [
               {
                 type: 'button',
-                text: { type: 'plain_text', text: 'Open in OnTask', emoji: true },
+                text: {
+                  type: 'plain_text',
+                  text: 'Open in OnTask',
+                  emoji: true,
+                },
                 url: taskUrl,
                 style: 'danger',
               },
@@ -214,7 +242,11 @@ export function buildSlackEventMessage(payload: EventSlackPayload): SlackMessage
         blocks: [
           {
             type: 'header',
-            text: { type: 'plain_text', text: '🎉 Blocker Resolved', emoji: true },
+            text: {
+              type: 'plain_text',
+              text: '🎉 Blocker Resolved',
+              emoji: true,
+            },
           },
           {
             type: 'section',
@@ -237,7 +269,11 @@ export function buildSlackEventMessage(payload: EventSlackPayload): SlackMessage
             elements: [
               {
                 type: 'button',
-                text: { type: 'plain_text', text: 'Open in OnTask', emoji: true },
+                text: {
+                  type: 'plain_text',
+                  text: 'Open in OnTask',
+                  emoji: true,
+                },
                 url: taskUrl,
                 style: 'primary',
               },
@@ -268,7 +304,11 @@ export function buildSlackEventMessage(payload: EventSlackPayload): SlackMessage
             elements: [
               {
                 type: 'button',
-                text: { type: 'plain_text', text: 'View Daily Report', emoji: true },
+                text: {
+                  type: 'plain_text',
+                  text: 'View Daily Report',
+                  emoji: true,
+                },
                 url: reportUrl,
                 style: 'primary',
               },
@@ -295,7 +335,11 @@ export function buildSlackEventMessage(payload: EventSlackPayload): SlackMessage
             elements: [
               {
                 type: 'button',
-                text: { type: 'plain_text', text: 'Open in OnTask', emoji: true },
+                text: {
+                  type: 'plain_text',
+                  text: 'Open in OnTask',
+                  emoji: true,
+                },
                 url: taskUrl,
               },
             ],

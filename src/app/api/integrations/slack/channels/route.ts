@@ -8,7 +8,10 @@ export async function GET(request: Request) {
   const workspaceId = searchParams.get('workspace_id')
 
   if (!workspaceId) {
-    return NextResponse.json({ error: 'workspace_id is required' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'workspace_id is required' },
+      { status: 400 },
+    )
   }
 
   const supabase = await createClient()
@@ -29,7 +32,10 @@ export async function GET(request: Request) {
     .single()
 
   if (!member) {
-    return NextResponse.json({ error: 'Not a member of this workspace' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'Not a member of this workspace' },
+      { status: 403 },
+    )
   }
 
   const serviceClient = createServiceRoleClient()
@@ -50,7 +56,8 @@ export async function GET(request: Request) {
     const channels = await listSlackChannels(connection.bot_access_token)
     return NextResponse.json({ channels })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to fetch Slack channels'
+    const message =
+      err instanceof Error ? err.message : 'Failed to fetch Slack channels'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

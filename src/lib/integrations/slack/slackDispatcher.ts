@@ -23,7 +23,17 @@ export async function dispatchSlackNotification(
   params: DispatchSlackEventParams,
 ): Promise<{ success: boolean; outcome: string; error?: string }> {
   try {
-    const { workspaceId, eventType, eventId, taskId, taskTitle, actorId, recipientUserId, blockerReason, reportId } = params
+    const {
+      workspaceId,
+      eventType,
+      eventId,
+      taskId,
+      taskTitle,
+      actorId,
+      recipientUserId,
+      blockerReason,
+      reportId,
+    } = params
 
     if (!workspaceId || !eventType) {
       return { success: false, outcome: 'invalid_params' }
@@ -57,7 +67,12 @@ export async function dispatchSlackNotification(
       .eq('workspace_id', workspaceId)
       .single()
 
-    if (connError || !connection || !connection.bot_access_token || !connection.channel_id) {
+    if (
+      connError ||
+      !connection ||
+      !connection.bot_access_token ||
+      !connection.channel_id
+    ) {
       return { success: true, outcome: 'no_channel_configured' }
     }
 
@@ -71,7 +86,10 @@ export async function dispatchSlackNotification(
       isEnabled = settings.completed !== false
     } else if (eventType === 'blocker_created') {
       isEnabled = settings.blockers !== false
-    } else if (eventType === 'blocker_resolved' || eventType === 'task_unblocked') {
+    } else if (
+      eventType === 'blocker_resolved' ||
+      eventType === 'task_unblocked'
+    ) {
       isEnabled = settings.resolutions !== false
     } else if (eventType === 'daily_report_ready') {
       isEnabled = settings.daily_reports !== false
@@ -101,7 +119,10 @@ export async function dispatchSlackNotification(
         .eq('id', actorId)
         .single()
       if (actorProfile) {
-        actorName = actorProfile.full_name || actorProfile.email?.split('@')[0] || 'Someone'
+        actorName =
+          actorProfile.full_name ||
+          actorProfile.email?.split('@')[0] ||
+          'Someone'
       }
     }
 
@@ -113,7 +134,8 @@ export async function dispatchSlackNotification(
         .eq('id', recipientUserId)
         .single()
       if (recipientProfile) {
-        recipientName = recipientProfile.full_name || recipientProfile.email?.split('@')[0]
+        recipientName =
+          recipientProfile.full_name || recipientProfile.email?.split('@')[0]
       }
     }
 
@@ -139,23 +161,34 @@ export async function dispatchSlackNotification(
     )
 
     if (!postResult.ok) {
-      console.error('[Slack Dispatcher] Slack postMessage failed:', postResult.error)
+      console.error(
+        '[Slack Dispatcher] Slack postMessage failed:',
+        postResult.error,
+      )
       const errCode = postResult.error || ''
 
       // Phase 14: Update integration health state based on API error code
-      if (['token_revoked', 'account_inactive', 'invalid_auth'].includes(errCode)) {
+      if (
+        ['token_revoked', 'account_inactive', 'invalid_auth'].includes(errCode)
+      ) {
         await supabase
           .from('workspace_slack_connections')
           .update({ connection_status: 'invalid_token' })
           .eq('id', connection.id)
-      } else if (['channel_not_found', 'is_archived', 'not_in_channel'].includes(errCode)) {
+      } else if (
+        ['channel_not_found', 'is_archived', 'not_in_channel'].includes(errCode)
+      ) {
         await supabase
           .from('workspace_slack_connections')
           .update({ connection_status: 'channel_missing' })
           .eq('id', connection.id)
       }
 
-      return { success: false, outcome: 'slack_api_error', error: postResult.error }
+      return {
+        success: false,
+        outcome: 'slack_api_error',
+        error: postResult.error,
+      }
     }
 
     // Clear any previous error status on successful delivery
@@ -168,7 +201,8 @@ export async function dispatchSlackNotification(
 
     return { success: true, outcome: 'delivered' }
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : 'Unknown dispatcher error'
+    const errorMsg =
+      err instanceof Error ? err.message : 'Unknown dispatcher error'
     console.error('[Slack Dispatcher] Exception caught while dispatching:', err)
     return { success: false, outcome: 'exception', error: errorMsg }
   }

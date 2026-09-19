@@ -12,24 +12,36 @@ export async function GET(request: Request) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
   if (slackError) {
-    console.error('[Slack OAuth] Access denied or error returned from Slack:', slackError)
+    console.error(
+      '[Slack OAuth] Access denied or error returned from Slack:',
+      slackError,
+    )
     return NextResponse.redirect(`${baseUrl}/?error=slack_auth_denied`)
   }
 
   if (!code || !state) {
-    return NextResponse.json({ error: 'Missing code or state' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Missing code or state' },
+      { status: 400 },
+    )
   }
 
   let statePayload: { userId: string; workspaceId: string; timestamp: number }
   try {
     statePayload = JSON.parse(Buffer.from(state, 'base64url').toString('utf-8'))
   } catch {
-    return NextResponse.json({ error: 'Invalid state parameter' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Invalid state parameter' },
+      { status: 400 },
+    )
   }
 
   // Validate state timestamp (15 minute expiration)
   if (Date.now() - statePayload.timestamp > 15 * 60 * 1000) {
-    return NextResponse.json({ error: 'OAuth state has expired' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'OAuth state has expired' },
+      { status: 400 },
+    )
   }
 
   const supabase = await createClient()
@@ -38,7 +50,10 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser()
 
   if (!user || user.id !== statePayload.userId) {
-    return NextResponse.json({ error: 'Unauthorized user match' }, { status: 401 })
+    return NextResponse.json(
+      { error: 'Unauthorized user match' },
+      { status: 401 },
+    )
   }
 
   // Fetch workspace details to get slug for redirect
@@ -90,7 +105,9 @@ export async function GET(request: Request) {
       )
     }
 
-    return NextResponse.redirect(`${baseUrl}/workspaces/${workspace.slug}?slack=connected`)
+    return NextResponse.redirect(
+      `${baseUrl}/workspaces/${workspace.slug}?slack=connected`,
+    )
   } catch (err) {
     console.error('[Slack OAuth] Unexpected error during callback:', err)
     return NextResponse.redirect(

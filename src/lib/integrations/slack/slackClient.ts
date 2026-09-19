@@ -52,7 +52,9 @@ export async function exchangeOAuthCode(
   const clientSecret = process.env.SLACK_CLIENT_SECRET
 
   if (!clientId || !clientSecret) {
-    throw new Error('Slack Client ID or Secret is not configured in environment variables.')
+    throw new Error(
+      'Slack Client ID or Secret is not configured in environment variables.',
+    )
   }
 
   const params = new URLSearchParams({
@@ -116,12 +118,15 @@ export async function listSlackChannels(
     limit: '200',
   })
 
-  const response = await fetch(`https://slack.com/api/conversations.list?${params.toString()}`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
+  const response = await fetch(
+    `https://slack.com/api/conversations.list?${params.toString()}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     },
-  })
+  )
 
   if (!response.ok) {
     throw new Error(`Slack conversations.list HTTP ${response.status}`)

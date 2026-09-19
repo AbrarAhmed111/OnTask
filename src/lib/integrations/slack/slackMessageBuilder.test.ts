@@ -17,7 +17,9 @@ describe('buildSlackEventMessage', () => {
     expect(message.blocks).toHaveLength(4)
     expect(JSON.stringify(message.blocks)).toContain('Task Assigned')
     expect(JSON.stringify(message.blocks)).toContain('*Workspace:* DevAbby')
-    expect(JSON.stringify(message.blocks)).toContain('http://localhost:3000/workspaces/devabby?task=task-123')
+    expect(JSON.stringify(message.blocks)).toContain(
+      'http://localhost:3000/workspaces/devabby?task=task-123',
+    )
   })
 
   it('formats task completion message correctly', () => {
@@ -30,7 +32,9 @@ describe('buildSlackEventMessage', () => {
       actorName: 'Araysh',
     })
 
-    expect(message.fallbackText).toContain('Araysh completed "Student CRUD API"')
+    expect(message.fallbackText).toContain(
+      'Araysh completed "Student CRUD API"',
+    )
     expect(JSON.stringify(message.blocks)).toContain('Task Completed')
     expect(JSON.stringify(message.blocks)).toContain('*Workspace:* DevAbby')
   })
@@ -46,8 +50,12 @@ describe('buildSlackEventMessage', () => {
       blockerReason: 'Waiting for Stripe credentials',
     })
 
-    expect(message.fallbackText).toContain('Task Blocked: "Payment Integration"')
-    expect(JSON.stringify(message.blocks)).toContain('Waiting for Stripe credentials')
+    expect(message.fallbackText).toContain(
+      'Task Blocked: "Payment Integration"',
+    )
+    expect(JSON.stringify(message.blocks)).toContain(
+      'Waiting for Stripe credentials',
+    )
     expect(JSON.stringify(message.blocks)).toContain('Task Blocked')
     expect(JSON.stringify(message.blocks)).toContain('*Workspace:* DevAbby')
   })
@@ -62,7 +70,8 @@ describe('buildSlackEventMessage', () => {
 
     expect(message.fallbackText).toContain('Daily Report is ready')
     expect(JSON.stringify(message.blocks)).toContain('Daily Report')
-    expect(JSON.stringify(message.blocks)).toContain('http://localhost:3000/workspaces/devabby?report=report-789')
+    expect(JSON.stringify(message.blocks)).toContain(
+      'http://localhost:3000/workspaces/devabby?report=report-789',
+    )
   })
 })
-

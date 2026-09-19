@@ -6,7 +6,10 @@ export async function GET(request: Request) {
   const workspaceId = searchParams.get('workspace_id')
 
   if (!workspaceId) {
-    return NextResponse.json({ error: 'workspace_id is required' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'workspace_id is required' },
+      { status: 400 },
+    )
   }
 
   const supabase = await createClient()

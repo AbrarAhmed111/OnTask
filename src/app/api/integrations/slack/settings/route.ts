@@ -8,7 +8,10 @@ export async function POST(request: Request) {
     const { workspaceId, channelId, channelName, notificationSettings } = body
 
     if (!workspaceId) {
-      return NextResponse.json({ error: 'workspaceId is required' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'workspaceId is required' },
+        { status: 400 },
+      )
     }
 
     const supabase = await createClient()
@@ -30,7 +33,9 @@ export async function POST(request: Request) {
 
     if (!member || !['owner', 'admin'].includes(member.role)) {
       return NextResponse.json(
-        { error: 'Only workspace owners and admins can modify Slack settings.' },
+        {
+          error: 'Only workspace owners and admins can modify Slack settings.',
+        },
         { status: 403 },
       )
     }
@@ -50,7 +55,9 @@ export async function POST(request: Request) {
       .from('workspace_slack_connections')
       .update(updatePayload)
       .eq('workspace_id', workspaceId)
-      .select('id, workspace_id, slack_team_name, channel_id, channel_name, notification_settings')
+      .select(
+        'id, workspace_id, slack_team_name, channel_id, channel_name, notification_settings',
+      )
       .single()
 
     if (updateError) {
@@ -60,7 +67,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, connection: updated })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Invalid request payload'
+    const message =
+      err instanceof Error ? err.message : 'Invalid request payload'
     return NextResponse.json({ error: message }, { status: 400 })
   }
 }
