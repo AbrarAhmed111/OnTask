@@ -180,7 +180,10 @@ export function WorkspaceSettingsSection({
       )}
 
       {!isPersonal && workspace && (
-        <SlackIntegrationCard workspaceId={workspace.id} canManage={canManage} />
+        <SlackIntegrationCard
+          workspaceId={workspace.id}
+          canManage={canManage}
+        />
       )}
 
       <SettingsCard icon={SlidersHorizontal} title="Your preferences">

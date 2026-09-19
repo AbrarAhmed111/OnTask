@@ -4,7 +4,11 @@ import { notifyTaskCompletion } from '@/lib/notifications'
 import { WorkspaceMember, WorkspaceTask } from '@/types/workspace'
 import { TaskFormValues } from '@/types'
 import { getWorkspaceLiveSeconds } from '@/lib/tasks/workspaceMappers'
-import { canControlTimer, canEmergencyStop, canReopenTask } from '@/lib/tasks/timerPermissions'
+import {
+  canControlTimer,
+  canEmergencyStop,
+  canReopenTask,
+} from '@/lib/tasks/timerPermissions'
 import { shouldReopenOnExtend } from '@/lib/tasks/reopen'
 import { useTaskBlockerActions } from '@/hooks/useTaskBlockerActions'
 
@@ -108,7 +112,7 @@ export function useWorkspaceTaskActions({
     const plannedMinutes =
       form.hasPlannedTime === false
         ? null
-        : (form.hours || form.minutes)
+        : form.hours || form.minutes
           ? Number(form.hours || 0) * 60 + Number(form.minutes || 0)
           : null
     const description = form.description?.trim() || null
@@ -199,9 +203,11 @@ export function useWorkspaceTaskActions({
     )
     const row: Record<string, unknown> = {}
     if (update.name !== undefined) row.title = update.name
-    if (update.description !== undefined) row.description = update.description ?? null
+    if (update.description !== undefined)
+      row.description = update.description ?? null
     if (update.plannedMinutes !== undefined)
-      row.planned_seconds = update.plannedMinutes !== null ? update.plannedMinutes * 60 : null
+      row.planned_seconds =
+        update.plannedMinutes !== null ? update.plannedMinutes * 60 : null
     if (update.progressLabel !== undefined)
       row.progress_label = update.progressLabel ?? null
     if (update.progressPercentage !== undefined)
@@ -568,4 +574,3 @@ export function useWorkspaceTaskActions({
     blockerActions,
   }
 }
-

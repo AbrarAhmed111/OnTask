@@ -238,7 +238,8 @@ export function WorkspaceOverviewClient() {
   }
   const openEditTask = (task: WorkspaceTask) => {
     setEditingTaskId(task.id)
-    const hasPlanned = task.plannedMinutes !== null && task.plannedMinutes !== undefined
+    const hasPlanned =
+      task.plannedMinutes !== null && task.plannedMinutes !== undefined
     const planned = task.plannedMinutes || 0
     setTaskForm({
       name: task.name,
@@ -266,7 +267,7 @@ export function WorkspaceOverviewClient() {
     const plannedMinutes =
       taskForm.hasPlannedTime === false
         ? null
-        : (taskForm.hours || taskForm.minutes)
+        : taskForm.hours || taskForm.minutes
           ? Number(taskForm.hours || 0) * 60 + Number(taskForm.minutes || 0)
           : null
     updateTask(editingTaskId, {
