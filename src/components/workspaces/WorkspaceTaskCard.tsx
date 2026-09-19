@@ -324,7 +324,12 @@ export function WorkspaceTaskCard({
       )}
 
       {notesOpen && (
-        <TaskNotesPanel taskId={task.id} user={user} members={members} />
+        <TaskNotesPanel
+          taskId={task.id}
+          workspaceId={task.workspaceId}
+          user={user}
+          members={members}
+        />
       )}
 
       <BlockerDialogs

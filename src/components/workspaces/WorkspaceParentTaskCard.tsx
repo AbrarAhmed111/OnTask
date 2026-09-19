@@ -132,7 +132,12 @@ export function WorkspaceParentTaskCard({
       }
       panel={
         notesOpen ? (
-          <TaskNotesPanel taskId={parent.id} user={user} members={members} />
+          <TaskNotesPanel
+            taskId={parent.id}
+            workspaceId={parent.workspaceId}
+            user={user}
+            members={members}
+          />
         ) : null
       }
     >

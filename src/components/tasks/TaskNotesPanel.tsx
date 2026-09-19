@@ -20,16 +20,20 @@ function authorName(authorId: string, members: WorkspaceMember[]) {
 // pattern WorkspaceParentTaskCard already uses).
 export function TaskNotesPanel({
   taskId,
+  workspaceId,
   user,
   members,
 }: {
   taskId: string
+  // The task's workspace: what its notes are cached under.
+  workspaceId: string
   user: AuthUser | null
   members: WorkspaceMember[]
 }) {
   const { notes, ready, error, addNote, updateNote, deleteNote } = useTaskNotes(
     taskId,
     user,
+    workspaceId,
   )
   const [draft, setDraft] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)

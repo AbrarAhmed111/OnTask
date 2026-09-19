@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useWorkspaceSnapshot } from '@/hooks/useWorkspaceSnapshot'
+import { useFetchStatus } from '@/hooks/useFetchStatus'
+import { SNAPSHOTS } from '@/lib/cache/workspaceSnapshots'
 import type { AuthUser } from '@/hooks/useAuth'
 import { TaskNote } from '@/types/workspace'
 
@@ -23,29 +26,50 @@ function rowToNote(row: TaskNoteRow): TaskNote {
   }
 }
 
+const NO_NOTES: TaskNote[] = []
+
 // Shared notes for a single task -- realtime via Supabase, same
 // postgres_changes pattern as every other hook here. Optimistic inserts use
 // a client-generated id that matches what's persisted, so the realtime
 // INSERT event reconciles into the same row instead of appending a
 // duplicate (rule 26) and the entrance animation (keyed by that stable id)
 // never replays.
-export function useTaskNotes(taskId: string, user: AuthUser | null) {
+//
+// Cached on this device per user, workspace AND task (which is why the workspace
+// is passed in), and shown while the real list is fetched.
+export function useTaskNotes(
+  taskId: string,
+  user: AuthUser | null,
+  workspaceId: string,
+) {
   const userId = user?.id
-  const [notes, setNotes] = useState<TaskNote[]>([])
-  const [ready, setReady] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const snapshot = useWorkspaceSnapshot<TaskNote[]>({
+    userId,
+    workspaceId,
+    scope: taskId,
+    descriptor: SNAPSHOTS.notes,
+    initial: NO_NOTES,
+  })
+  const { data: notes, setData: setNotes, confirm } = snapshot
+  const [actionError, setError] = useState<string | null>(null)
+  const fetchKey =
+    userId && workspaceId && taskId
+      ? `${userId}|${workspaceId}|${taskId}`
+      : null
+  const status = useFetchStatus(snapshot, fetchKey, {
+    load: "Couldn't load notes.",
+    refresh: "Couldn't refresh notes — you may be seeing older ones.",
+  })
+  const { failed: markFailed, succeeded: markSucceeded } = status
+  const { ready } = status
+  const error = status.error ?? actionError
 
   useEffect(() => {
-    if (!userId || !taskId) {
-      setNotes([])
-      setReady(true)
-      return
-    }
+    if (!userId || !taskId || !workspaceId || !fetchKey) return
     let cancelled = false
     const supabase = createClient()
 
-    const fetchNotes = (showLoading: boolean) => {
-      if (showLoading) setReady(false)
+    const fetchNotes = () => {
       supabase
         .from('task_notes')
         .select('*')
@@ -54,18 +78,17 @@ export function useTaskNotes(taskId: string, user: AuthUser | null) {
         .then(({ data, error: fetchError }) => {
           if (cancelled) return
           if (fetchError) {
-            setError("Couldn't load notes.")
-            setReady(true)
+            markFailed()
             return
           }
-          setNotes(((data ?? []) as TaskNoteRow[]).map(rowToNote))
-          setReady(true)
+          confirm(((data ?? []) as TaskNoteRow[]).map(rowToNote))
+          markSucceeded()
         })
     }
 
-    fetchNotes(true)
+    fetchNotes()
 
-    const handleReconnect = () => fetchNotes(false)
+    const handleReconnect = () => fetchNotes()
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') handleReconnect()
     }
@@ -109,7 +132,16 @@ export function useTaskNotes(taskId: string, user: AuthUser | null) {
       document.removeEventListener('visibilitychange', handleVisibility)
       supabase.removeChannel(channel)
     }
-  }, [userId, taskId])
+  }, [
+    userId,
+    taskId,
+    workspaceId,
+    fetchKey,
+    confirm,
+    setNotes,
+    markFailed,
+    markSucceeded,
+  ])
 
   const addNote = (content: string) => {
     const trimmed = content.trim()
