@@ -50,7 +50,8 @@ export function TaskForm({
         />
       </label>
       <label className="block text-xs font-semibold text-muted">
-        Description <span className="font-normal text-muted/80">(optional)</span>
+        Description{' '}
+        <span className="font-normal text-muted/80">(optional)</span>
         <textarea
           rows={2}
           value={values.description || ''}
@@ -77,7 +78,8 @@ export function TaskForm({
         </label>
       )}
       <label className="block text-xs font-semibold text-muted">
-        {targetLabel} <span className="font-normal text-muted/80">(optional)</span>
+        {targetLabel}{' '}
+        <span className="font-normal text-muted/80">(optional)</span>
         <div className="mt-2 flex items-center gap-2">
           <input
             type="number"

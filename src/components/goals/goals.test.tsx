@@ -59,7 +59,10 @@ describe('GoalDetailHeader', () => {
   it('shows Reactivate and Delete for archived goals when onDelete is provided', () => {
     const html = renderToStaticMarkup(
       <GoalDetailHeader
-        goal={makeGoal({ status: 'archived', archivedAt: '2026-09-10T00:00:00Z' })}
+        goal={makeGoal({
+          status: 'archived',
+          archivedAt: '2026-09-10T00:00:00Z',
+        })}
         progress={100}
         focusedSeconds={7200}
         totalTasks={4}
@@ -124,7 +127,12 @@ describe('WorkspaceGoalsSection', () => {
         workspaceId="ws-1"
         isPersonal={false}
         soundEnabled={true}
-        user={{ id: 'user-owner', email: 'owner@example.com', fullName: null, avatarUrl: null }}
+        user={{
+          id: 'user-owner',
+          email: 'owner@example.com',
+          fullName: null,
+          avatarUrl: null,
+        }}
         members={[ownerMember]}
         updateGoal={() => {}}
         setGoalStatus={() => {}}
@@ -143,11 +151,22 @@ describe('WorkspaceGoalsSection', () => {
     const html = renderToStaticMarkup(
       <WorkspaceGoalsSection
         ready={true}
-        goals={[makeGoal({ id: 'g-archived', name: 'Archived Launch', status: 'archived' })]}
+        goals={[
+          makeGoal({
+            id: 'g-archived',
+            name: 'Archived Launch',
+            status: 'archived',
+          }),
+        ]}
         workspaceId="ws-1"
         isPersonal={false}
         soundEnabled={true}
-        user={{ id: 'user-owner', email: 'owner@example.com', fullName: null, avatarUrl: null }}
+        user={{
+          id: 'user-owner',
+          email: 'owner@example.com',
+          fullName: null,
+          avatarUrl: null,
+        }}
         members={[ownerMember]}
         updateGoal={() => {}}
         setGoalStatus={() => {}}
@@ -167,11 +186,20 @@ describe('GoalCard', () => {
   it('renders a delete button for an archived goal when the user is the owner', () => {
     const html = renderToStaticMarkup(
       <GoalCard
-        goal={makeGoal({ id: 'g-1', name: 'Archived Roadmap', status: 'archived' })}
+        goal={makeGoal({
+          id: 'g-1',
+          name: 'Archived Roadmap',
+          status: 'archived',
+        })}
         workspaceId="ws-1"
         isPersonal={false}
         soundEnabled={false}
-        user={{ id: 'user-owner', email: 'owner@example.com', fullName: null, avatarUrl: null }}
+        user={{
+          id: 'user-owner',
+          email: 'owner@example.com',
+          fullName: null,
+          avatarUrl: null,
+        }}
         members={[ownerMember]}
         updateGoal={() => {}}
         setGoalStatus={() => {}}
@@ -195,7 +223,12 @@ describe('GoalCard', () => {
         workspaceId="ws-1"
         isPersonal={false}
         soundEnabled={false}
-        user={{ id: 'user-member', email: 'member@example.com', fullName: null, avatarUrl: null }}
+        user={{
+          id: 'user-member',
+          email: 'member@example.com',
+          fullName: null,
+          avatarUrl: null,
+        }}
         members={[regularMember]}
         updateGoal={() => {}}
         setGoalStatus={() => {}}
@@ -219,7 +252,12 @@ describe('GoalCard', () => {
         workspaceId="ws-1"
         isPersonal={false}
         soundEnabled={false}
-        user={{ id: 'user-member', email: 'member@example.com', fullName: null, avatarUrl: null }}
+        user={{
+          id: 'user-member',
+          email: 'member@example.com',
+          fullName: null,
+          avatarUrl: null,
+        }}
         members={[regularMember]}
         updateGoal={() => {}}
         setGoalStatus={() => {}}
@@ -243,7 +281,12 @@ describe('GoalCard', () => {
         workspaceId="ws-1"
         isPersonal={false}
         soundEnabled={false}
-        user={{ id: 'user-owner', email: 'owner@example.com', fullName: null, avatarUrl: null }}
+        user={{
+          id: 'user-owner',
+          email: 'owner@example.com',
+          fullName: null,
+          avatarUrl: null,
+        }}
         members={[ownerMember]}
         updateGoal={() => {}}
         setGoalStatus={() => {}}
@@ -255,4 +298,3 @@ describe('GoalCard', () => {
     expect(html).not.toContain('aria-label="Delete Active Goal"')
   })
 })
-

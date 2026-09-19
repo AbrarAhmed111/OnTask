@@ -208,7 +208,8 @@ export function GoalCard({
   }
   const openEditTask = (task: WorkspaceTask) => {
     setEditingTaskId(task.id)
-    const hasPlanned = task.plannedMinutes !== null && task.plannedMinutes !== undefined
+    const hasPlanned =
+      task.plannedMinutes !== null && task.plannedMinutes !== undefined
     const planned = task.plannedMinutes || 0
     setTaskForm({
       name: task.name,
@@ -236,7 +237,7 @@ export function GoalCard({
     const plannedMinutes =
       taskForm.hasPlannedTime === false
         ? null
-        : (taskForm.hours || taskForm.minutes)
+        : taskForm.hours || taskForm.minutes
           ? Number(taskForm.hours || 0) * 60 + Number(taskForm.minutes || 0)
           : null
     updateTask(editingTaskId, {
@@ -325,8 +326,7 @@ export function GoalCard({
   }
 
   const isOwner =
-    isPersonal ||
-    members.some(m => m.userId === user?.id && m.role === 'owner')
+    isPersonal || members.some(m => m.userId === user?.id && m.role === 'owner')
   const canDeleteGoal =
     isOwner || (user?.id ? goal.createdBy === user.id : false)
 
