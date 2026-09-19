@@ -166,6 +166,14 @@ includes:
 - Raising a completed task's planned time above the time already worked
   reopens it as paused, ready to resume. Nothing ever starts on its own, and a
   skipped task stays skipped.
+- When a running task's planned time runs out it is completed automatically —
+  by the assigned member's open browser, and only on the database's say-so: the
+  app names the timer run it saw and the database, on its own clock and holding
+  the task's row lock, completes it only if that run is still going and really
+  is out of time. A task paused, restarted, extended or already completed
+  elsewhere is left alone, and a repeated request never logs the completion
+  twice. Nothing is completed from data the app has only cached; it waits for
+  the server's answer first.
 
 ### Shared Notes and Resources
 
@@ -526,6 +534,14 @@ users' personal tasks into their new Personal Workspace (non-destructively —
 the old `personal_tasks` table is left untouched). To check them,
 run [`supabase/tests/0028_personal_workspaces.sql`](supabase/tests/0028_personal_workspaces.sql)
 against a scratch project.
+
+Migration `0043` adds `auto_complete_workspace_task`, the guarded completion
+behind a task finishing when its planned time runs out (see Focused Time). The
+app works without it — it then re-reads the task and completes it with
+`complete_workspace_task`, which does not check that the task is still running
+or due — but apply it so the database, not the browser, has the last word. To
+check it, run `supabase/tests/0043_guarded_task_auto_completion.sql` against a
+scratch project.
 
 Start the development server:
 
