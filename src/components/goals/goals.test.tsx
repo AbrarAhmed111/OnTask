@@ -124,7 +124,7 @@ describe('WorkspaceGoalsSection', () => {
         workspaceId="ws-1"
         isPersonal={false}
         soundEnabled={true}
-        user={{ id: 'user-owner', email: 'owner@example.com' }}
+        user={{ id: 'user-owner', email: 'owner@example.com', fullName: null, avatarUrl: null }}
         members={[ownerMember]}
         updateGoal={() => {}}
         setGoalStatus={() => {}}
@@ -147,7 +147,7 @@ describe('WorkspaceGoalsSection', () => {
         workspaceId="ws-1"
         isPersonal={false}
         soundEnabled={true}
-        user={{ id: 'user-owner', email: 'owner@example.com' }}
+        user={{ id: 'user-owner', email: 'owner@example.com', fullName: null, avatarUrl: null }}
         members={[ownerMember]}
         updateGoal={() => {}}
         setGoalStatus={() => {}}
@@ -171,7 +171,7 @@ describe('GoalCard', () => {
         workspaceId="ws-1"
         isPersonal={false}
         soundEnabled={false}
-        user={{ id: 'user-owner', email: 'owner@example.com' }}
+        user={{ id: 'user-owner', email: 'owner@example.com', fullName: null, avatarUrl: null }}
         members={[ownerMember]}
         updateGoal={() => {}}
         setGoalStatus={() => {}}
@@ -195,7 +195,7 @@ describe('GoalCard', () => {
         workspaceId="ws-1"
         isPersonal={false}
         soundEnabled={false}
-        user={{ id: 'user-member', email: 'member@example.com' }}
+        user={{ id: 'user-member', email: 'member@example.com', fullName: null, avatarUrl: null }}
         members={[regularMember]}
         updateGoal={() => {}}
         setGoalStatus={() => {}}
@@ -219,7 +219,7 @@ describe('GoalCard', () => {
         workspaceId="ws-1"
         isPersonal={false}
         soundEnabled={false}
-        user={{ id: 'user-member', email: 'member@example.com' }}
+        user={{ id: 'user-member', email: 'member@example.com', fullName: null, avatarUrl: null }}
         members={[regularMember]}
         updateGoal={() => {}}
         setGoalStatus={() => {}}
@@ -243,7 +243,7 @@ describe('GoalCard', () => {
         workspaceId="ws-1"
         isPersonal={false}
         soundEnabled={false}
-        user={{ id: 'user-owner', email: 'owner@example.com' }}
+        user={{ id: 'user-owner', email: 'owner@example.com', fullName: null, avatarUrl: null }}
         members={[ownerMember]}
         updateGoal={() => {}}
         setGoalStatus={() => {}}

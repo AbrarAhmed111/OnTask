@@ -7,12 +7,14 @@ import {
   MessageSquare,
   Pause,
   Play,
+  RotateCcw,
   Square,
 } from 'lucide-react'
 import { WorkspaceMember, WorkspaceTask } from '@/types/workspace'
 import {
   canControlTimer,
   canEmergencyStop,
+  canReopenTask,
   timerLockReason,
 } from '@/lib/tasks/timerPermissions'
 import {
@@ -60,6 +62,7 @@ export function WorkspaceTaskCard({
   onPause,
   onEmergencyStop,
   onFinish,
+  onReopen,
   onEdit,
   onDelete,
   onAddSubtask,
@@ -80,6 +83,7 @@ export function WorkspaceTaskCard({
   // Owner-only: stops someone else's running timer (never starts one).
   onEmergencyStop?: () => void
   onFinish: () => void
+  onReopen?: () => void
   onEdit: () => void
   onDelete: () => void
   onAddSubtask?: () => void
@@ -134,6 +138,7 @@ export function WorkspaceTaskCard({
     isOwner: workspaceDetail?.isOwner ?? false,
   }
   const canTimer = canControlTimer(task, timerActor)
+  const canReopen = canReopenTask(task, timerActor)
   const canStop = canEmergencyStop(task, timerActor)
 
   // Blockers: everyone sees the active one; who may raise, edit or resolve it
@@ -174,6 +179,7 @@ export function WorkspaceTaskCard({
       id={`task-${task.id}`}
       className={highlighted ? 'ring-2 ring-[var(--ws-accent,#375b4b)]' : ''}
       title={task.name}
+      description={task.description}
       index={index}
       tone={running ? 'running' : completed ? 'done' : 'idle'}
       blocked={blocked}
@@ -244,9 +250,12 @@ export function WorkspaceTaskCard({
               </span>
             )}
           </button>
-          {/* Finishing a running task stops its timer, so it needs the same
-              permission as Pause; finishing an idle one is open to anyone. */}
-          {!completed && (canTimer || !running) && (
+          {completed && canReopen && onReopen && (
+            <Button variant="secondary" onClick={onReopen}>
+              <RotateCcw size={15} /> Continue
+            </Button>
+          )}
+          {!completed && canTimer && (
             <button
               onClick={onFinish}
               disabled={hasBlocker}

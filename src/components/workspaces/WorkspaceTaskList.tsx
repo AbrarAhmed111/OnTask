@@ -20,6 +20,7 @@ export function WorkspaceTaskList({
   onPause,
   onEmergencyStop,
   onFinish,
+  onReopen,
   onEdit,
   onDelete,
   onReassign,
@@ -38,6 +39,7 @@ export function WorkspaceTaskList({
   onPause: (task: WorkspaceTask) => void
   onEmergencyStop?: (task: WorkspaceTask) => void
   onFinish: (task: WorkspaceTask) => void
+  onReopen?: (task: WorkspaceTask) => void
   onEdit: (task: WorkspaceTask) => void
   onDelete: (id: string) => void
   onReassign: (id: string, userId: string | null) => void
@@ -64,6 +66,7 @@ export function WorkspaceTaskList({
           onPause={onPause}
           onEmergencyStop={onEmergencyStop}
           onFinish={onFinish}
+          onReopen={onReopen}
           onEdit={onEdit}
           onDelete={onDelete}
           onReassign={onReassign}
@@ -88,6 +91,7 @@ export function WorkspaceTaskList({
             onEmergencyStop ? () => onEmergencyStop(task) : undefined
           }
           onFinish={() => onFinish(task)}
+          onReopen={onReopen ? () => onReopen(task) : undefined}
           onEdit={() => onEdit(task)}
           onDelete={() => onDelete(task.id)}
           onReassign={userId => onReassign(task.id, userId)}

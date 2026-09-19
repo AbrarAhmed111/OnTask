@@ -68,6 +68,7 @@ export function WorkspaceOverviewClient() {
     pauseTask,
     emergencyStopTask,
     finishTask,
+    reopenTask,
     addTask,
     updateTask,
     deleteTask,
@@ -82,6 +83,7 @@ export function WorkspaceOverviewClient() {
     completionAlert.notify,
     isPersonal,
   )
+
   // Off hides the whole Daily Report section -- no empty card, no "no reports
   // yet" placeholder -- and stops it fetching anything. Nothing is deleted:
   // switching it back on shows the reports that were already stored.
@@ -236,10 +238,14 @@ export function WorkspaceOverviewClient() {
   }
   const openEditTask = (task: WorkspaceTask) => {
     setEditingTaskId(task.id)
+    const hasPlanned = task.plannedMinutes !== null && task.plannedMinutes !== undefined
+    const planned = task.plannedMinutes || 0
     setTaskForm({
       name: task.name,
-      hours: String(Math.floor(task.plannedMinutes / 60)),
-      minutes: String(task.plannedMinutes % 60),
+      description: task.description || '',
+      hours: hasPlanned ? String(Math.floor(planned / 60)) : '',
+      minutes: hasPlanned ? String(planned % 60) : '',
+      hasPlannedTime: hasPlanned,
       goal: task.progressLabel || '',
       progress: String(task.progressPercentage || 0),
       trackGoal: Boolean(task.progressLabel),
@@ -256,12 +262,16 @@ export function WorkspaceOverviewClient() {
   }
   const handleEditTask = (event: FormEvent) => {
     event.preventDefault()
-    if (!editingTaskId) return
+    if (!editingTaskId || !taskForm.name.trim()) return
     const plannedMinutes =
-      Number(taskForm.hours || 0) * 60 + Number(taskForm.minutes || 0)
-    if (!taskForm.name.trim() || plannedMinutes <= 0) return
+      taskForm.hasPlannedTime === false
+        ? null
+        : (taskForm.hours || taskForm.minutes)
+          ? Number(taskForm.hours || 0) * 60 + Number(taskForm.minutes || 0)
+          : null
     updateTask(editingTaskId, {
       name: taskForm.name.trim(),
+      description: taskForm.description?.trim() || null,
       plannedMinutes,
       progressLabel: taskForm.trackGoal
         ? taskForm.goal.trim() || undefined
@@ -282,6 +292,10 @@ export function WorkspaceOverviewClient() {
   const handleFinishTask = (task: WorkspaceTask) => {
     finishTask(task, true)
     showSuccessToast(`${task.name} finished.`)
+  }
+  const handleReopenTask = (task: WorkspaceTask) => {
+    reopenTask(task)
+    showSuccessToast(`${task.name} reopened.`)
   }
   const handleDeleteTask = (id: string) => {
     deleteTask(id)
@@ -334,6 +348,7 @@ export function WorkspaceOverviewClient() {
           onPause={pauseTask}
           onEmergencyStop={emergencyStopTask}
           onFinish={handleFinishTask}
+          onReopen={handleReopenTask}
           onEdit={openEditTask}
           onDelete={handleDeleteTask}
           onReassign={reassignTask}

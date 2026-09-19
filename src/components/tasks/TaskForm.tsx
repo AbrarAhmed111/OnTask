@@ -49,6 +49,16 @@ export function TaskForm({
           className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted/60 focus:border-sage focus:ring-4 focus:ring-sage/15"
         />
       </label>
+      <label className="block text-xs font-semibold text-muted">
+        Description <span className="font-normal text-muted/80">(optional)</span>
+        <textarea
+          rows={2}
+          value={values.description || ''}
+          onChange={event => update('description', event.target.value)}
+          placeholder="Add details or notes..."
+          className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted/60 focus:border-sage focus:ring-4 focus:ring-sage/15 resize-y"
+        />
+      </label>
       {assignment && (
         <label className="block text-xs font-semibold text-muted">
           Assign to
@@ -67,24 +77,24 @@ export function TaskForm({
         </label>
       )}
       <label className="block text-xs font-semibold text-muted">
-        {targetLabel}
+        {targetLabel} <span className="font-normal text-muted/80">(optional)</span>
         <div className="mt-2 flex items-center gap-2">
           <input
-            required
             type="number"
             min="0"
             value={values.hours}
             onChange={event => update('hours', event.target.value)}
+            placeholder="0"
             className="w-20 rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-sage focus:ring-4 focus:ring-sage/15"
           />
           <span className="text-[11px] font-normal">hours</span>
           <input
-            required
             type="number"
             min="0"
             max="59"
             value={values.minutes}
             onChange={event => update('minutes', event.target.value)}
+            placeholder="0"
             className="w-20 rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-sage focus:ring-4 focus:ring-sage/15"
           />
           <span className="text-[11px] font-normal">minutes</span>

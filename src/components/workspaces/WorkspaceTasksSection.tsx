@@ -79,6 +79,7 @@ export function WorkspaceTasksSection({
   onPause,
   onEmergencyStop,
   onFinish,
+  onReopen,
   onEdit,
   onDelete,
   onReassign,
@@ -113,6 +114,7 @@ export function WorkspaceTasksSection({
   onPause: (task: WorkspaceTask) => void
   onEmergencyStop?: (task: WorkspaceTask) => void
   onFinish: (task: WorkspaceTask) => void
+  onReopen?: (task: WorkspaceTask) => void
   onEdit: (task: WorkspaceTask) => void
   onDelete: (id: string) => void
   onReassign: (id: string, userId: string | null) => void
@@ -270,6 +272,7 @@ export function WorkspaceTasksSection({
               onPause={onPause}
               onEmergencyStop={onEmergencyStop}
               onFinish={onFinish}
+              onReopen={onReopen}
               onEdit={onEdit}
               onDelete={onDelete}
               onReassign={onReassign}
@@ -299,6 +302,7 @@ export function WorkspaceTasksSection({
             onPause={onPause}
             onEmergencyStop={onEmergencyStop}
             onFinish={onFinish}
+            onReopen={onReopen}
             onEdit={onEdit}
             onDelete={onDelete}
             onReassign={onReassign}

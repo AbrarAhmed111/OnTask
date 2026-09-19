@@ -43,6 +43,7 @@ const BADGE_TONE: Record<TaskCardTone, string> = {
 export function TaskCardShell({
   id,
   title,
+  description,
   index,
   tone,
   blocked = false,
@@ -63,6 +64,7 @@ export function TaskCardShell({
   // Lets something outside the card (a notification's deep link) find it.
   id?: string
   title: string
+  description?: string | null
   // Present only for root-level cards in a list — drives the numbered badge
   // and drag-to-reorder. Subtask rows omit it and get a plain dot.
   index?: number
@@ -73,7 +75,7 @@ export function TaskCardShell({
   statusLabel: string
   focusLabel: string
   workedSeconds: number
-  plannedMinutes: number
+  plannedMinutes?: number | null
   progressLabel?: string
   progressPercentage?: number
   drag?: TaskDragProps
@@ -90,10 +92,10 @@ export function TaskCardShell({
   const done = tone === 'done'
   const running = tone === 'running'
   const draggable = index !== undefined && Boolean(drag)
-  const taskProgress = Math.min(
-    100,
-    (workedSeconds / (plannedMinutes * 60)) * 100,
-  )
+  const taskProgress =
+    plannedMinutes && plannedMinutes > 0
+      ? Math.min(100, (workedSeconds / (plannedMinutes * 60)) * 100)
+      : null
 
   return (
     <article
@@ -144,6 +146,12 @@ export function TaskCardShell({
       </div>
 
       <div className="space-y-4 px-4 pb-5 sm:px-5 sm:pl-[68px]">
+        {description && (
+          <p className="text-xs text-muted/90 whitespace-pre-wrap leading-relaxed">
+            {description}
+          </p>
+        )}
+
         <div>
           <div className="flex items-end justify-between gap-4">
             <div>
@@ -152,20 +160,26 @@ export function TaskCardShell({
               </span>
               <strong className="mt-1.5 block text-2xl font-bold tracking-tight text-ink">
                 {formatTime(workedSeconds)}{' '}
-                <small className="text-xs font-medium text-muted">
-                  / {formatPlanned(plannedMinutes)}
-                </small>
+                {plannedMinutes != null && plannedMinutes > 0 && (
+                  <small className="text-xs font-medium text-muted">
+                    / {formatPlanned(plannedMinutes)}
+                  </small>
+                )}
               </strong>
             </div>
-            <span className="shrink-0 rounded-full bg-[var(--ws-accent-soft,#e9f0ec)] px-2.5 py-1 font-mono text-[11px] font-bold text-[var(--ws-accent,#375b4b)]">
-              {Math.round(taskProgress)}%
-            </span>
+            {taskProgress != null && (
+              <span className="shrink-0 rounded-full bg-[var(--ws-accent-soft,#e9f0ec)] px-2.5 py-1 font-mono text-[11px] font-bold text-[var(--ws-accent,#375b4b)]">
+                {Math.round(taskProgress)}%
+              </span>
+            )}
           </div>
-          <ProgressBar
-            value={taskProgress}
-            tone="coral"
-            className="mt-3 h-1.5"
-          />
+          {taskProgress != null && (
+            <ProgressBar
+              value={taskProgress}
+              tone="coral"
+              className="mt-3 h-1.5"
+            />
+          )}
         </div>
 
         {progressLabel && (
