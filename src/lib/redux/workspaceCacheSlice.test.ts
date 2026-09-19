@@ -3,7 +3,9 @@ import reducer, {
   CachedWorkspaceIdentity,
   WorkspaceCacheState,
   selectCachedWorkspaceIdentity,
+  toCachedWorkspaceIdentity,
   upsertPersonalWorkspaceIdentity,
+  upsertWorkspaceIdentities,
   upsertWorkspaceIdentity,
 } from '@/lib/redux/workspaceCacheSlice'
 import { PERSONAL_WORKSPACE_SLUG } from '@/lib/workspaces'
@@ -104,6 +106,47 @@ describe('workspace identity cache', () => {
 
     expect(accentFor('user-a')).toBe('berry')
     expect(accentFor('user-b')).toBe('sunset')
+  })
+
+  it("paints a workspace's accent from the hub's list before it has ever been opened", () => {
+    const other: CachedWorkspaceIdentity = {
+      id: 'ws-other',
+      slug: 'marketing',
+      name: 'Marketing',
+      accent: 'berry',
+      timezone: 'UTC',
+    }
+    const state = reducer(empty, upsertWorkspaceIdentities([shared, other]))
+    const accentFor = (workspaceSlug: string) =>
+      selectCachedWorkspaceIdentity(state, {
+        workspaceId: '',
+        workspaceSlug,
+        userId: 'user-a',
+      })?.accent
+
+    expect(accentFor('design-team')).toBe('ocean')
+    expect(accentFor('marketing')).toBe('berry')
+  })
+
+  it("replaces a workspace's cached accent when the list reports a new one", () => {
+    let state = reducer(empty, upsertWorkspaceIdentity(shared))
+    state = reducer(
+      state,
+      upsertWorkspaceIdentities([{ ...shared, accent: 'rose' }]),
+    )
+
+    expect(state.byId[shared.id].accent).toBe('rose')
+  })
+
+  it('narrows a workspace to only its identity fields', () => {
+    const identity = toCachedWorkspaceIdentity({
+      ...shared,
+      // Anything else on a Workspace must never reach localStorage.
+      description: 'private',
+      ownerId: 'user-a',
+    } as Parameters<typeof toCachedWorkspaceIdentity>[0])
+
+    expect(identity).toEqual(shared)
   })
 
   it('never registers a personal workspace under the shared slug alias', () => {

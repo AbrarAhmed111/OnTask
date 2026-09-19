@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { PERSONAL_WORKSPACE_SLUG } from '@/lib/workspaces'
+import type { Workspace } from '@/types/workspace'
 
 // Only the near-static identity fields a workspace page needs to paint
 // correctly on first render — never member lists, tasks, or anything that
@@ -11,6 +12,20 @@ export type CachedWorkspaceIdentity = {
   name: string
   accent: string
   timezone: string
+}
+
+// The one place a Workspace is narrowed to what gets cached, so every writer
+// (the detail page, the hub's list) stores exactly the same shape.
+export function toCachedWorkspaceIdentity(
+  workspace: Pick<Workspace, 'id' | 'slug' | 'name' | 'accent' | 'timezone'>,
+): CachedWorkspaceIdentity {
+  return {
+    id: workspace.id,
+    slug: workspace.slug,
+    name: workspace.name,
+    accent: workspace.accent,
+    timezone: workspace.timezone,
+  }
 }
 
 export type WorkspaceCacheState = {
@@ -41,6 +56,17 @@ const workspaceCacheSlice = createSlice({
     ) {
       state.byId[action.payload.id] = action.payload
       state.bySlug[action.payload.slug] = action.payload.id
+    },
+    // A list of shared workspaces in one action, so the hub seeds them with a
+    // single store update (and so a single localStorage write).
+    upsertWorkspaceIdentities(
+      state,
+      action: PayloadAction<CachedWorkspaceIdentity[]>,
+    ) {
+      for (const identity of action.payload) {
+        state.byId[identity.id] = identity
+        state.bySlug[identity.slug] = identity.id
+      }
     },
     upsertPersonalWorkspaceIdentity(
       state,
@@ -75,6 +101,9 @@ export function selectCachedWorkspaceIdentity(
   return cachedId ? cache.byId[cachedId] : undefined
 }
 
-export const { upsertWorkspaceIdentity, upsertPersonalWorkspaceIdentity } =
-  workspaceCacheSlice.actions
+export const {
+  upsertWorkspaceIdentity,
+  upsertWorkspaceIdentities,
+  upsertPersonalWorkspaceIdentity,
+} = workspaceCacheSlice.actions
 export default workspaceCacheSlice.reducer

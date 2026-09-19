@@ -12,18 +12,10 @@ export function makeStore() {
     reducer: {
       workspaceCache: workspaceCacheReducer,
     },
-    // Default each field independently rather than trusting the persisted
-    // shape outright -- a cache written by an older build (e.g. before
-    // `bySlug` or `personalByOwner` existed) would otherwise leave that key
-    // undefined.
+    // Already validated and defaulted field by field (see persist.ts), so a
+    // cache from an older build or a damaged one can't reach the reducers.
     preloadedState: persistedWorkspaceCache
-      ? {
-          workspaceCache: {
-            byId: persistedWorkspaceCache.byId ?? {},
-            bySlug: persistedWorkspaceCache.bySlug ?? {},
-            personalByOwner: persistedWorkspaceCache.personalByOwner ?? {},
-          },
-        }
+      ? { workspaceCache: persistedWorkspaceCache }
       : undefined,
   })
 

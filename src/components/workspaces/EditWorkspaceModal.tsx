@@ -1,6 +1,6 @@
 'use client'
 
-import { CSSProperties, FormEvent, useState } from 'react'
+import { FormEvent, useState } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Modal } from '@/components/ui/Modal'
@@ -12,6 +12,7 @@ import {
   getWorkspaceTheme,
   WORKSPACE_THEMES,
   WorkspaceThemeId,
+  workspaceThemeVars,
 } from '@/lib/workspaceThemes'
 import { Workspace } from '@/types/workspace'
 
@@ -109,12 +110,7 @@ export function EditWorkspaceModal({
     >
       <form
         onSubmit={handleSubmit}
-        style={
-          {
-            '--ws-accent': previewTheme.strong,
-            '--ws-accent-soft': previewTheme.soft,
-          } as CSSProperties
-        }
+        style={workspaceThemeVars(previewTheme)}
         className="space-y-4"
       >
         {error && <ErrorBanner>{error}</ErrorBanner>}

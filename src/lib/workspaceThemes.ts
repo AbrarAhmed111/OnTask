@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+
 // Curated accent presets for a workspace — deliberately not a free-form
 // color picker, so every option is pre-checked for readable white-on-strong
 // contrast and a soft tint that reads well as a badge/highlight background
@@ -29,4 +31,14 @@ export function getWorkspaceTheme(
   id: string | null | undefined,
 ): WorkspaceTheme {
   return WORKSPACE_THEMES.find(theme => theme.id === id) ?? DEFAULT_THEME
+}
+
+// The CSS variables every accent-aware component reads (`var(--ws-accent, ...)`
+// in Button, the shell, cards, ...). Kept here so the names exist in one place
+// for whatever sets them: the workspace-wide scope and the edit form's preview.
+export function workspaceThemeVars(theme: WorkspaceTheme): CSSProperties {
+  return {
+    '--ws-accent': theme.strong,
+    '--ws-accent-soft': theme.soft,
+  } as CSSProperties
 }

@@ -6,6 +6,7 @@ import type { AuthUser } from '@/hooks/useAuth'
 import { Workspace, WorkspaceMember, WorkspaceRole } from '@/types/workspace'
 import { useAppDispatch } from '@/lib/redux/hooks'
 import {
+  toCachedWorkspaceIdentity,
   upsertPersonalWorkspaceIdentity,
   upsertWorkspaceIdentity,
 } from '@/lib/redux/workspaceCacheSlice'
@@ -71,13 +72,7 @@ export function useWorkspace(workspaceSlug: string, user: AuthUser | null) {
   // account's accent paint for the next account on this browser.
   const cacheIdentity = useCallback(
     (ws: Workspace) => {
-      const identity = {
-        id: ws.id,
-        slug: ws.slug,
-        name: ws.name,
-        accent: ws.accent,
-        timezone: ws.timezone,
-      }
+      const identity = toCachedWorkspaceIdentity(ws)
       if (ws.type !== 'personal') dispatch(upsertWorkspaceIdentity(identity))
       else if (userId)
         dispatch(upsertPersonalWorkspaceIdentity({ ownerId: userId, identity }))

@@ -1,6 +1,6 @@
 'use client'
 
-import { CSSProperties, ReactNode, useEffect, useState } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -15,14 +15,11 @@ import {
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Avatar } from '@/components/ui/Avatar'
-import { ThemeScope } from '@/components/ui/PortalTheme'
 import { AccountMenu } from '@/components/layout/AccountMenu'
 import { PresenceDot } from '@/components/workspaces/PresenceDot'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
-import { getWorkspaceTheme } from '@/lib/workspaceThemes'
 import { TourAnchor, tourAnchor, tourInset } from '@/lib/tourAnchors'
-import { useAppSelector } from '@/lib/redux/hooks'
-import { selectCachedWorkspaceIdentity } from '@/lib/redux/workspaceCacheSlice'
+import type { CachedWorkspaceIdentity } from '@/lib/redux/workspaceCacheSlice'
 import type { AuthUser } from '@/hooks/useAuth'
 import { Workspace, WorkspaceMember, WorkspaceRole } from '@/types/workspace'
 
@@ -121,11 +118,13 @@ function MemberChip({
 // workspaces and the user's Personal Workspace; `isPersonal` swaps the
 // collaboration-only parts (members, invite, avatars) for a "Private • Only
 // you" header. The shell itself is never centered in a max-width wrapper, so
-// it stays aligned at any viewport width or browser zoom.
+// it stays aligned at any viewport width or browser zoom. The workspace accent
+// isn't chosen here: it is set above the shell by WorkspaceThemeScope, so the
+// dialogs the layout opens beside the shell inherit it too.
 export function WorkspaceShell({
   workspaceId,
-  workspaceSlug,
   workspace,
+  paintIdentity,
   members,
   role,
   ready,
@@ -139,8 +138,14 @@ export function WorkspaceShell({
   children,
 }: {
   workspaceId: string
-  workspaceSlug: string
   workspace: Workspace | null
+  // The workspace's identity as known before its row has loaded (read by the
+  // server for this request, else remembered from an earlier visit) — lets the
+  // header paint the real name/timezone immediately instead of a skeleton,
+  // while `ready` (and everything gated on it, like members) still waits for
+  // the actual network fetch. Chosen by the layout, which also takes its accent
+  // from the same entry, so the two never disagree.
+  paintIdentity?: CachedWorkspaceIdentity
   members: WorkspaceMember[]
   role: WorkspaceRole | null
   ready: boolean
@@ -154,20 +159,6 @@ export function WorkspaceShell({
   children: ReactNode
 }) {
   const [now, setNow] = useState<Date | null>(null)
-  // Cached identity from a previous visit — lets the header paint the real
-  // name/color/timezone immediately on refresh instead of a skeleton and a
-  // green-then-real-color flash, while `ready` (and everything gated on it,
-  // like members) still waits for the actual network fetch.
-  // A personal workspace is found by who is signed in rather than by its URL
-  // alias (see selectCachedWorkspaceIdentity), so its accent survives a
-  // refresh without ever painting another account's.
-  const cached = useAppSelector(state =>
-    selectCachedWorkspaceIdentity(state.workspaceCache, {
-      workspaceId,
-      workspaceSlug,
-      userId: user.id,
-    }),
-  )
 
   useEffect(() => {
     setNow(new Date())
@@ -176,10 +167,9 @@ export function WorkspaceShell({
   }, [])
 
   const isOwner = role === 'owner'
-  const displayName = workspace?.name ?? cached?.name
-  const displayTimezone = workspace?.timezone ?? cached?.timezone
-  const theme = getWorkspaceTheme(workspace?.accent ?? cached?.accent)
-  const showHeaderSkeleton = !isPersonal && !ready && !cached
+  const displayName = workspace?.name ?? paintIdentity?.name
+  const displayTimezone = workspace?.timezone ?? paintIdentity?.timezone
+  const showHeaderSkeleton = !isPersonal && !ready && !paintIdentity
   const items = NAV_ITEMS.filter(item => !item.sharedOnly || !isPersonal)
   const showMembers = !isPersonal && ready && members.length > 0
   const headerPreview = members.slice(0, HEADER_PREVIEW_COUNT)
@@ -197,15 +187,7 @@ export function WorkspaceShell({
       : null
 
   return (
-    <ThemeScope
-      vars={
-        {
-          '--ws-accent': theme.strong,
-          '--ws-accent-soft': theme.soft,
-        } as CSSProperties
-      }
-      className="min-h-screen bg-[radial-gradient(circle_at_80%_0%,#e4f0e6_0,transparent_30%),linear-gradient(135deg,#f8faf7_0%,#eff3ee_100%)] text-ink"
-    >
+    <div className="min-h-screen bg-[radial-gradient(circle_at_80%_0%,#e4f0e6_0,transparent_30%),linear-gradient(135deg,#f8faf7_0%,#eff3ee_100%)] text-ink">
       <header
         {...tourInset('top')}
         className="sticky top-0 z-30 border-b border-line bg-paper/85 backdrop-blur"
@@ -417,6 +399,6 @@ export function WorkspaceShell({
           </div>
         </div>
       </div>
-    </ThemeScope>
+    </div>
   )
 }

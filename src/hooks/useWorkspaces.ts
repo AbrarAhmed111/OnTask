@@ -5,6 +5,12 @@ import { createClient } from '@/lib/supabase/client'
 import type { AuthUser } from '@/hooks/useAuth'
 import { Workspace } from '@/types/workspace'
 import { WorkspaceRow, rowToWorkspace } from '@/lib/workspaces'
+import { useAppDispatch } from '@/lib/redux/hooks'
+import {
+  toCachedWorkspaceIdentity,
+  upsertWorkspaceIdentities,
+  upsertWorkspaceIdentity,
+} from '@/lib/redux/workspaceCacheSlice'
 
 // The workspace hub's data: the caller's SHARED workspaces (+ member counts)
 // and create. The Personal Workspace deliberately isn't part of this list —
@@ -15,8 +21,15 @@ import { WorkspaceRow, rowToWorkspace } from '@/lib/workspaces'
 // invited to (so the row must be filtered by real membership here), and an
 // invitation is only ever shown in the invitations section until it's accepted.
 // Detail data lives in useWorkspace.
+//
+// Every workspace listed here also has its identity (name, accent, timezone)
+// written to the paint-first cache. The list already carries the accent, and
+// without this a workspace opened for the first time from the hub -- or
+// accepted from an invitation -- would paint the default accent until its own
+// row loaded, and only then switch to the real one.
 export function useWorkspaces(user: AuthUser | null) {
   const userId = user?.id
+  const dispatch = useAppDispatch()
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
   const [ready, setReady] = useState(false)
@@ -51,7 +64,11 @@ export function useWorkspaces(user: AuthUser | null) {
         }
         setError(null)
         const rows = (data ?? []) as WorkspaceRow[]
-        setWorkspaces(rows.map(rowToWorkspace))
+        const loaded = rows.map(rowToWorkspace)
+        setWorkspaces(loaded)
+        dispatch(
+          upsertWorkspaceIdentities(loaded.map(toCachedWorkspaceIdentity)),
+        )
         setReady(true)
         if (rows.length === 0) {
           setMemberCounts({})
@@ -76,7 +93,7 @@ export function useWorkspaces(user: AuthUser | null) {
     return () => {
       cancelled = true
     }
-  }, [userId, reloadToken])
+  }, [userId, reloadToken, dispatch])
 
   const reload = useCallback(() => setReloadToken(token => token + 1), [])
 
@@ -101,6 +118,7 @@ export function useWorkspaces(user: AuthUser | null) {
       }
     }
     const workspace = rowToWorkspace(data as WorkspaceRow)
+    dispatch(upsertWorkspaceIdentity(toCachedWorkspaceIdentity(workspace)))
     setWorkspaces(current => [workspace, ...current])
     setMemberCounts(current => ({ ...current, [workspace.id]: 1 }))
     return { success: true as const, workspace }

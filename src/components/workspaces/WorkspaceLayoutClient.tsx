@@ -17,11 +17,17 @@ import {
   WorkspaceShell,
   WorkspaceSection,
 } from '@/components/workspaces/WorkspaceShell'
+import { WorkspaceThemeScope } from '@/components/workspaces/WorkspaceThemeScope'
 import {
   WorkspaceDetailContext,
   WorkspaceDetailContextValue,
 } from '@/components/workspaces/WorkspaceDetailContext'
 import type { AuthUser } from '@/hooks/useAuth'
+import { useAppSelector } from '@/lib/redux/hooks'
+import {
+  CachedWorkspaceIdentity,
+  selectCachedWorkspaceIdentity,
+} from '@/lib/redux/workspaceCacheSlice'
 import { saveTourOutcome } from '@/lib/tour/progress'
 import type { TourId, TourOutcome } from '@/lib/tour/types'
 import { PERSONAL_WORKSPACE_SLUG } from '@/lib/workspaces'
@@ -38,9 +44,13 @@ function sectionFromPathname(pathname: string): WorkspaceSection {
 
 export function WorkspaceLayoutClient({
   workspaceSlug,
+  initialIdentity,
   children,
 }: {
   workspaceSlug: string
+  // The workspace's identity as the server read it for this request (see
+  // app/workspaces/[workspaceSlug]/layout.tsx), if it could.
+  initialIdentity?: CachedWorkspaceIdentity
   children: ReactNode
 }) {
   const { user, ready: authReady, handleLogout } = useAuthGuard()
@@ -52,6 +62,7 @@ export function WorkspaceLayoutClient({
   return (
     <WorkspaceLayout
       workspaceSlug={workspaceSlug}
+      initialIdentity={initialIdentity}
       user={user}
       onLogout={handleLogout}
     >
@@ -60,13 +71,17 @@ export function WorkspaceLayoutClient({
   )
 }
 
-function WorkspaceLayout({
+// Exported for tests only -- the app renders it through WorkspaceLayoutClient,
+// which is what waits for the signed-in user.
+export function WorkspaceLayout({
   workspaceSlug,
+  initialIdentity,
   user,
   onLogout,
   children,
 }: {
   workspaceSlug: string
+  initialIdentity?: CachedWorkspaceIdentity
   user: AuthUser
   onLogout: () => void
   children: ReactNode
@@ -87,6 +102,27 @@ function WorkspaceLayout({
   // (and everything handed down via context) keys off this, never the URL
   // slug, since that's what workspace_id FKs and realtime filters expect.
   const workspaceId = workspace?.id ?? ''
+  // What to paint the workspace's name, timezone AND accent from before its row
+  // has loaded (that needs a network round trip), so the first paint already
+  // has the real ones instead of the default followed by a switch. Two sources,
+  // in order of trust:
+  //   1. what the server read for this very request (initialIdentity) -- always
+  //      current, and there even on a browser that has never opened the
+  //      workspace;
+  //   2. the localStorage cache of an earlier visit -- instant, but empty on a
+  //      new browser and stale if the accent was changed from another device,
+  //      so it only fills in when the server couldn't read the workspace.
+  // A personal workspace is found in the cache by who is signed in rather than
+  // by its URL alias (see selectCachedWorkspaceIdentity), so it never paints
+  // another account's.
+  const localIdentity = useAppSelector(state =>
+    selectCachedWorkspaceIdentity(state.workspaceCache, {
+      workspaceId,
+      workspaceSlug: workspace?.slug ?? workspaceSlug,
+      userId: user.id,
+    }),
+  )
+  const paintIdentity = initialIdentity ?? localIdentity
   // Known from the URL alone before the workspace row has loaded, so the
   // shell can render the personal header (and skip collaboration-only work)
   // from the very first paint.
@@ -184,45 +220,50 @@ function WorkspaceLayout({
 
   return (
     <WorkspaceDetailContext.Provider value={contextValue}>
-      {/* The first-visit welcome comes first: the personal tour opens once it
-          has been shown and dismissed, not while it is still being decided. */}
-      <TourProvider
-        paused={isPersonal && (!welcome.checked || welcome.open)}
-        onOutcome={recordTourOutcome}
-      >
-        <WorkspaceShell
-          workspaceId={workspaceId}
-          workspaceSlug={workspace?.slug ?? workspaceSlug}
-          workspace={workspace}
-          members={members}
-          role={role}
-          ready={ready}
-          user={user}
-          onlineUserIds={onlineUserIds}
-          section={section}
-          onSectionChange={handleSectionChange}
-          isPersonal={isPersonal}
-          onInvite={
-            isOwner && !isPersonal ? () => setInviting(true) : undefined
-          }
-          onLogout={onLogout}
+      {/* The live workspace's accent, else the remembered one. It wraps the
+          shell and every dialog below so they all inherit the same accent. */}
+      <WorkspaceThemeScope accent={workspace?.accent ?? paintIdentity?.accent}>
+        {/* The first-visit welcome comes first: the personal tour opens once
+            it has been shown and dismissed, not while it is still being
+            decided. */}
+        <TourProvider
+          paused={isPersonal && (!welcome.checked || welcome.open)}
+          onOutcome={recordTourOutcome}
         >
-          {children}
-        </WorkspaceShell>
+          <WorkspaceShell
+            workspaceId={workspaceId}
+            workspace={workspace}
+            paintIdentity={paintIdentity}
+            members={members}
+            role={role}
+            ready={ready}
+            user={user}
+            onlineUserIds={onlineUserIds}
+            section={section}
+            onSectionChange={handleSectionChange}
+            isPersonal={isPersonal}
+            onInvite={
+              isOwner && !isPersonal ? () => setInviting(true) : undefined
+            }
+            onLogout={onLogout}
+          >
+            {children}
+          </WorkspaceShell>
 
-        {inviting && !isPersonal && (
-          <InviteMemberModal
-            onInvite={inviteByEmail}
-            onClose={() => setInviting(false)}
-          />
-        )}
-        {isPersonal && welcome.open && (
-          <PersonalWelcomeModal onClose={welcome.close} />
-        )}
-        {isPersonal && ready && (
-          <GuestWorkPrompt suppressed={!welcome.checked || welcome.open} />
-        )}
-      </TourProvider>
+          {inviting && !isPersonal && (
+            <InviteMemberModal
+              onInvite={inviteByEmail}
+              onClose={() => setInviting(false)}
+            />
+          )}
+          {isPersonal && welcome.open && (
+            <PersonalWelcomeModal onClose={welcome.close} />
+          )}
+          {isPersonal && ready && (
+            <GuestWorkPrompt suppressed={!welcome.checked || welcome.open} />
+          )}
+        </TourProvider>
+      </WorkspaceThemeScope>
     </WorkspaceDetailContext.Provider>
   )
 }
