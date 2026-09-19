@@ -7,6 +7,7 @@ import { EditWorkspaceModal } from '@/components/workspaces/EditWorkspaceModal'
 import { useWorkspaceDetail } from '@/components/workspaces/WorkspaceDetailContext'
 import { useTour } from '@/components/tour/TourProvider'
 import { useSettings } from '@/hooks/useSettings'
+import { showSuccessToast } from '@/lib/toast'
 import { TOURS, tourIdForWorkspace } from '@/lib/tour/definitions'
 import { PERSONAL_WORKSPACE_PATH, workspacePath } from '@/lib/workspaces'
 
@@ -18,6 +19,7 @@ export function WorkspaceSettingsClient() {
   const { settings, ready: settingsReady, updateSettings } = useSettings()
   const [editing, setEditing] = useState(false)
   const [settingsError, setSettingsError] = useState<string | null>(null)
+  const [dailyReportsSaving, setDailyReportsSaving] = useState(false)
 
   const handleUpdateWorkspace: typeof updateWorkspace = async patch => {
     const result = await updateWorkspace(patch)
@@ -27,6 +29,17 @@ export function WorkspaceSettingsClient() {
       setSettingsError(result.error || 'Failed to save changes.')
     }
     return result
+  }
+
+  const handleDailyReportsChange = async (enabled: boolean) => {
+    setDailyReportsSaving(true)
+    const result = await handleUpdateWorkspace({ dailyReportsEnabled: enabled })
+    setDailyReportsSaving(false)
+    if (result.success) {
+      showSuccessToast(
+        enabled ? 'Daily Reports turned on.' : 'Daily Reports turned off.',
+      )
+    }
   }
 
   // The tour points at the Overview, so replaying it means going there: the
@@ -51,6 +64,10 @@ export function WorkspaceSettingsClient() {
           soundEnabled: settings.soundEnabled,
           onSoundEnabledChange: soundEnabled =>
             updateSettings({ soundEnabled }),
+        }}
+        dailyReports={{
+          saving: dailyReportsSaving,
+          onChange: handleDailyReportsChange,
         }}
         guidance={{ label: tour.label, onReplay: handleReplayTour }}
         onEdit={() => {

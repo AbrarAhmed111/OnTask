@@ -82,6 +82,10 @@ export function WorkspaceOverviewClient() {
     completionAlert.notify,
     isPersonal,
   )
+  // Off hides the whole Daily Report section -- no empty card, no "no reports
+  // yet" placeholder -- and stops it fetching anything. Nothing is deleted:
+  // switching it back on shows the reports that were already stored.
+  const dailyReportsEnabled = workspace?.dailyReportsEnabled ?? false
   const {
     goals,
     ready: goalsReady,
@@ -117,6 +121,7 @@ export function WorkspaceOverviewClient() {
     user,
     workspace?.timezone ?? '',
     workspace?.reportTime ?? '12:00:00',
+    dailyReportsEnabled,
   )
 
   // The tour's steps point at things these sections render, so it waits until
@@ -361,10 +366,12 @@ export function WorkspaceOverviewClient() {
       />
 
       <WorkspaceSummarySection
+        enabled={dailyReportsEnabled}
         ready={ready && summaryReady}
         error={summaryError}
         summary={summary}
         members={members}
+        isPersonal={isPersonal}
         nextReportLabel={nextReportLabel}
         reportTimeLabel={formatTimeOfDay(workspace?.reportTime ?? '12:00:00')}
         generating={summaryGenerating}

@@ -14,17 +14,23 @@ import {
 import { Button } from '@/components/ui/Button'
 import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { formatMemberEvent } from '@/lib/workspaceSummaryEvents'
 import { formatBoundary } from '@/lib/dailyReportWindow'
+import {
+  ReportTaskStatus,
+  getDailyReportMetrics,
+  hasReportActivity,
+  narrativeParagraphs,
+  reportTaskStatus,
+} from '@/lib/dailyReportMetrics'
 import { formatHM } from '@/lib/time'
 import {
   StructuredSnapshotBlocker,
   StructuredSnapshotMember,
   StructuredSnapshotTaskActivity,
   StructuredSnapshotWorkspaceChanges,
-  SummaryTaskStatus,
   WorkspaceDailySummary,
   WorkspaceMember,
+  WorkspaceStructuredSnapshot,
 } from '@/types/workspace'
 
 // The report's own frozen report_timezone is used here (never the
@@ -52,17 +58,28 @@ function formatTimestamp(iso: string): string {
   })
 }
 
-const STATUS_STYLE: Record<SummaryTaskStatus, string> = {
+const STATUS_STYLE: Record<ReportTaskStatus, string> = {
   completed: 'bg-sage/20 text-forest',
+  working: 'bg-[var(--ws-accent-soft,#e9f0ec)] text-[var(--ws-accent,#375b4b)]',
+  // A report stored before task states were recorded: all it knows is "not done".
   in_progress:
     'bg-[var(--ws-accent-soft,#e9f0ec)] text-[var(--ws-accent,#375b4b)]',
+  paused: 'bg-line/50 text-muted',
+  queued: 'bg-line/50 text-muted',
+  blocked: 'bg-coral/10 text-coral',
   skipped: 'bg-coral/10 text-coral',
+  deleted: 'bg-line/50 text-muted',
 }
 
-const STATUS_LABEL: Record<SummaryTaskStatus, string> = {
+const STATUS_LABEL: Record<ReportTaskStatus, string> = {
   completed: 'Completed',
+  working: 'Working',
   in_progress: 'In progress',
+  paused: 'Paused',
+  queued: 'Queued',
+  blocked: 'Blocked',
   skipped: 'Skipped',
+  deleted: 'Deleted',
 }
 
 function TaskActivityRow({
@@ -72,6 +89,7 @@ function TaskActivityRow({
   task: StructuredSnapshotTaskActivity
   indented?: boolean
 }) {
+  const status = reportTaskStatus(task)
   return (
     <div
       className={`flex items-center justify-between gap-3 py-1.5 text-xs ${indented ? 'pl-5' : ''}`}
@@ -87,27 +105,41 @@ function TaskActivityRow({
           {formatHM(task.focused_seconds)}
         </span>
         <span
-          className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${STATUS_STYLE[task.status_end]}`}
+          className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${STATUS_STYLE[status]}`}
         >
-          {STATUS_LABEL[task.status_end]}
+          {STATUS_LABEL[status]}
         </span>
       </span>
     </div>
   )
 }
 
-function MemberBreakdown({
-  member,
-  note,
-}: {
-  member: StructuredSnapshotMember
-  note?: string
-}) {
-  const taskById = new Map(member.task_activity.map(t => [t.task_id, t]))
-  const topLevel = member.task_activity.filter(
+// A parent task with its subtasks indented beneath it.
+function TaskList({ tasks }: { tasks: StructuredSnapshotTaskActivity[] }) {
+  const taskById = new Map(tasks.map(t => [t.task_id, t]))
+  const topLevel = tasks.filter(
     t => !t.parent_task_id || !taskById.has(t.parent_task_id),
   )
+  return (
+    <div className="divide-y divide-line/50">
+      {topLevel.map(task => (
+        <div key={task.task_id}>
+          <TaskActivityRow task={task} />
+          {tasks
+            .filter(t => t.parent_task_id === task.task_id)
+            .map(child => (
+              <TaskActivityRow key={child.task_id} task={child} indented />
+            ))}
+        </div>
+      ))}
+    </div>
+  )
+}
 
+// One person's tasks with their exact focused time -- shared workspaces only.
+// (Deterministic: the exact numbers, straight from the snapshot. What they mean
+// is the narrative's job.)
+function MemberBreakdown({ member }: { member: StructuredSnapshotMember }) {
   return (
     <div className="rounded-xl border border-line/70 bg-paper/60 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -116,49 +148,39 @@ function MemberBreakdown({
           {formatHM(member.focused_seconds)}
         </span>
       </div>
-      {note && <p className="mt-1.5 text-xs leading-5 text-muted">{note}</p>}
-
-      {member.events.length > 0 && (
-        <ul className="mt-2.5 list-disc space-y-1 border-t border-line/50 pl-5 pt-2.5 text-xs leading-5 text-ink">
-          {member.events.map((event, i) => (
-            <li key={i}>{formatMemberEvent(event)}</li>
-          ))}
-        </ul>
-      )}
-
-      {topLevel.length > 0 && (
-        <div className="mt-2.5 divide-y divide-line/50 border-t border-line/50">
-          {topLevel.map(task => (
-            <div key={task.task_id}>
-              <TaskActivityRow task={task} />
-              {member.task_activity
-                .filter(t => t.parent_task_id === task.task_id)
-                .map(child => (
-                  <TaskActivityRow key={child.task_id} task={child} indented />
-                ))}
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="mt-2.5 border-t border-line/50">
+        <TaskList tasks={member.task_activity} />
+      </div>
     </div>
   )
 }
 
+// A personal workspace has one person, so there is no one to name and no
+// per-person total to show: just the tasks.
+function PersonalTasks({ tasks }: { tasks: StructuredSnapshotTaskActivity[] }) {
+  return (
+    <div className="rounded-xl border border-line/70 bg-paper/60 p-4">
+      <p className="text-xs font-bold text-ink">Tasks worked on</p>
+      <div className="mt-2.5 border-t border-line/50">
+        <TaskList tasks={tasks} />
+      </div>
+    </div>
+  )
+}
+
+// What changed in the workspace besides the work itself. The count of completed
+// tasks is deliberately not repeated here: the headline above carries the one
+// authoritative figure (distinct tasks still completed at the end), and a raw
+// event count would disagree with it whenever a task was reopened.
 function WorkspaceChangesSection({
   changes,
-  summaryText,
 }: {
   changes: StructuredSnapshotWorkspaceChanges
-  summaryText: string
 }) {
   const items: string[] = []
   if (changes.tasks_created > 0)
     items.push(
       `${changes.tasks_created} task${changes.tasks_created === 1 ? '' : 's'} created`,
-    )
-  if (changes.tasks_completed > 0)
-    items.push(
-      `${changes.tasks_completed} task${changes.tasks_completed === 1 ? '' : 's'} completed`,
     )
   if (changes.tasks_skipped > 0)
     items.push(
@@ -189,11 +211,8 @@ function WorkspaceChangesSection({
   return (
     <div className="rounded-xl border border-line/70 bg-paper/60 p-4">
       <p className="flex items-center gap-1.5 text-xs font-bold text-ink">
-        <UserPlus size={13} /> Workspace Changes
+        <UserPlus size={13} /> Workspace changes
       </p>
-      {summaryText && (
-        <p className="mt-1.5 text-xs leading-5 text-muted">{summaryText}</p>
-      )}
       <ul className="mt-2.5 list-disc space-y-1 border-t border-line/50 pl-5 pt-2.5 text-xs leading-5 text-ink">
         {items.map((item, i) => (
           <li key={i}>{item}</li>
@@ -261,60 +280,130 @@ export function BlockersSection({
   )
 }
 
-// Cross-member groupings by status — mechanically derived from task_activity,
-// never AI output (see summary_service.py's SummaryNarrative docstring: this
-// is exactly the kind of grouping that's 100% derivable from the snapshot,
-// so it's computed here rather than risking the model re-deriving it).
-function StatusRollup({
-  title,
-  entries,
+// The exact figures, straight from the backend's own snapshot -- focused time,
+// distinct tasks completed, and (shared workspaces only) how many people were
+// active. A personal workspace is one person's own work, so it never counts
+// members: "1 member" is team language for something that is not a team.
+export function ReportMetrics({
+  snapshot,
+  isPersonal,
 }: {
-  title: string
-  entries: { title: string; memberName: string }[]
+  snapshot: WorkspaceStructuredSnapshot
+  isPersonal: boolean
 }) {
-  if (entries.length === 0) return null
+  const { focusedSeconds, tasksCompleted, activeMembers } =
+    getDailyReportMetrics(snapshot)
+  const figure = (value: string) => (
+    <span className="font-mono text-sm font-bold text-ink">{value}</span>
+  )
   return (
-    <div className="rounded-xl border border-line/70 bg-paper/60 p-4">
-      <p className="text-xs font-bold text-ink">
-        {title} <span className="font-mono text-muted">{entries.length}</span>
-      </p>
-      <ul className="mt-2.5 space-y-1 border-t border-line/50 pt-2.5 text-xs leading-5">
-        {entries.map((entry, i) => (
-          <li key={i} className="flex items-center justify-between gap-3">
-            <span className="min-w-0 truncate text-ink">{entry.title}</span>
-            <span className="shrink-0 text-muted">{entry.memberName}</span>
-          </li>
-        ))}
-      </ul>
+    <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-muted">
+      <span>{figure(formatHM(focusedSeconds))} focused</span>
+      {tasksCompleted > 0 && (
+        <span>
+          {figure(String(tasksCompleted))} task
+          {tasksCompleted === 1 ? '' : 's'} completed
+        </span>
+      )}
+      {!isPersonal && activeMembers > 0 && (
+        <span>
+          {figure(String(activeMembers))}{' '}
+          {activeMembers === 1 ? 'member' : 'members'} active
+        </span>
+      )}
+    </p>
+  )
+}
+
+// The AI's reading of what happened, as the paragraph(s) it wrote.
+function Narrative({ summary }: { summary: WorkspaceDailySummary }) {
+  return (
+    <div className="space-y-3">
+      {narrativeParagraphs(summary.narrative).map((paragraph, i) => (
+        <p key={i} className="text-sm leading-6 text-ink">
+          {paragraph}
+        </p>
+      ))}
     </div>
   )
 }
 
+function ReportDetails({
+  summary,
+  isPersonal,
+  regeneratedByName,
+}: {
+  summary: WorkspaceDailySummary
+  isPersonal: boolean
+  regeneratedByName: string
+}) {
+  const snapshot = summary.structuredSnapshot
+  const membersWithTasks = snapshot.members.filter(
+    m => m.task_activity.length > 0,
+  )
+  return (
+    <div className="space-y-4 border-t border-line/70 px-5 py-4">
+      {isPersonal ? (
+        membersWithTasks.length > 0 && (
+          <PersonalTasks
+            tasks={membersWithTasks.flatMap(m => m.task_activity)}
+          />
+        )
+      ) : (
+        <div className="space-y-3">
+          {membersWithTasks.map(member => (
+            <MemberBreakdown key={member.user_id} member={member} />
+          ))}
+        </div>
+      )}
+
+      <WorkspaceChangesSection changes={snapshot.workspace_changes} />
+      <BlockersSection blockers={snapshot.blockers ?? []} />
+
+      <p className="text-[10px] text-muted">
+        {summary.regeneratedAt
+          ? `Last regenerated by ${regeneratedByName} · ${formatTimestamp(summary.regeneratedAt)}`
+          : `Automatically generated at ${formatTimestamp(summary.generatedAt)}`}
+      </p>
+    </div>
+  )
+}
+
+// `enabled` is the workspace's Daily Reports switch. When it is off this renders
+// nothing at all -- no empty card, no "no reports yet" placeholder -- while every
+// report already written stays stored, ready to reappear if it is switched back on.
 export function WorkspaceSummarySection({
+  enabled = true,
   ready,
   error,
   summary,
   members,
+  isPersonal = false,
   nextReportLabel,
   reportTimeLabel,
   generating,
   onRegenerate,
+  defaultExpanded = false,
 }: {
+  enabled?: boolean
   ready: boolean
   error?: string | null
   summary: WorkspaceDailySummary | null
   members: WorkspaceMember[]
+  isPersonal?: boolean
   nextReportLabel: string | null
   reportTimeLabel: string
   generating: boolean
   onRegenerate: () => void
+  defaultExpanded?: boolean
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(defaultExpanded)
+  if (!enabled) return null
   const isPending = summary?.generationStatus === 'pending'
   const isFailed = summary?.generationStatus === 'failed'
   const isCompleted = summary?.generationStatus === 'completed'
   const hasNoRecordedActivity =
-    isCompleted && summary.structuredSnapshot.members.length === 0
+    isCompleted && !hasReportActivity(summary.structuredSnapshot)
 
   const regeneratedByMember = summary?.regeneratedBy
     ? members.find(m => m.userId === summary.regeneratedBy)
@@ -322,45 +411,23 @@ export function WorkspaceSummarySection({
   const regeneratedByName =
     regeneratedByMember?.fullName || regeneratedByMember?.email || 'A member'
 
-  const byStatus = (status: SummaryTaskStatus) =>
-    summary
-      ? summary.structuredSnapshot.members.flatMap(member =>
-          member.task_activity
-            .filter(task => task.status_end === status)
-            .map(task => ({
-              title: task.title,
-              memberName: member.display_name,
-            })),
-        )
-      : []
-
   return (
     <div className="rounded-2xl border border-line bg-panel shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-line/70 px-5 py-4">
-        <div>
-          <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight text-ink">
-            <Sparkles size={15} /> Daily Report
-          </h2>
-          {summary ? (
-            <p className="mt-1 flex items-center gap-1 text-[11px] leading-4 text-muted">
-              <Clock size={11} className="shrink-0" />
-              Previous 24 hours · {formatWindow(summary)}
-            </p>
-          ) : (
-            <p className="mt-1 text-[11px] leading-4 text-muted">
-              Automatically generated every day at {reportTimeLabel}, covering
-              your workspace&apos;s previous 24 hours.
-            </p>
-          )}
-        </div>
-        {isCompleted && !hasNoRecordedActivity && (
-          <button
-            onClick={() => setExpanded(current => !current)}
-            className="flex items-center gap-1 text-[11px] font-semibold text-[var(--ws-accent,#375b4b)] transition hover:text-coral"
-          >
-            {expanded ? 'Hide' : 'View Report'}
-            {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-          </button>
+      <div className="border-b border-line/70 px-5 py-4">
+        <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight text-ink">
+          <Sparkles size={15} /> Daily Report
+        </h2>
+        {summary ? (
+          <p className="mt-1 flex items-center gap-1 text-[11px] leading-4 text-muted">
+            <Clock size={11} className="shrink-0" />
+            Previous 24 hours · {formatWindow(summary)}
+          </p>
+        ) : (
+          <p className="mt-1 text-[11px] leading-4 text-muted">
+            Automatically generated every day at {reportTimeLabel}, covering
+            your {isPersonal ? 'work over the' : "workspace's"} previous 24
+            hours.
+          </p>
         )}
       </div>
 
@@ -374,14 +441,14 @@ export function WorkspaceSummarySection({
           <p className="text-xs leading-5 text-muted">
             {nextReportLabel
               ? `Next report: ${nextReportLabel}`
-              : 'The Daily Report is generated automatically once your workspace has activity to cover.'}
+              : 'The Daily Report is generated automatically once there is activity to cover.'}
           </p>
         </div>
       ) : isPending ? (
         <div className="flex items-center justify-center gap-2 px-5 py-8 text-center">
           <Loader2 size={14} className="animate-spin text-muted" />
           <p className="text-xs leading-5 text-muted">
-            Generating your workspace&apos;s Daily Report…
+            Generating your Daily Report…
           </p>
         </div>
       ) : isFailed ? (
@@ -406,16 +473,11 @@ export function WorkspaceSummarySection({
         </div>
       ) : (
         <div>
-          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-            <p className="text-xs text-muted">
-              <span className="font-mono text-sm font-bold text-ink">
-                {formatHM(summary.structuredSnapshot.total_focused_seconds)}
-              </span>{' '}
-              recorded · {summary.structuredSnapshot.members.length}{' '}
-              {summary.structuredSnapshot.members.length === 1
-                ? 'member'
-                : 'members'}
-            </p>
+          <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-4">
+            <ReportMetrics
+              snapshot={summary.structuredSnapshot}
+              isPersonal={isPersonal}
+            />
             <Button
               variant="ghost"
               onClick={onRegenerate}
@@ -431,74 +493,37 @@ export function WorkspaceSummarySection({
           </div>
 
           {error && (
-            <div className="px-5 pb-4">
+            <div className="px-5 pt-3">
               <ErrorBanner>{error}</ErrorBanner>
             </div>
           )}
 
+          <div className="space-y-2 px-5 pb-4 pt-3">
+            <Narrative summary={summary} />
+            {summary.meta.used_fallback_template && (
+              <p className="text-[10px] leading-4 text-muted">
+                AI narration wasn&apos;t available for this report, so this
+                summary was written directly from what was recorded.
+              </p>
+            )}
+          </div>
+
+          <div className="border-t border-line/70 px-5 py-2.5">
+            <button
+              onClick={() => setExpanded(current => !current)}
+              className="flex items-center gap-1 text-[11px] font-semibold text-[var(--ws-accent,#375b4b)] transition hover:text-coral"
+            >
+              {expanded ? 'Hide details' : 'Show details'}
+              {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </button>
+          </div>
+
           {expanded && (
-            <div className="space-y-4 border-t border-line/70 px-5 py-4">
-              <p className="text-xs leading-6 text-ink">
-                {summary.narrative.overall_summary}
-              </p>
-
-              {summary.narrative.highlights.length > 0 && (
-                <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-muted">
-                  {summary.narrative.highlights.map((highlight, i) => (
-                    <li key={i}>{highlight}</li>
-                  ))}
-                </ul>
-              )}
-
-              <div className="space-y-3">
-                {summary.structuredSnapshot.members.map(member => (
-                  <MemberBreakdown
-                    key={member.user_id}
-                    member={member}
-                    note={
-                      summary.narrative.members.find(
-                        n => n.user_id === member.user_id,
-                      )?.note
-                    }
-                  />
-                ))}
-              </div>
-
-              <WorkspaceChangesSection
-                changes={summary.structuredSnapshot.workspace_changes}
-                summaryText={summary.narrative.workspace_changes_summary}
-              />
-
-              <BlockersSection
-                blockers={summary.structuredSnapshot.blockers ?? []}
-              />
-
-              <StatusRollup
-                title="Completed Work"
-                entries={byStatus('completed')}
-              />
-              <StatusRollup
-                title="Still In Progress"
-                entries={byStatus('in_progress')}
-              />
-              <StatusRollup
-                title="Skipped Work"
-                entries={byStatus('skipped')}
-              />
-
-              {summary.meta.used_fallback_template && (
-                <p className="text-[10px] leading-4 text-muted">
-                  AI narration wasn&apos;t available for this report — the
-                  totals above are computed directly from tracked time.
-                </p>
-              )}
-
-              <p className="text-[10px] text-muted">
-                {summary.regeneratedAt
-                  ? `Last regenerated by ${regeneratedByName} · ${formatTimestamp(summary.regeneratedAt)}`
-                  : `Automatically generated at ${formatTimestamp(summary.generatedAt)}`}
-              </p>
-            </div>
+            <ReportDetails
+              summary={summary}
+              isPersonal={isPersonal}
+              regeneratedByName={regeneratedByName}
+            />
           )}
         </div>
       )}

@@ -64,6 +64,9 @@ export function useWorkspaceSummary(
   user: AuthUser | null,
   timezone: string,
   reportTime: string,
+  // Whether the workspace has Daily Reports switched on. When it hasn't, the
+  // section isn't shown at all, so there is nothing to load or keep live.
+  enabled = true,
 ) {
   const userId = user?.id
   const [history, setHistory] = useState<WorkspaceDailySummary[]>([])
@@ -72,7 +75,7 @@ export function useWorkspaceSummary(
   const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
-    if (!userId || !workspaceId) {
+    if (!userId || !workspaceId || !enabled) {
       setHistory([])
       setReady(true)
       return
@@ -121,7 +124,7 @@ export function useWorkspaceSummary(
       cancelled = true
       supabase.removeChannel(channel)
     }
-  }, [userId, workspaceId])
+  }, [userId, workspaceId, enabled])
 
   // The most recently due/created report -- automatic generation always
   // produces (at most) one row per rolling window, ordered newest-first.

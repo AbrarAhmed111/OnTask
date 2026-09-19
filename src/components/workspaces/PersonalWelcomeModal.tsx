@@ -16,7 +16,7 @@ const HIGHLIGHTS = [
   { icon: ListChecks, text: 'Organize projects, tasks and subtasks' },
   { icon: Clock, text: 'Track focused work time' },
   { icon: History, text: 'View your activity and history' },
-  { icon: Sparkles, text: 'Generate AI-powered daily reports' },
+  { icon: Sparkles, text: 'Turn on AI-powered daily reports in Settings' },
   { icon: Lock, text: 'Keep your work private and saved' },
 ]
 

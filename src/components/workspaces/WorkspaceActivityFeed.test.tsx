@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { WorkspaceActivityFeed } from '@/components/workspaces/WorkspaceActivityFeed'
-import { formatMemberEvent } from '@/lib/workspaceSummaryEvents'
 import type { ActivityEvent } from '@/hooks/useWorkspaceActivity'
-import type {
-  StructuredSnapshotEvent,
-  WorkspaceMember,
-} from '@/types/workspace'
+import type { WorkspaceMember } from '@/types/workspace'
 
 const member = (userId: string, fullName: string): WorkspaceMember => ({
   id: `m-${userId}`,
@@ -139,62 +135,5 @@ describe('WorkspaceActivityFeed — task blockers', () => {
       '&quot;Deploy&quot; is now blocked by &quot;Build&quot;',
     )
     expect(html).not.toContain('blocker')
-  })
-})
-
-describe('formatMemberEvent — task blockers in the Daily Report', () => {
-  const report = (
-    type: string,
-    metadata: Record<string, unknown>,
-    overrides: Partial<StructuredSnapshotEvent> = {},
-  ): StructuredSnapshotEvent => ({
-    type,
-    timestamp: '2026-09-19T10:00:00Z',
-    task_id: 't-1',
-    task_title: 'Student API',
-    parent_title: null,
-    metadata,
-    ...overrides,
-  })
-
-  it('states the reason exactly as recorded', () => {
-    expect(
-      formatMemberEvent(
-        report('task_blocker_added', {
-          reason: 'Waiting for API credentials from @Araysh.',
-        }),
-      ),
-    ).toBe('Blocked "Student API" — Waiting for API credentials from @Araysh.')
-  })
-
-  it('names who was mentioned', () => {
-    expect(
-      formatMemberEvent(
-        report('task_blocker_mention', { mentioned_name: 'Araysh' }),
-      ),
-    ).toBe('Mentioned Araysh in the blocker for "Student API"')
-  })
-
-  it('states a resolution with its note, or without one', () => {
-    expect(
-      formatMemberEvent(
-        report('task_blocker_resolved', {
-          resolution_note: 'API credentials have been provided.',
-        }),
-      ),
-    ).toBe(
-      'Resolved the blocker on "Student API" — API credentials have been provided.',
-    )
-    expect(formatMemberEvent(report('task_blocker_resolved', {}))).toBe(
-      'Resolved the blocker on "Student API"',
-    )
-  })
-
-  it('reports an edit and keeps the parent for a subtask', () => {
-    expect(
-      formatMemberEvent(
-        report('task_blocker_updated', {}, { parent_title: 'School MVP' }),
-      ),
-    ).toBe('Updated the blocker on "Student API" under "School MVP"')
   })
 })

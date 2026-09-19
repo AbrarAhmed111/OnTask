@@ -19,6 +19,8 @@ export type WorkspaceRow = {
   owner_id: string
   timezone: string
   report_time: string
+  // Absent until migration 0042 is applied; see rowToWorkspace.
+  daily_reports_enabled?: boolean
   accent: string
   created_at: string
   updated_at: string
@@ -36,10 +38,42 @@ export function rowToWorkspace(row: WorkspaceRow): Workspace {
     ownerId: row.owner_id,
     timezone: row.timezone,
     reportTime: row.report_time,
+    // Until the migration is applied there is no column: report the product
+    // default (a personal workspace opt-in, a shared one on) rather than guess.
+    dailyReportsEnabled: row.daily_reports_enabled ?? row.type !== 'personal',
     accent: row.accent,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
+}
+
+// The fields of a workspace its owner can change after creation.
+export type WorkspacePatch = Partial<
+  Pick<
+    Workspace,
+    | 'name'
+    | 'description'
+    | 'timezone'
+    | 'reportTime'
+    | 'accent'
+    | 'dailyReportsEnabled'
+  >
+>
+
+// A patch as the columns it updates -- only the ones actually present, so saving
+// one setting (the Daily Reports switch) never rewrites another.
+export function workspacePatchToRow(
+  patch: WorkspacePatch,
+): Record<string, string | boolean | null> {
+  const row: Record<string, string | boolean | null> = {}
+  if (patch.name !== undefined) row.name = patch.name
+  if (patch.description !== undefined) row.description = patch.description
+  if (patch.timezone !== undefined) row.timezone = patch.timezone
+  if (patch.reportTime !== undefined) row.report_time = patch.reportTime
+  if (patch.accent !== undefined) row.accent = patch.accent
+  if (patch.dailyReportsEnabled !== undefined)
+    row.daily_reports_enabled = patch.dailyReportsEnabled
+  return row
 }
 
 export function isPersonalWorkspace(

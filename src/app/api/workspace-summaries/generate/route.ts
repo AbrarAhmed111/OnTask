@@ -15,6 +15,10 @@ import { WorkspaceStructuredSnapshot } from '@/types/workspace'
 // from the client) and passed through unchanged to
 // regenerate_workspace_daily_report, which preserves them plus the report's
 // original generation_type/generated_by.
+//
+// It also honours the workspace's Daily Reports switch: with reports turned off
+// there is nothing to regenerate (the section is hidden), so a direct call is
+// refused up front -- before the snapshot is aggregated or an AI call is made.
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
   const workspaceId = body?.workspaceId
@@ -36,6 +40,32 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  }
+
+  const { data: workspace, error: workspaceError } = await supabase
+    .from('workspaces')
+    .select('daily_reports_enabled')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  if (workspaceError) {
+    return NextResponse.json(
+      { error: 'Failed to load the workspace' },
+      { status: 500 },
+    )
+  }
+  if (!workspace) {
+    return NextResponse.json(
+      { error: 'Not a member of this workspace' },
+      { status: 403 },
+    )
+  }
+  // `=== false`, not falsy: a database that hasn't got migration 0042 yet has
+  // no such column, and reports were always on before it.
+  if (workspace.daily_reports_enabled === false) {
+    return NextResponse.json(
+      { error: 'Daily Reports are turned off for this workspace' },
+      { status: 409 },
+    )
   }
 
   const { data: existing, error: existingError } = await supabase

@@ -20,6 +20,11 @@ export type Workspace = {
   // The workspace-local time of day (e.g. "12:00:00") the automatic Daily
   // Report is generated at -- owner-configurable, defaults to noon.
   reportTime: string
+  // Whether the automatic Daily Report runs for this workspace at all. Owner-
+  // configurable; off by default for a personal workspace, on for a shared one
+  // (supabase/migrations/0042). Turning it off hides the report section and
+  // stops new reports, and keeps the ones already stored.
+  dailyReportsEnabled: boolean
   accent: string
   createdAt: string
   updatedAt: string
@@ -220,6 +225,17 @@ export type WorkspaceResource = {
 
 export type SummaryTaskStatus = 'completed' | 'in_progress' | 'skipped'
 
+// A task's state AT report_end, from the authoritative task record -- never
+// derived from how many times it was completed or reopened in the window.
+export type SummaryCurrentStatus =
+  | 'queued'
+  | 'working'
+  | 'paused'
+  | 'blocked'
+  | 'completed'
+  | 'skipped'
+  | 'deleted'
+
 // One task_events row (or a synthesized 'invitation_sent' entry attributed
 // to the inviter) — the raw, factual activity log a member's narrative is
 // grounded in. `metadata` is forwarded from the DB as-is; shape depends on
@@ -229,8 +245,17 @@ export type StructuredSnapshotEvent = {
   type: string
   timestamp: string
   task_id: string | null
+  // Resolved in SQL (the title on the event, else the task's own, else the one
+  // its `deleted` event kept) so nothing downstream has to guess. Null only for
+  // an event with no task, or a task that genuinely cannot be resolved -- never
+  // a placeholder.
   task_title: string | null
   parent_title: string | null
+  // What a task-less event is about: a goal's name, a file's name, an invited
+  // address. Absent on snapshots from before migration 0042.
+  subject?: string | null
+  actor_user_id?: string | null
+  actor_name?: string | null
   metadata: Record<string, unknown>
 }
 
@@ -250,6 +275,8 @@ export type StructuredSnapshotTaskActivity = {
   progress_start: number | null
   progress_end: number | null
   status_end: SummaryTaskStatus
+  // Absent on snapshots from before migration 0042 (status_end is all they have).
+  current_status?: SummaryCurrentStatus | null
 }
 
 export type StructuredSnapshotMember = {
@@ -315,13 +342,25 @@ export type StructuredSnapshotBlocker = {
   blocked_seconds: number
 }
 
+// The authoritative counts the report shows (migration 0042). Distinct TASKS:
+// `tasks_completed` counts tasks completed in the window that are still
+// completed at its end, so a task completed, reopened and running again is not
+// one. Absent on older snapshots -- see lib/dailyReportMetrics.ts.
+export type StructuredSnapshotMetrics = {
+  tasks_worked_on: number
+  tasks_completed: number
+}
+
 export type WorkspaceStructuredSnapshot = {
   workspace_id: string
   workspace_name: string
+  // Absent on snapshots from before migration 0042.
+  workspace_type?: WorkspaceType
   report_start: string
   report_end: string
   timezone: string
   total_focused_seconds: number
+  metrics?: StructuredSnapshotMetrics
   members: StructuredSnapshotMember[]
   workspace_changes: StructuredSnapshotWorkspaceChanges
   // Absent on reports generated before task blockers existed.
@@ -333,6 +372,10 @@ export type SummaryMemberNarrative = {
   note: string
 }
 
+// Since migration 0042 the Daily Report narrative is prose: `overall_summary`
+// holds ALL of it (paragraphs separated by a blank line) and the other three
+// fields are empty. They stay on the type because a report stored before then
+// filled them.
 export type SummaryNarrative = {
   overall_summary: string
   members: SummaryMemberNarrative[]

@@ -14,6 +14,7 @@ const workspace = (overrides: Partial<Workspace> = {}): Workspace => ({
   ownerId: 'u1',
   timezone: 'Europe/London',
   reportTime: '09:00:00',
+  dailyReportsEnabled: true,
   accent: 'ocean',
   createdAt: '2026-01-01',
   updatedAt: '2026-01-01',
@@ -152,5 +153,75 @@ describe('WorkspaceSettingsSection', () => {
       expect(loading).toContain('disabled=""')
       expect(loaded).not.toContain('disabled=""')
     })
+  })
+})
+
+describe('WorkspaceSettingsSection — Daily Reports', () => {
+  // The completion sound is switched off here so that a `checked=""` in the
+  // markup can only be the Daily Reports switch.
+  const quiet = { ready: true, soundEnabled: false, onSoundEnabledChange: noop }
+  const daily = { saving: false, onChange: noop }
+  const renderDaily = (
+    props: Partial<Parameters<typeof WorkspaceSettingsSection>[0]> = {},
+  ) => render({ preferences: quiet, dailyReports: daily, ...props })
+
+  it('offers the switch on its own card', () => {
+    const html = renderDaily()
+    expect(html).toContain('Daily Reports')
+    expect(html).toContain('AI Daily Report')
+  })
+
+  it('leaves the card out when the page does not offer it', () => {
+    expect(render()).not.toContain('AI Daily Report')
+  })
+
+  it('reflects whether reports are on, for a shared workspace', () => {
+    expect(
+      renderDaily({ workspace: workspace({ dailyReportsEnabled: true }) }),
+    ).toContain('checked=""')
+    expect(
+      renderDaily({ workspace: workspace({ dailyReportsEnabled: false }) }),
+    ).not.toContain('checked=""')
+  })
+
+  it('shows a personal workspace that has not opted in as off', () => {
+    const html = renderDaily({
+      isPersonal: true,
+      workspace: workspace({ type: 'personal', dailyReportsEnabled: false }),
+    })
+    expect(html).not.toContain('checked=""')
+    expect(html).toContain('A short written summary of your work,')
+    expect(html).toContain('Turn this on to start receiving a Daily Report')
+  })
+
+  it('lets the owner change it, and only the owner', () => {
+    const disabledFor = (canManage: boolean) => {
+      const html = renderDaily({ canManage })
+      // the only checkbox that is disabled here is the Daily Reports one
+      return html.includes('disabled=""')
+    }
+    expect(disabledFor(true)).toBe(false)
+    expect(disabledFor(false)).toBe(true)
+    expect(renderDaily({ canManage: false })).toContain(
+      'Only the workspace owner can change this.',
+    )
+  })
+
+  it('locks the switch while a change is being saved', () => {
+    expect(
+      renderDaily({ dailyReports: { saving: true, onChange: noop } }),
+    ).toContain('disabled=""')
+  })
+
+  it('explains what turning it off does, without promising to delete anything', () => {
+    const html = renderDaily({
+      workspace: workspace({ dailyReportsEnabled: true }),
+    })
+    expect(html).toContain('hides the Daily Report and stops new reports')
+    expect(html).toContain('Reports already written are kept.')
+  })
+
+  it('shows the report time it will run at', () => {
+    expect(renderDaily()).toContain('9:00 AM')
   })
 })

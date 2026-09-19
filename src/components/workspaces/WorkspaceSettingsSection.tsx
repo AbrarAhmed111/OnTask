@@ -1,5 +1,12 @@
 import { ReactNode } from 'react'
-import { Bell, CircleHelp, Settings2, SlidersHorizontal } from 'lucide-react'
+import {
+  Bell,
+  CircleHelp,
+  FileText,
+  Settings2,
+  Sparkles,
+  SlidersHorizontal,
+} from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ErrorBanner } from '@/components/ui/ErrorBanner'
 import { PreferenceToggle } from '@/components/ui/PreferenceToggle'
@@ -55,6 +62,10 @@ function SettingsCard({
 //
 // Plus "Help & guidance", which replays this workspace's onboarding tour.
 //
+// The Daily Report switch is a property of the workspace too (owner only), but
+// it is a plain on/off with an immediate effect, so it has its own card and
+// saves on the spot rather than going through the Edit dialog.
+//
 // A personal workspace keeps its fixed name and has no description.
 export function WorkspaceSettingsSection({
   ready,
@@ -63,6 +74,7 @@ export function WorkspaceSettingsSection({
   isPersonal = false,
   canManage,
   preferences,
+  dailyReports,
   guidance,
   onEdit,
 }: {
@@ -80,6 +92,8 @@ export function WorkspaceSettingsSection({
   // Replaying this workspace's onboarding tour. `label` names it ("Personal
   // Workspace tour"); omit `guidance` to leave the card out.
   guidance?: { label: string; onReplay: () => void }
+  // Turning the Daily Report on or off; omit to leave the card out.
+  dailyReports?: { saving: boolean; onChange: (enabled: boolean) => void }
   onEdit: () => void
 }) {
   const theme = getWorkspaceTheme(workspace?.accent)
@@ -137,6 +151,32 @@ export function WorkspaceSettingsSection({
           </div>
         )}
       </SettingsCard>
+
+      {dailyReports && workspace && (
+        <SettingsCard icon={Sparkles} title="Daily Reports">
+          <div className="space-y-3 px-5 py-4">
+            <PreferenceToggle
+              icon={FileText}
+              title="AI Daily Report"
+              description={`${
+                isPersonal
+                  ? 'A short written summary of your work,'
+                  : 'A short written summary of what the workspace got done,'
+              } generated each day at ${formatTimeOfDay(workspace.reportTime ?? '12:00:00')}.`}
+              checked={workspace.dailyReportsEnabled}
+              disabled={!ready || !canManage || dailyReports.saving}
+              onChange={dailyReports.onChange}
+            />
+            <p className="text-[10px] leading-4 text-muted">
+              {!canManage
+                ? 'Only the workspace owner can change this.'
+                : workspace.dailyReportsEnabled
+                  ? 'Turning this off hides the Daily Report and stops new reports. Reports already written are kept.'
+                  : 'Turn this on to start receiving a Daily Report. Reports already written are kept, and nothing is written for the time it was off.'}
+            </p>
+          </div>
+        </SettingsCard>
+      )}
 
       <SettingsCard icon={SlidersHorizontal} title="Your preferences">
         <div className="space-y-3 px-5 py-4">

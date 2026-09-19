@@ -15,6 +15,12 @@ import { WorkspaceStructuredSnapshot } from '@/types/workspace'
 // RLS) but every RPC it calls stays scoped to one explicit workspace_id at a
 // time, so it can never mix data across workspaces.
 //
+// The workspace's Daily Reports switch is enforced in the database, not here:
+// list_workspaces_due_for_daily_report never returns a workspace whose reports
+// are off (or a window that ended before they were last switched on), and
+// claim_daily_report refuses one switched off since -- so a disabled workspace
+// costs no snapshot and no AI call. A refused claim reads as 'skipped' below.
+//
 // Idempotency/concurrency is owned entirely by claim_daily_report's atomic
 // INSERT ... ON CONFLICT ... WHERE <retryable> -- this route can safely run
 // concurrently with itself (overlapping ticks, retried pg_net deliveries)

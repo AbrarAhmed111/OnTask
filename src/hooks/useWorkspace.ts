@@ -12,8 +12,10 @@ import {
 } from '@/lib/redux/workspaceCacheSlice'
 import {
   PERSONAL_WORKSPACE_SLUG,
+  WorkspacePatch,
   WorkspaceRow,
   rowToWorkspace,
+  workspacePatchToRow,
 } from '@/lib/workspaces'
 
 type WorkspaceMemberRow = {
@@ -181,25 +183,12 @@ export function useWorkspace(workspaceSlug: string, user: AuthUser | null) {
 
   const role = members.find(member => member.userId === userId)?.role ?? null
 
-  const updateWorkspace = async (
-    patch: Partial<
-      Pick<
-        Workspace,
-        'name' | 'description' | 'timezone' | 'reportTime' | 'accent'
-      >
-    >,
-  ) => {
+  const updateWorkspace = async (patch: WorkspacePatch) => {
     if (!workspace) return { success: false as const, error: 'Not loaded.' }
     const supabase = createClient()
-    const row: Record<string, string | null> = {}
-    if (patch.name !== undefined) row.name = patch.name
-    if (patch.description !== undefined) row.description = patch.description
-    if (patch.timezone !== undefined) row.timezone = patch.timezone
-    if (patch.reportTime !== undefined) row.report_time = patch.reportTime
-    if (patch.accent !== undefined) row.accent = patch.accent
     const { error: updateError } = await supabase
       .from('workspaces')
-      .update(row)
+      .update(workspacePatchToRow(patch))
       .eq('id', workspace.id)
     if (updateError) {
       return { success: false as const, error: updateError.message }
