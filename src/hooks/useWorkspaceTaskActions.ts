@@ -4,7 +4,7 @@ import { notifyTaskCompletion } from '@/lib/notifications'
 import { WorkspaceMember, WorkspaceTask } from '@/types/workspace'
 import { TaskFormValues } from '@/types'
 import { getWorkspaceLiveSeconds } from '@/lib/tasks/workspaceMappers'
-import { canControlTimer, canEmergencyStop } from '@/lib/tasks/timerPermissions'
+import { canControlTimer, canEmergencyStop, canReopenTask } from '@/lib/tasks/timerPermissions'
 import { shouldReopenOnExtend } from '@/lib/tasks/reopen'
 import { useTaskBlockerActions } from '@/hooks/useTaskBlockerActions'
 
@@ -103,10 +103,15 @@ export function useWorkspaceTaskActions({
     goalId: string | null = null,
   ) => {
     event.preventDefault()
-    if (!userId) return false
+    if (!userId || !form.name.trim()) return false
+
     const plannedMinutes =
-      Number(form.hours || 0) * 60 + Number(form.minutes || 0)
-    if (!form.name.trim() || plannedMinutes <= 0) return false
+      form.hasPlannedTime === false
+        ? null
+        : (form.hours || form.minutes)
+          ? Number(form.hours || 0) * 60 + Number(form.minutes || 0)
+          : null
+    const description = form.description?.trim() || null
 
     const id = crypto.randomUUID()
     const name = form.name.trim()
@@ -127,6 +132,7 @@ export function useWorkspaceTaskActions({
         createdBy: userId,
         assignedTo,
         name,
+        description,
         plannedMinutes,
         workedSeconds: 0,
         status: 'queued',
@@ -148,7 +154,8 @@ export function useWorkspaceTaskActions({
         created_by: userId,
         assigned_to: assignedTo,
         title: name,
-        planned_seconds: plannedMinutes * 60,
+        description,
+        planned_seconds: plannedMinutes !== null ? plannedMinutes * 60 : null,
         progress_label: progressLabel ?? null,
         progress_percentage: progressPercentage ?? null,
       })
@@ -192,8 +199,9 @@ export function useWorkspaceTaskActions({
     )
     const row: Record<string, unknown> = {}
     if (update.name !== undefined) row.title = update.name
+    if (update.description !== undefined) row.description = update.description ?? null
     if (update.plannedMinutes !== undefined)
-      row.planned_seconds = update.plannedMinutes * 60
+      row.planned_seconds = update.plannedMinutes !== null ? update.plannedMinutes * 60 : null
     if (update.progressLabel !== undefined)
       row.progress_label = update.progressLabel ?? null
     if (update.progressPercentage !== undefined)
@@ -340,10 +348,8 @@ export function useWorkspaceTaskActions({
     if (!userId) return
     // Same as starting: a blocked task has to be unblocked before it can end.
     if (task.status === 'blocked') return
-    // Finishing a task whose timer is running stops that timer, so it takes
-    // the same permission as pausing it. A task that isn't running can be
-    // finished by anyone, as before.
-    if (task.status === 'working' && !canControlTimer(task, timerActor)) return
+    // Finishing or skipping a task requires timer control permission.
+    if (!canControlTimer(task, timerActor)) return
     notifyTaskCompletion(task.name)
     onComplete?.(task)
     const workedSeconds = Math.round(getWorkspaceLiveSeconds(task, now))
@@ -367,6 +373,30 @@ export function useWorkspaceTaskActions({
         if (!rpcError) return
         restoreTasks([task])
         setError(timerErrorMessage(rpcError, "Couldn't save task completion."))
+      })
+  }
+
+  const reopenTask = (task: WorkspaceTask) => {
+    if (!userId || !canReopenTask(task, timerActor)) return
+    setTasks(current =>
+      current.map(t =>
+        t.id === task.id
+          ? {
+              ...t,
+              status: 'queued' as const,
+              startedAt: null,
+              completedAt: null,
+            }
+          : t,
+      ),
+    )
+    const supabase = createClient()
+    void supabase
+      .rpc('reopen_workspace_task', { p_task_id: task.id })
+      .then(({ error: rpcError }) => {
+        if (!rpcError) return
+        restoreTasks([task])
+        setError(timerErrorMessage(rpcError, "Couldn't reopen task."))
       })
   }
 
@@ -533,9 +563,11 @@ export function useWorkspaceTaskActions({
     pauseTask,
     emergencyStopTask,
     finishTask,
+    reopenTask,
     deleteTask,
     moveTask,
     reassignTask,
     blockerActions,
   }
 }
+
