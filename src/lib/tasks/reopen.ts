@@ -14,13 +14,13 @@
 // nothing left to do.
 
 export function shouldReopenOnExtend(
-  task: { status: string; plannedMinutes: number; workedSeconds: number },
-  newPlannedMinutes: number | undefined,
+  task: { status: string; plannedMinutes: number | null; workedSeconds: number },
+  newPlannedMinutes: number | null | undefined,
 ): boolean {
+  if (task.status !== 'completed' || newPlannedMinutes == null) return false
+  const oldPlanned = task.plannedMinutes ?? 0
   return (
-    task.status === 'completed' &&
-    newPlannedMinutes !== undefined &&
-    newPlannedMinutes > task.plannedMinutes &&
+    newPlannedMinutes > oldPlanned &&
     task.workedSeconds < newPlannedMinutes * 60
   )
 }

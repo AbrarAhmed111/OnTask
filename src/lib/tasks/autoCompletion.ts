@@ -52,6 +52,9 @@ export function isTaskDue(
   actor: CompletionActor,
   now: number,
 ): boolean {
+  if (task.plannedMinutes === null || task.plannedMinutes === undefined) {
+    return false
+  }
   return (
     task.status === 'working' &&
     canControlTimer(task, actor) &&

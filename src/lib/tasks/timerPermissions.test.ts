@@ -43,9 +43,9 @@ describe('canControlTimer', () => {
     expect(canControlTimer(task('alice'), owner('olivia'))).toBe(false)
   })
 
-  it('gives nobody control of an unassigned task', () => {
-    expect(canControlTimer(task(null), member('alice'))).toBe(false)
-    expect(canControlTimer(task(null), owner('olivia'))).toBe(false)
+  it('gives any member control of an unassigned task', () => {
+    expect(canControlTimer(task(null), member('alice'))).toBe(true)
+    expect(canControlTimer(task(null), owner('olivia'))).toBe(true)
   })
 
   it('moves control to the new assignee the moment the task is reassigned', () => {
@@ -76,8 +76,8 @@ describe('canEmergencyStop', () => {
     )
   })
 
-  it('lets the owner stop a running timer on an unassigned task', () => {
-    expect(canEmergencyStop(task(null, 'working'), owner('olivia'))).toBe(true)
+  it('is not needed on unassigned tasks because any member (including owner) can pause directly', () => {
+    expect(canEmergencyStop(task(null, 'working'), owner('olivia'))).toBe(false)
   })
 
   it('does not apply when the timer is not running', () => {
@@ -120,10 +120,7 @@ describe('timerLockReason', () => {
   it('has no reason when the actor controls the timer', () => {
     expect(timerLockReason(task('alice'), member('alice'))).toBeNull()
     expect(timerLockReason(task(null), personal('me'))).toBeNull()
-  })
-
-  it('asks for an assignee when the task has none', () => {
-    expect(timerLockReason(task(null), member('alice'))).toMatch(/assign/i)
+    expect(timerLockReason(task(null), member('alice'))).toBeNull()
   })
 
   it('names the assignee rule when someone else holds the timer', () => {

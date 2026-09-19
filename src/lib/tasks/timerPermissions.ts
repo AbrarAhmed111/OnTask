@@ -23,8 +23,16 @@ export function canControlTimer(
   actor: Pick<TimerActor, 'userId' | 'isPersonal'>,
 ): boolean {
   if (!actor.userId) return false
-  if (task.assignedTo === null) return actor.isPersonal
+  if (task.assignedTo === null) return true
   return task.assignedTo === actor.userId
+}
+
+export function canReopenTask(
+  task: Pick<WorkspaceTask, 'assignedTo' | 'status'>,
+  actor: Pick<TimerActor, 'userId' | 'isPersonal'>,
+): boolean {
+  if (task.status !== 'completed' && task.status !== 'skipped') return false
+  return canControlTimer(task, actor)
 }
 
 // The owner's separate override for someone else's running timer. It can only
@@ -45,7 +53,5 @@ export function timerLockReason(
   actor: Pick<TimerActor, 'userId' | 'isPersonal'>,
 ): string | null {
   if (canControlTimer(task, actor)) return null
-  return task.assignedTo === null
-    ? 'Assign this task to a member to use its timer'
-    : 'Only the assigned member can control this timer'
+  return 'Only the assigned member can work or complete this task'
 }

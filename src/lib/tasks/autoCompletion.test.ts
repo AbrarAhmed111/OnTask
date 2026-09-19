@@ -85,13 +85,19 @@ describe('isTaskDue', () => {
     expect(isTaskDue(theirs, actor, PLANNED_END + 1e6)).toBe(false)
   })
 
-  it('an unassigned task is due only in a personal workspace', () => {
+  it('an unassigned task is due when planned time has run out', () => {
     const unassigned = task({ assignedTo: null })
 
-    expect(isTaskDue(unassigned, actor, PLANNED_END)).toBe(false)
+    expect(isTaskDue(unassigned, actor, PLANNED_END)).toBe(true)
     expect(
       isTaskDue(unassigned, { ...actor, isPersonal: true }, PLANNED_END),
     ).toBe(true)
+  })
+
+  it('is never due when plannedMinutes is null', () => {
+    const noPlanned = task({ plannedMinutes: null })
+
+    expect(isTaskDue(noPlanned, actor, PLANNED_END + 1e9)).toBe(false)
   })
 })
 
