@@ -208,8 +208,8 @@ begin
         else greatest(0, extract(epoch from (now() - v_task.started_at)))
       end;
 
-  -- A task with no planned time, or whose worked time has not reached planned_seconds, is NOT due.
-  if v_task.planned_seconds is null or v_worked < v_task.planned_seconds then
+  -- A task with no planned time (or 0 planned time), or whose worked time has not reached planned_seconds, is NOT due.
+  if v_task.planned_seconds is null or v_task.planned_seconds <= 0 or v_worked < v_task.planned_seconds then
     return jsonb_build_object('outcome', 'not_due', 'task', to_jsonb(v_task));
   end if;
 

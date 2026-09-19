@@ -29,7 +29,12 @@ export function useTasks(
 
   useEffect(() => {
     const active = tasks.find(task => task.status === 'active')
-    if (!active || getLiveSeconds(active, now) < active.plannedMinutes * 60)
+    if (
+      !active ||
+      active.plannedMinutes == null ||
+      active.plannedMinutes <= 0 ||
+      getLiveSeconds(active, now) < active.plannedMinutes * 60
+    )
       return
 
     notifyTaskCompletion(active.name)

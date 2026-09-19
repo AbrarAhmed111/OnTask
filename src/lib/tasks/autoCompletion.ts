@@ -52,7 +52,11 @@ export function isTaskDue(
   actor: CompletionActor,
   now: number,
 ): boolean {
-  if (task.plannedMinutes === null || task.plannedMinutes === undefined) {
+  if (
+    task.plannedMinutes === null ||
+    task.plannedMinutes === undefined ||
+    task.plannedMinutes <= 0
+  ) {
     return false
   }
   return (
