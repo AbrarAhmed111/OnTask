@@ -50,7 +50,7 @@ OnTask has three clear places to work:
 | | Where | Who | What you get |
 | --- | --- | --- | --- |
 | **Guest** | `/` | Anyone, no account | The local-first dashboard below. Data stays in the browser. |
-| **Personal Workspace** | `/workspaces/personal-workspace` | Every registered user, automatically | A private, owner-only workspace: goals, tasks and subtasks, focused time, progress, activity/history, resources, and the AI Daily Report. Nothing to create, nothing to invite. |
+| **Personal Workspace** | `/workspaces/personal-workspace` | Every registered user, automatically | A private, owner-only workspace: goals, tasks and subtasks, focused time, progress, activity/history, resources, and an optional AI Daily Report (off until you turn it on). Nothing to create, nothing to invite. |
 | **Shared Workspaces** | `/workspaces/<slug>` | Invited members | The same workspace features plus members, invitations, assignments and team activity. |
 
 `/workspaces` is a signed-in user's hub: their pending invitations, their
@@ -110,7 +110,7 @@ includes:
 | Resources (file uploads) | — | ✓ | ✓ |
 | Activity feed | — | ✓ | ✓ |
 | Notifications | — | Own + every shared workspace's | That workspace's |
-| Automatic AI Daily Report | — | ✓ (days with activity) | ✓ |
+| Automatic AI Daily Report | — | Opt-in; days with activity | ✓ (owner can turn off) |
 | Members, invitations, assignments, live presence | — | — | ✓ |
 | Task blockers | — | — | ✓ |
 | Guided tour | — | Once on sign-up, then replay | Replay from Settings |
@@ -314,26 +314,40 @@ when that migration runs.
 
 ### Automatic Daily Report
 
-- Every workspace automatically gets a **Daily Report at a configured time of
-  day (12:00 PM by default) in its own configured timezone**, covering the
-  exact previous rolling 24 hours (not a calendar day) — no one has to click
+- A workspace's **Daily Report** is written automatically **at a configured
+  time of day (12:00 PM by default) in its own configured timezone**, covering
+  the exact previous rolling 24 hours (not a calendar day) — no one has to click
   "Generate," and OnTask doesn't need to be open. The owner can change both
   the timezone and the report time per workspace at any time (workspace
   settings). A Supabase `pg_cron` job ticks every 5 minutes, finds workspaces
   whose configured local time has arrived, and calls the Next.js app
   server-side to build and save the report; a secondary "Regenerate" action
   stays available to any workspace member for the current report.
-- Each report covers an overall summary and highlights; every member's focused
-  time with a short note and their task activity; workspace changes
-  (invitations, members joined or removed, tasks created, completed, skipped,
-  and deleted); the blockers raised or resolved in the window (reason, who was
-  asked, who resolved); and Completed, Still In Progress, and Skipped Work
-  roll-ups. If AI narration is unavailable the report says so, and its totals
-  are still computed from tracked time.
-- Personal Workspaces get a report too, but only on days with recorded
-  activity, so idle accounts never trigger an AI call. Shared Workspaces always
-  get one, even if it just says nothing was recorded. Members are notified
-  when a report is ready.
+- **Daily Reports can be turned On or Off per workspace** (Settings → Daily
+  Reports, owner only). A Shared Workspace starts **On**; a Personal Workspace
+  starts **Off**, so nobody gets an AI report they didn't ask for. Off means no
+  new reports are generated (the scheduler skips the workspace, so no AI call
+  is made), the Daily Report section is hidden — no empty card, no "no reports
+  yet" placeholder — and reports already written are kept. Turning it back On
+  resumes future reports; it doesn't back-fill the one missed while it was off.
+  It is enforced in the database, not just hidden in the UI.
+- The report reads as a **short narrative, not an activity log**: the AI turns
+  the verified facts into one short paragraph (Personal) or one to three
+  (Shared) about what actually got done — the tasks worked on, by their real
+  titles; what was completed, reopened, blocked or resolved — with repetitive
+  pausing and resuming folded together. A Personal Workspace's report is about
+  the owner's own work, never "1 member". The exact figures stay separate and
+  deterministic, straight from the database: focused time, tasks completed
+  (distinct tasks still completed at the end), each task's current status, and
+  the report period; the AI never states or recalculates them. The details view
+  adds the tasks and their status, workspace changes and blockers; the raw
+  event list stays in the Activity feed. If AI narration is unavailable the
+  report says so and falls back to a short summary written from those same
+  facts.
+- Personal Workspaces that have turned reports on get one only on days with
+  recorded activity, so idle accounts never trigger an AI call. Shared
+  Workspaces get one every day, even if it just says nothing was recorded.
+  Members are notified when a report is ready.
 - Generation is structured-first: the app aggregates the window's task
   events into a factual snapshot, hands it to the separate
   [`ontask-llm`](ontask-llm) service, and validates the returned narrative
@@ -362,6 +376,8 @@ when that migration runs.
 - **Workspace details** — name, description (Shared Workspaces only), timezone,
   Daily Report time, and accent theme. Only the owner can edit them; members
   see them read-only. A Personal Workspace keeps its fixed name.
+- **Daily Reports** — an On/Off switch for the workspace's automatic Daily
+  Report. Only the owner can change it; it saves immediately.
 - **Your preferences** — the completion sound, saved on this device.
 - **Help & guidance** — replay the workspace's guided tour.
 
@@ -532,7 +548,7 @@ npm test          # Run the Vitest suite
 
 The AI service has its own tests (`uv run pytest` in
 [`ontask-llm`](ontask-llm)). The database rules — timers, Personal Workspaces,
-Daily Reports, blockers — have SQL tests in
+Daily Reports (including the On/Off setting), blockers — have SQL tests in
 [`supabase/tests`](supabase/tests) to run against a scratch Supabase project.
 
 ## Local Data
