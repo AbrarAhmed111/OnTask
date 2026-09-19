@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useTimer } from '@/hooks/useTimer'
-import { notifyTaskCompletion } from '@/lib/notifications'
 import { useWorkspaceTaskActions } from '@/hooks/useWorkspaceTaskActions'
-import { canControlTimer } from '@/lib/tasks/timerPermissions'
+import { useWorkspaceSnapshot } from '@/hooks/useWorkspaceSnapshot'
+import { useTaskAutoCompletion } from '@/hooks/useTaskAutoCompletion'
+import { SNAPSHOTS } from '@/lib/cache/workspaceSnapshots'
 import {
   WorkspaceTaskRow,
   getWorkspaceLiveSeconds,
@@ -43,6 +44,8 @@ function rowToDependency(row: TaskDependencyRow): TaskDependency {
   }
 }
 
+const NO_TASKS: WorkspaceTask[] = []
+
 // A single Goal's tasks + subtasks (Task -> Subtask is the only hierarchy
 // level a Goal allows). Mirrors useWorkspaceTasks.ts's realtime pattern,
 // scoped by goal_id instead of "flat tasks in this workspace", and shares
@@ -56,14 +59,24 @@ export function useGoalDetail(
   isPersonal = false,
 ) {
   const userId = user?.id
-  const [tasks, setTasks] = useState<WorkspaceTask[]>([])
+  // Held with its origin, so the completion below only ever sees data the
+  // server has confirmed. Goal tasks are not cached on this device (yet), so
+  // nothing is read from or written to disk here.
+  const snapshot = useWorkspaceSnapshot<WorkspaceTask[]>({
+    userId,
+    workspaceId,
+    scope: goalId,
+    descriptor: SNAPSHOTS.tasks,
+    initial: NO_TASKS,
+    persist: false,
+  })
+  const { data: tasks, setData: setTasks, confirm } = snapshot
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dependencies, setDependencies] = useState<TaskDependency[]>([])
   const [dependenciesReady, setDependenciesReady] = useState(false)
   const now = useTimer()
   const onCompleteRef = useRef(onComplete)
-  const completingRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     onCompleteRef.current = onComplete
@@ -71,7 +84,6 @@ export function useGoalDetail(
 
   useEffect(() => {
     if (!userId || !goalId) {
-      setTasks([])
       setReady(true)
       return
     }
@@ -92,7 +104,7 @@ export function useGoalDetail(
             setReady(true)
             return
           }
-          setTasks(((data ?? []) as WorkspaceTaskRow[]).map(rowToTask))
+          confirm(((data ?? []) as WorkspaceTaskRow[]).map(rowToTask))
           setReady(true)
         })
     }
@@ -141,7 +153,7 @@ export function useGoalDetail(
       document.removeEventListener('visibilitychange', handleVisibility)
       supabase.removeChannel(channel)
     }
-  }, [userId, goalId])
+  }, [userId, goalId, confirm, setTasks])
 
   useEffect(() => {
     if (!userId || !goalId) {
@@ -272,47 +284,17 @@ export function useGoalDetail(
   ) => addTaskAction(event, form, parentTaskId, assignedTo, goalId)
 
   // Same auto-complete-on-planned-time behavior as flat tasks (useWorkspaceTasks.ts) —
-  // goal tasks use the identical execution model.
-  useEffect(() => {
-    if (!userId) return
-    // Only the timer's own controller completes it — see useWorkspaceTasks.ts.
-    const working = tasks.find(
-      task =>
-        task.status === 'working' &&
-        canControlTimer(task, { userId, isPersonal }),
-    )
-    if (
-      !working ||
-      getWorkspaceLiveSeconds(working, now) < working.plannedMinutes * 60
-    )
-      return
-    if (completingRef.current.has(working.id)) return
-    completingRef.current.add(working.id)
-
-    notifyTaskCompletion(working.name)
-    onCompleteRef.current?.(working)
-    const finalSeconds = Math.round(getWorkspaceLiveSeconds(working, now))
-    setTasks(current =>
-      current.map(task =>
-        task.id === working.id
-          ? {
-              ...task,
-              status: 'completed',
-              workedSeconds: finalSeconds,
-              startedAt: null,
-              completedAt: Date.now(),
-            }
-          : task,
-      ),
-    )
-    const supabase = createClient()
-    void supabase
-      .rpc('complete_workspace_task', { p_task_id: working.id, p_skip: false })
-      .then(({ error: rpcError }) => {
-        completingRef.current.delete(working.id)
-        if (rpcError) setError("Couldn't save task completion.")
-      })
-  }, [now, tasks, userId, isPersonal])
+  // goal tasks use the identical execution model, and now the identical code.
+  useTaskAutoCompletion({
+    tasks: snapshot.authoritative,
+    userId,
+    isPersonal,
+    now,
+    setTasks,
+    setError,
+    onComplete,
+    belongsInList: task => task.goalId === goalId,
+  })
 
   const tasksMap = buildTasksById(tasks)
 

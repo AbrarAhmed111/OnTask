@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useTimer } from '@/hooks/useTimer'
-import { notifyTaskCompletion } from '@/lib/notifications'
 import { useWorkspaceTaskActions } from '@/hooks/useWorkspaceTaskActions'
-import { canControlTimer } from '@/lib/tasks/timerPermissions'
+import { useWorkspaceSnapshot } from '@/hooks/useWorkspaceSnapshot'
+import { useFetchStatus } from '@/hooks/useFetchStatus'
+import { useTaskAutoCompletion } from '@/hooks/useTaskAutoCompletion'
+import { SNAPSHOTS } from '@/lib/cache/workspaceSnapshots'
 import {
   WorkspaceTaskRow,
   getWorkspaceLiveSeconds,
@@ -17,6 +19,18 @@ export { getWorkspaceLiveSeconds }
 // Ordinary (non-Goal) workspace tasks — permanently flat: hierarchy and
 // dependencies only exist inside Goals (useGoalDetail.ts). Realtime via
 // Supabase, following the same pattern as useWorkspaceActivity.ts etc.
+//
+// The list is also cached on this device (namespaced by user AND workspace) and
+// shown from there on a repeat visit while the real list is fetched. What the
+// cache may and may not do is the point of useWorkspaceSnapshot: it fills the
+// screen sooner, but only a list the server has confirmed this session is
+// handed to anything that acts on it -- auto-completing a task included (see
+// useTaskAutoCompletion). A cached "working" task that ran out of time while the
+// app was closed is shown, and is completed only if Supabase says it still is.
+const NO_TASKS: WorkspaceTask[] = []
+// The flat list holds goal-less tasks only; goal tasks are useGoalDetail's.
+const isFlatTask = (task: WorkspaceTask) => task.goalId === null
+
 export function useWorkspaceTasks(
   workspaceId: string,
   user: AuthUser | null,
@@ -25,28 +39,37 @@ export function useWorkspaceTasks(
   isPersonal = false,
 ) {
   const userId = user?.id
-  const [tasks, setTasks] = useState<WorkspaceTask[]>([])
-  const [ready, setReady] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const snapshot = useWorkspaceSnapshot<WorkspaceTask[]>({
+    userId,
+    workspaceId,
+    descriptor: SNAPSHOTS.tasks,
+    initial: NO_TASKS,
+  })
+  const { data: tasks, setData: setTasks, confirm } = snapshot
+  const [actionError, setError] = useState<string | null>(null)
   const now = useTimer()
   const onCompleteRef = useRef(onComplete)
-  const completingRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     onCompleteRef.current = onComplete
   }, [onComplete])
 
+  const fetchKey = userId && workspaceId ? `${userId}|${workspaceId}` : null
+  const status = useFetchStatus(snapshot, fetchKey, {
+    load: "Couldn't load workspace tasks.",
+    refresh: "Couldn't refresh tasks — you may be seeing an out-of-date list.",
+  })
+  const { failed: markFailed, succeeded: markSucceeded } = status
+  const { ready } = status
+  // A failed refresh, or a failed action (add, start, ...).
+  const error = status.error ?? actionError
+
   useEffect(() => {
-    if (!userId || !workspaceId) {
-      setTasks([])
-      setReady(true)
-      return
-    }
+    if (!userId || !workspaceId || !fetchKey) return
     let cancelled = false
     const supabase = createClient()
 
-    const fetchTasks = (showLoading: boolean) => {
-      if (showLoading) setReady(false)
+    const fetchTasks = () => {
       supabase
         .from('workspace_tasks')
         .select('*')
@@ -59,22 +82,23 @@ export function useWorkspaceTasks(
         .then(({ data, error: fetchError }) => {
           if (cancelled) return
           if (fetchError) {
-            setError("Couldn't load workspace tasks.")
-            setReady(true)
+            // Whatever is already shown (cached) stays: a failed refresh must
+            // not blank the list, and must not pretend it is current.
+            markFailed()
             return
           }
-          setTasks(((data ?? []) as WorkspaceTaskRow[]).map(rowToTask))
-          setReady(true)
+          confirm(((data ?? []) as WorkspaceTaskRow[]).map(rowToTask))
+          markSucceeded()
         })
     }
 
-    fetchTasks(true)
+    fetchTasks()
 
     // Timer state is never trusted from memory alone across a reconnect —
     // a dropped websocket (laptop sleep, network blip) can silently miss
     // postgres_changes events, so coming back online or back into the tab
     // always re-derives the full task list from the database.
-    const handleReconnect = () => fetchTasks(false)
+    const handleReconnect = () => fetchTasks()
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') handleReconnect()
     }
@@ -124,7 +148,15 @@ export function useWorkspaceTasks(
       document.removeEventListener('visibilitychange', handleVisibility)
       supabase.removeChannel(channel)
     }
-  }, [userId, workspaceId])
+  }, [
+    userId,
+    workspaceId,
+    fetchKey,
+    confirm,
+    setTasks,
+    markFailed,
+    markSucceeded,
+  ])
 
   const {
     addTask: addTaskAction,
@@ -188,47 +220,19 @@ export function useWorkspaceTasks(
     })
   }
 
-  useEffect(() => {
-    if (!userId) return
-    // Only the timer's own controller completes it — every member's browser
-    // sees the same running task, and the server rejects anyone else.
-    const working = tasks.find(
-      task =>
-        task.status === 'working' &&
-        canControlTimer(task, { userId, isPersonal }),
-    )
-    if (
-      !working ||
-      getWorkspaceLiveSeconds(working, now) < working.plannedMinutes * 60
-    )
-      return
-    if (completingRef.current.has(working.id)) return
-    completingRef.current.add(working.id)
-
-    notifyTaskCompletion(working.name)
-    onCompleteRef.current?.(working)
-    const finalSeconds = Math.round(getWorkspaceLiveSeconds(working, now))
-    setTasks(current =>
-      current.map(task =>
-        task.id === working.id
-          ? {
-              ...task,
-              status: 'completed',
-              workedSeconds: finalSeconds,
-              startedAt: null,
-              completedAt: Date.now(),
-            }
-          : task,
-      ),
-    )
-    const supabase = createClient()
-    void supabase
-      .rpc('complete_workspace_task', { p_task_id: working.id, p_skip: false })
-      .then(({ error: rpcError }) => {
-        completingRef.current.delete(working.id)
-        if (rpcError) setError("Couldn't save task completion.")
-      })
-  }, [now, tasks, userId, isPersonal])
+  // Completing a task whose planned time ran out. Fed only server-confirmed
+  // data (`snapshot.authoritative` is null while the list is cache-only), and
+  // de-duplicated per timer run -- see hooks/useTaskAutoCompletion.ts.
+  useTaskAutoCompletion({
+    tasks: snapshot.authoritative,
+    userId,
+    isPersonal,
+    now,
+    setTasks,
+    setError,
+    onComplete,
+    belongsInList: isFlatTask,
+  })
 
   const activeTask = tasks.find(task => task.status === 'working')
 

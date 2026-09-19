@@ -1,5 +1,8 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useWorkspaceSnapshot } from '@/hooks/useWorkspaceSnapshot'
+import { useFetchStatus } from '@/hooks/useFetchStatus'
+import { SNAPSHOTS } from '@/lib/cache/workspaceSnapshots'
 import type { AuthUser } from '@/hooks/useAuth'
 import { Goal, GoalStatus } from '@/types/workspace'
 
@@ -41,26 +44,38 @@ export type GoalFormValues = {
   targetDate: string
 }
 
+const NO_GOALS: Goal[] = []
+
 // List + realtime for a workspace's Goals — same postgres_changes pattern as
 // useWorkspaceTasks.ts/useWorkspaceActivity.ts. A single Goal's own tasks/
 // subtasks are fetched separately by useGoalDetail.ts.
 export function useWorkspaceGoals(workspaceId: string, user: AuthUser | null) {
   const userId = user?.id
-  const [goals, setGoals] = useState<Goal[]>([])
-  const [ready, setReady] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // Cached on this device per user AND workspace, shown while the real list is
+  // fetched; see useWorkspaceSnapshot.
+  const snapshot = useWorkspaceSnapshot<Goal[]>({
+    userId,
+    workspaceId,
+    descriptor: SNAPSHOTS.goals,
+    initial: NO_GOALS,
+  })
+  const { data: goals, setData: setGoals, confirm } = snapshot
+  const [actionError, setError] = useState<string | null>(null)
+  const fetchKey = userId && workspaceId ? `${userId}|${workspaceId}` : null
+  const status = useFetchStatus(snapshot, fetchKey, {
+    load: "Couldn't load goals.",
+    refresh: "Couldn't refresh goals — you may be seeing an out-of-date list.",
+  })
+  const { failed: markFailed, succeeded: markSucceeded } = status
+  const { ready } = status
+  const error = status.error ?? actionError
 
   useEffect(() => {
-    if (!userId || !workspaceId) {
-      setGoals([])
-      setReady(true)
-      return
-    }
+    if (!userId || !workspaceId || !fetchKey) return
     let cancelled = false
     const supabase = createClient()
 
-    const fetchGoals = (showLoading: boolean) => {
-      if (showLoading) setReady(false)
+    const fetchGoals = () => {
       supabase
         .from('goals')
         .select('*')
@@ -69,18 +84,17 @@ export function useWorkspaceGoals(workspaceId: string, user: AuthUser | null) {
         .then(({ data, error: fetchError }) => {
           if (cancelled) return
           if (fetchError) {
-            setError("Couldn't load goals.")
-            setReady(true)
+            markFailed()
             return
           }
-          setGoals(((data ?? []) as GoalRow[]).map(rowToGoal))
-          setReady(true)
+          confirm(((data ?? []) as GoalRow[]).map(rowToGoal))
+          markSucceeded()
         })
     }
 
-    fetchGoals(true)
+    fetchGoals()
 
-    const handleReconnect = () => fetchGoals(false)
+    const handleReconnect = () => fetchGoals()
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') handleReconnect()
     }
@@ -122,7 +136,15 @@ export function useWorkspaceGoals(workspaceId: string, user: AuthUser | null) {
       document.removeEventListener('visibilitychange', handleVisibility)
       supabase.removeChannel(channel)
     }
-  }, [userId, workspaceId])
+  }, [
+    userId,
+    workspaceId,
+    fetchKey,
+    confirm,
+    setGoals,
+    markFailed,
+    markSucceeded,
+  ])
 
   const createGoal = (event: FormEvent, form: GoalFormValues) => {
     event.preventDefault()
