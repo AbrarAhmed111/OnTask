@@ -263,9 +263,9 @@ export function SlackIntegrationCard({
   }
 
   return (
-    <div className="min-h-[460px] flex flex-col justify-between rounded-2xl border border-line bg-panel shadow-sm divide-y divide-line/70">
+    <div className="rounded-2xl border border-line bg-panel shadow-sm divide-y divide-line/70">
       {/* Card Header */}
-      <div className="flex min-h-[57px] items-center justify-between px-5 py-3.5 shrink-0">
+      <div className="flex min-h-[52px] items-center justify-between px-5 py-3 shrink-0">
         <h2 className="flex items-center gap-2.5 text-sm font-bold tracking-tight text-ink">
           <SlackLogo className="h-5 w-5" /> Slack Integration
         </h2>
@@ -284,60 +284,58 @@ export function SlackIntegrationCard({
       {error && <ErrorBanner variant="flush">{error}</ErrorBanner>}
 
       {loading ? (
-        <div className="flex-1 space-y-4 px-5 py-6">
+        <div className="space-y-3 px-5 py-5">
           <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-28 w-full" />
-          <Skeleton className="h-10 w-1/3" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-9 w-1/3" />
         </div>
       ) : (
-        <div className="flex-1 flex flex-col justify-between px-5 py-6">
+        <div className="px-5 py-4">
           {/* Main Connection Status / Controls */}
           {!status?.connected ? (
-            <div className="flex flex-col justify-between flex-1 space-y-6">
-              <div className="space-y-4">
-                <p className="text-xs leading-5 text-muted">
-                  Connect your Slack workspace to receive automatic OnTask
-                  notifications for task assignments, completions, blockers, and
-                  Daily Reports directly inside your Slack channel.
-                </p>
+            <div className="space-y-4">
+              <p className="text-xs leading-5 text-muted">
+                Connect your Slack workspace to receive automatic OnTask
+                notifications for task assignments, completions, blockers, and
+                Daily Reports directly inside your Slack channel.
+              </p>
 
-                {/* Feature highlights to maintain card height stability */}
-                <div className="rounded-xl border border-line/60 bg-subtle/40 p-4 space-y-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-ink">
-                    Integration Features
-                  </p>
-                  <ul className="space-y-2.5 text-xs text-muted">
-                    <li className="flex items-center gap-2.5">
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                        ✓
-                      </span>
-                      <span>Real-time task assignment & status alerts</span>
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                        ✓
-                      </span>
-                      <span>Automated Daily Team Activity Reports</span>
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                        ✓
-                      </span>
-                      <span>Blocker creation & resolution notifications</span>
-                    </li>
-                  </ul>
-                </div>
+              {/* Feature highlights */}
+              <div className="rounded-xl border border-line/60 bg-subtle/40 p-3 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-ink">
+                  Integration Features
+                </p>
+                <ul className="space-y-1.5 text-[11px] text-muted">
+                  <li className="flex items-center gap-2">
+                    <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                      ✓
+                    </span>
+                    <span>Real-time task assignment & status alerts</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                      ✓
+                    </span>
+                    <span>Automated Daily Team Activity Reports</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                      ✓
+                    </span>
+                    <span>Blocker creation & resolution notifications</span>
+                  </li>
+                </ul>
               </div>
 
               {canManage ? (
-                <div className="pt-2">
+                <div className="pt-1">
                   {/* Official "Add to Slack" Button */}
                   <button
                     type="button"
                     onClick={handleConnect}
-                    className="inline-flex items-center justify-center gap-3 rounded-xl bg-[#4A154B] px-6 py-3 font-bold text-xs text-white shadow-md transition-all hover:bg-[#39103A] hover:shadow-lg active:scale-[0.99]"
+                    className="inline-flex items-center justify-center gap-2.5 rounded-xl bg-[#4A154B] px-5 py-2.5 font-bold text-xs text-white shadow-xs transition-all hover:bg-[#39103A] hover:shadow-md active:scale-[0.99]"
                   >
-                    <SlackLogo className="h-5 w-5" />
+                    <SlackLogo className="h-4.5 w-4.5" />
                     <span>Add to Slack</span>
                   </button>
                 </div>
@@ -348,174 +346,171 @@ export function SlackIntegrationCard({
               )}
             </div>
           ) : (
-            <div className="space-y-5 flex-1 flex flex-col justify-between">
-              <div className="space-y-5">
-                {status.connection_status === 'invalid_token' && (
-                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between gap-3">
-                    <span>
-                      Authorization expired or revoked. Please reconnect Slack
-                      to continue receiving updates.
-                    </span>
-                    {canManage && (
-                      <Button
-                        onClick={handleConnect}
-                        className="shrink-0 text-xs py-1 px-2.5 bg-amber-600 hover:bg-amber-700 text-white"
-                      >
-                        Reconnect
-                      </Button>
-                    )}
-                  </div>
-                )}
-
-                {status.connection_status === 'channel_missing' && (
-                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-800 dark:text-amber-200">
-                    Selected channel is no longer accessible. Please choose a
-                    valid Slack channel below.
-                  </div>
-                )}
-
-                {status.connection_status === 'configuration_incomplete' && (
-                  <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3.5 text-xs text-blue-800 dark:text-blue-200">
-                    Slack is connected! Select a destination channel below to
-                    activate notifications.
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between rounded-xl border border-line bg-subtle/50 px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <SlackLogo className="h-6 w-6" />
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-                        Connected Workspace
-                      </p>
-                      <p className="text-sm font-bold text-ink">
-                        {status.slack_team_name || 'Slack Workspace'}
-                      </p>
-                    </div>
-                  </div>
+            <div className="space-y-3.5">
+              {status.connection_status === 'invalid_token' && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between gap-3">
+                  <span>
+                    Authorization expired or revoked. Please reconnect Slack to
+                    continue receiving updates.
+                  </span>
                   {canManage && (
                     <Button
-                      variant="ghost"
-                      onClick={handleDisconnect}
-                      disabled={disconnecting}
-                      className="text-red-500 hover:bg-red-500/10 hover:text-red-600 gap-1.5 text-xs py-1 px-2.5"
+                      onClick={handleConnect}
+                      className="shrink-0 text-xs py-1 px-2.5 bg-amber-600 hover:bg-amber-700 text-white"
                     >
-                      {disconnecting ? (
-                        <Loader2 size={13} className="animate-spin" />
-                      ) : (
-                        <LogOut size={13} />
-                      )}
-                      Disconnect
+                      Reconnect
                     </Button>
                   )}
                 </div>
+              )}
 
-                {/* Channel Picker */}
-                <div className="space-y-2">
-                  <label className="flex items-center justify-between text-xs font-semibold tracking-tight text-ink">
-                    <span className="flex items-center gap-1.5">
-                      <Hash size={13} className="text-accent" />
-                      Destination Channel
-                    </span>
-                    {loadingChannels && (
-                      <span className="flex items-center gap-1 text-[11px] text-muted">
-                        <Loader2 size={12} className="animate-spin" /> Fetching
-                        channels...
-                      </span>
-                    )}
-                  </label>
-                  <div className="relative flex items-center">
-                    <div className="pointer-events-none absolute left-3 text-muted">
-                      <Hash size={14} />
-                    </div>
-                    <select
-                      value={selectedChannelId}
-                      onChange={e => setSelectedChannelId(e.target.value)}
-                      disabled={!canManage || loadingChannels}
-                      className="w-full appearance-none rounded-xl border border-line bg-panel pl-9 pr-8 py-2.5 text-xs font-semibold text-ink shadow-xs transition-all hover:border-line-hover focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <option value="">-- Select a Slack channel --</option>
-                      {channels.map(channel => (
-                        <option key={channel.id} value={channel.id}>
-                          #{channel.name}{' '}
-                          {channel.is_private ? '(private)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute right-3 text-muted">
-                      <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20">
-                        <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                      </svg>
-                    </div>
-                  </div>
-                  {status.channel_name && !selectedChannelId && (
-                    <p className="text-[11px] text-muted">
-                      Currently posting to{' '}
-                      <span className="font-semibold text-ink">
-                        #{status.channel_name}
-                      </span>
-                    </p>
-                  )}
+              {status.connection_status === 'channel_missing' && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-200">
+                  Selected channel is no longer accessible. Please choose a
+                  valid Slack channel below.
                 </div>
+              )}
 
-                {/* Notification Preferences Toggles */}
-                <div className="space-y-2.5">
-                  <p className="text-xs font-semibold text-ink">
-                    Notification Types
-                  </p>
-                  <div className="grid gap-2">
-                    {[
-                      {
-                        key: 'assigned',
-                        label: 'Task assignments & reassignments',
-                      },
-                      { key: 'completed', label: 'Task completions & reopens' },
-                      { key: 'blockers', label: 'Task blockers created' },
-                      {
-                        key: 'resolutions',
-                        label: 'Blocker resolutions & unblocks',
-                      },
-                      { key: 'daily_reports', label: 'Daily Reports' },
-                    ].map(({ key, label }) => (
-                      <label
-                        key={key}
-                        className="flex items-center gap-2.5 rounded-lg border border-line/50 px-3 py-2 text-xs text-ink hover:bg-subtle/40 cursor-pointer transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={
-                            settings[key as keyof SlackNotificationSettings]
-                          }
-                          onChange={() =>
-                            toggleSetting(
-                              key as keyof SlackNotificationSettings,
-                            )
-                          }
-                          disabled={!canManage}
-                          className="h-4 w-4 rounded border-line text-accent focus:ring-ring"
-                        />
-                        <span>{label}</span>
-                      </label>
-                    ))}
+              {status.connection_status === 'configuration_incomplete' && (
+                <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-2.5 text-xs text-blue-800 dark:text-blue-200">
+                  Slack is connected! Select a destination channel below to
+                  activate notifications.
+                </div>
+              )}
+
+              <div className="flex items-center justify-between rounded-xl border border-line bg-subtle/50 px-3.5 py-2.5">
+                <div className="flex items-center gap-2.5">
+                  <SlackLogo className="h-5 w-5" />
+                  <div>
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-muted">
+                      Connected Workspace
+                    </p>
+                    <p className="text-xs font-bold text-ink">
+                      {status.slack_team_name || 'Slack Workspace'}
+                    </p>
                   </div>
+                </div>
+                {canManage && (
+                  <Button
+                    variant="ghost"
+                    onClick={handleDisconnect}
+                    disabled={disconnecting}
+                    className="text-red-500 hover:bg-red-500/10 hover:text-red-600 gap-1 text-[11px] py-1 px-2"
+                  >
+                    {disconnecting ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <LogOut size={12} />
+                    )}
+                    Disconnect
+                  </Button>
+                )}
+              </div>
+
+              {/* Channel Picker */}
+              <div className="space-y-1.5">
+                <label className="flex items-center justify-between text-xs font-semibold tracking-tight text-ink">
+                  <span className="flex items-center gap-1.5">
+                    <Hash size={13} className="text-accent" />
+                    Destination Channel
+                  </span>
+                  {loadingChannels && (
+                    <span className="flex items-center gap-1 text-[10px] text-muted">
+                      <Loader2 size={11} className="animate-spin" /> Fetching...
+                    </span>
+                  )}
+                </label>
+                <div className="relative flex items-center">
+                  <div className="pointer-events-none absolute left-3 text-muted">
+                    <Hash size={13} />
+                  </div>
+                  <select
+                    value={selectedChannelId}
+                    onChange={e => setSelectedChannelId(e.target.value)}
+                    disabled={!canManage || loadingChannels}
+                    className="w-full appearance-none rounded-xl border border-line bg-panel pl-8 pr-8 py-2 text-xs font-semibold text-ink shadow-xs transition-all hover:border-line-hover focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <option value="">-- Select a Slack channel --</option>
+                    {channels.map(channel => (
+                      <option key={channel.id} value={channel.id}>
+                        #{channel.name} {channel.is_private ? '(private)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute right-3 text-muted">
+                    <svg
+                      className="h-3.5 w-3.5 fill-current"
+                      viewBox="0 0 20 20"
+                    >
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </div>
+                </div>
+                {status.channel_name && !selectedChannelId && (
+                  <p className="text-[10px] text-muted">
+                    Currently posting to{' '}
+                    <span className="font-semibold text-ink">
+                      #{status.channel_name}
+                    </span>
+                  </p>
+                )}
+              </div>
+
+              {/* Notification Preferences Toggles with Scrollbar */}
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-ink">
+                  Notification Types
+                </p>
+                <div className="max-h-[115px] overflow-y-auto space-y-1.5 pr-1 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">
+                  {[
+                    {
+                      key: 'assigned',
+                      label: 'Task assignments & reassignments',
+                    },
+                    { key: 'completed', label: 'Task completions & reopens' },
+                    { key: 'blockers', label: 'Task blockers created' },
+                    {
+                      key: 'resolutions',
+                      label: 'Blocker resolutions & unblocks',
+                    },
+                    { key: 'daily_reports', label: 'Daily Reports' },
+                  ].map(({ key, label }) => (
+                    <label
+                      key={key}
+                      className="flex items-center gap-2 rounded-lg border border-line/50 px-2.5 py-1.5 text-xs text-ink hover:bg-subtle/40 cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={
+                          settings[key as keyof SlackNotificationSettings]
+                        }
+                        onChange={() =>
+                          toggleSetting(key as keyof SlackNotificationSettings)
+                        }
+                        disabled={!canManage}
+                        className="h-3.5 w-3.5 rounded border-line text-accent focus:ring-ring"
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
 
               {/* Save Action */}
               {canManage && (
-                <div className="flex items-center gap-3 pt-2">
+                <div className="pt-1">
                   <Button
                     variant="primary"
                     onClick={handleSave}
                     disabled={saving || !selectedChannelId}
-                    className="gap-2 text-xs py-2 px-4 shadow-sm"
+                    className="gap-2 text-xs py-1.5 px-3.5 shadow-xs"
                   >
                     {saving ? (
-                      <Loader2 size={13} className="animate-spin" />
+                      <Loader2 size={12} className="animate-spin" />
                     ) : savedSuccess ? (
-                      <Check size={13} />
+                      <Check size={12} />
                     ) : (
-                      <RefreshCw size={13} />
+                      <RefreshCw size={12} />
                     )}
                     {savedSuccess ? 'Saved!' : 'Save Settings'}
                   </Button>
