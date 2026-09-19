@@ -159,3 +159,72 @@ end;
 $$;
 
 grant execute on function public.reopen_workspace_task(uuid) to authenticated;
+
+-- 5. Fix auto_complete_workspace_task to safely handle nullable planned_seconds:
+-- A task with no planned time (planned_seconds is null) is NEVER auto-completed.
+create or replace function public.auto_complete_workspace_task(
+  p_task_id uuid,
+  p_expected_started_at timestamptz
+)
+returns jsonb
+language plpgsql security invoker set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_task public.workspace_tasks%rowtype;
+  v_result public.workspace_tasks%rowtype;
+  v_same_run boolean;
+  v_worked numeric;
+begin
+  if v_user_id is null then
+    raise exception 'not authenticated';
+  end if;
+
+  select * into v_task from public.workspace_tasks where id = p_task_id for update;
+  if not found then
+    return jsonb_build_object('outcome', 'not_found', 'task', null);
+  end if;
+
+  if v_task.status <> 'working' then
+    return jsonb_build_object('outcome', 'not_running', 'task', to_jsonb(v_task));
+  end if;
+
+  v_same_run :=
+    (v_task.started_at is null and p_expected_started_at is null)
+    or (
+      v_task.started_at is not null
+      and p_expected_started_at is not null
+      and abs(extract(epoch from (v_task.started_at - p_expected_started_at))) <= 0.001
+    );
+  if not v_same_run then
+    return jsonb_build_object('outcome', 'different_run', 'task', to_jsonb(v_task));
+  end if;
+
+  -- Time worked so far: what was booked before this run, plus this run so far,
+  -- on the database's clock (not the browser's, which may be minutes off).
+  v_worked := v_task.actual_seconds
+    + case
+        when v_task.started_at is null then 0
+        else greatest(0, extract(epoch from (now() - v_task.started_at)))
+      end;
+
+  -- A task with no planned time, or whose worked time has not reached planned_seconds, is NOT due.
+  if v_task.planned_seconds is null or v_worked < v_task.planned_seconds then
+    return jsonb_build_object('outcome', 'not_due', 'task', to_jsonb(v_task));
+  end if;
+
+  -- Only the timer's own controller completes it, as for every timer action.
+  perform public.assert_workspace_task_timer_controller(
+    v_task.workspace_id, v_task.assigned_to, v_user_id
+  );
+
+  select * into v_result from public.complete_workspace_task(p_task_id, false);
+  return jsonb_build_object('outcome', 'completed', 'task', to_jsonb(v_result));
+end;
+$$;
+
+revoke all on function public.auto_complete_workspace_task(uuid, timestamptz)
+  from public, anon;
+grant execute on function public.auto_complete_workspace_task(uuid, timestamptz)
+  to authenticated;
+
