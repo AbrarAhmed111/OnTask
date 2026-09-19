@@ -29,6 +29,7 @@ import {
   selectCachedWorkspaceIdentity,
 } from '@/lib/redux/workspaceCacheSlice'
 import { saveTourOutcome } from '@/lib/tour/progress'
+import { showErrorToast } from '@/lib/toast'
 import type { TourId, TourOutcome } from '@/lib/tour/types'
 import { PERSONAL_WORKSPACE_SLUG } from '@/lib/workspaces'
 
@@ -95,9 +96,16 @@ export function WorkspaceLayout({
     role,
     ready,
     error,
+    syncError,
     updateWorkspace,
     removeMember,
   } = useWorkspace(workspaceSlug, user)
+  // A failed refresh leaves the last copy on screen (it never replaces the page,
+  // unlike `error`); say so once, so an out-of-date view isn't mistaken for a
+  // current one.
+  useEffect(() => {
+    if (syncError) showErrorToast(syncError)
+  }, [syncError])
   // The real workspace uuid, once resolved -- every downstream hook below
   // (and everything handed down via context) keys off this, never the URL
   // slug, since that's what workspace_id FKs and realtime filters expect.
