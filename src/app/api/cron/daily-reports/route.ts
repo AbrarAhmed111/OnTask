@@ -5,6 +5,7 @@ import {
   buildUnreachableFallbackMeta,
 } from '@/lib/dailyReportFallback'
 import { WorkspaceStructuredSnapshot } from '@/types/workspace'
+import { dispatchSlackNotification } from '@/lib/integrations/slack/slackDispatcher'
 
 // The automatic Daily Report scheduler's entry point. Invoked every 5
 // minutes by Supabase pg_cron/pg_net (see the `daily-reports-tick` job in
@@ -153,6 +154,10 @@ async function processCandidate(
       p_meta: meta,
     })
     if (finishError) throw new Error(finishError.message)
+    void dispatchSlackNotification({
+      workspaceId: candidate.workspace_id,
+      eventType: 'daily_report_ready',
+    })
     return 'completed'
   } catch (err) {
     const message =
