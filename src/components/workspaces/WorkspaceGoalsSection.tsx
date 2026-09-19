@@ -20,6 +20,7 @@ export function WorkspaceGoalsSection({
   members,
   updateGoal,
   setGoalStatus,
+  deleteGoal,
   onWorkingTasksChange,
   onBlockedTasksChange,
   onAddGoal,
@@ -43,6 +44,7 @@ export function WorkspaceGoalsSection({
     >,
   ) => void
   setGoalStatus: (id: string, status: Goal['status']) => void
+  deleteGoal?: (id: string) => void
   onWorkingTasksChange: (goalId: string, tasks: WorkspaceTask[]) => void
   // The goal's blocked tasks, for the overview's "Blocked" panel.
   onBlockedTasksChange?: (goalId: string, tasks: WorkspaceTask[]) => void
@@ -62,7 +64,7 @@ export function WorkspaceGoalsSection({
           Goals
         </h2>
         <div className="flex items-center gap-3">
-          {archivedCount > 0 && (
+          {(archivedCount > 0 || showArchived) && (
             <button
               onClick={() => setShowArchived(open => !open)}
               className="flex items-center gap-1.5 text-[11px] font-semibold text-muted transition hover:text-ink"
@@ -89,9 +91,19 @@ export function WorkspaceGoalsSection({
           icon={Target}
           title={showArchived ? 'No archived goals' : 'No goals yet'}
         >
-          {showArchived
-            ? null
-            : 'Goals group related tasks and subtasks toward a bigger outcome — create one when work needs more structure than a single task.'}
+          {showArchived ? (
+            <div className="mt-2">
+              <Button
+                variant="secondary"
+                className="text-xs"
+                onClick={() => setShowArchived(false)}
+              >
+                Show active goals
+              </Button>
+            </div>
+          ) : (
+            'Goals group related tasks and subtasks toward a bigger outcome — create one when work needs more structure than a single task.'
+          )}
         </EmptyState>
       ) : (
         <div className="space-y-3">
@@ -106,6 +118,7 @@ export function WorkspaceGoalsSection({
               members={members}
               updateGoal={updateGoal}
               setGoalStatus={setGoalStatus}
+              deleteGoal={deleteGoal}
               onWorkingTasksChange={onWorkingTasksChange}
               onBlockedTasksChange={onBlockedTasksChange}
             />

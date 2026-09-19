@@ -10,9 +10,11 @@ import {
   CirclePlus,
   RotateCcw,
   Target,
+  Trash2,
 } from 'lucide-react'
 import { showErrorToast, showSuccessToast } from '@/lib/toast'
 import { Button } from '@/components/ui/Button'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Modal } from '@/components/ui/Modal'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -66,6 +68,7 @@ export function GoalCard({
   members,
   updateGoal,
   setGoalStatus,
+  deleteGoal,
   onWorkingTasksChange,
   onBlockedTasksChange,
 }: {
@@ -85,10 +88,12 @@ export function GoalCard({
     >,
   ) => void
   setGoalStatus: (id: string, status: Goal['status']) => void
+  deleteGoal?: (id: string) => void
   onWorkingTasksChange: (goalId: string, tasks: WorkspaceTask[]) => void
   onBlockedTasksChange?: (goalId: string, tasks: WorkspaceTask[]) => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [pendingDeleteGoal, setPendingDeleteGoal] = useState(false)
   const completionAlert = useCompletionAlert<WorkspaceTask>(soundEnabled)
   const {
     tasks,
@@ -306,6 +311,18 @@ export function GoalCard({
     showSuccessToast('Goal updated.')
   }
 
+  const isOwner =
+    isPersonal ||
+    members.some(m => m.userId === user?.id && m.role === 'owner')
+  const canDeleteGoal =
+    isOwner || (user?.id ? goal.createdBy === user.id : false)
+
+  const confirmDeleteGoal = () => {
+    deleteGoal?.(goal.id)
+    setPendingDeleteGoal(false)
+    showSuccessToast('Goal deleted.')
+  }
+
   const StatusIcon =
     goal.status === 'completed'
       ? CircleCheck
@@ -315,46 +332,59 @@ export function GoalCard({
 
   return (
     <div className="rounded-2xl border border-line bg-panel shadow-sm">
-      <button
-        type="button"
-        onClick={() => setExpanded(open => !open)}
-        className="flex w-full items-start gap-3 px-5 py-4 text-left"
-      >
-        {expanded ? (
-          <ChevronDown size={16} className="mt-0.5 shrink-0 text-muted" />
-        ) : (
-          <ChevronRight size={16} className="mt-0.5 shrink-0 text-muted" />
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="min-w-0 truncate text-sm font-bold tracking-tight text-ink">
-              {goal.name}
-            </h3>
-            {(goal.status !== 'active' || hasWorkingTask) && (
-              <span
-                className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase ${STATUS_STYLES[goal.status]}`}
-              >
-                <StatusIcon size={10} /> {STATUS_LABEL[goal.status]}
-              </span>
+      <div className="flex w-full items-start gap-3 px-5 py-4">
+        <button
+          type="button"
+          onClick={() => setExpanded(open => !open)}
+          className="flex min-w-0 flex-1 items-start gap-3 text-left"
+        >
+          {expanded ? (
+            <ChevronDown size={16} className="mt-0.5 shrink-0 text-muted" />
+          ) : (
+            <ChevronRight size={16} className="mt-0.5 shrink-0 text-muted" />
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="min-w-0 truncate text-sm font-bold tracking-tight text-ink">
+                {goal.name}
+              </h3>
+              {(goal.status !== 'active' || hasWorkingTask) && (
+                <span
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase ${STATUS_STYLES[goal.status]}`}
+                >
+                  <StatusIcon size={10} /> {STATUS_LABEL[goal.status]}
+                </span>
+              )}
+            </div>
+            {!expanded && goal.description && (
+              <p className="mt-1 line-clamp-1 text-xs text-muted">
+                {goal.description}
+              </p>
+            )}
+            {!expanded && goal.targetDate && (
+              <p className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold text-muted">
+                <CalendarDays size={11} />
+                Target{' '}
+                {new Date(goal.targetDate).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </p>
             )}
           </div>
-          {!expanded && goal.description && (
-            <p className="mt-1 line-clamp-1 text-xs text-muted">
-              {goal.description}
-            </p>
-          )}
-          {!expanded && goal.targetDate && (
-            <p className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold text-muted">
-              <CalendarDays size={11} />
-              Target{' '}
-              {new Date(goal.targetDate).toLocaleDateString(undefined, {
-                month: 'short',
-                day: 'numeric',
-              })}
-            </p>
-          )}
-        </div>
-      </button>
+        </button>
+
+        {goal.status === 'archived' && canDeleteGoal && !expanded && (
+          <button
+            type="button"
+            aria-label={`Delete ${goal.name}`}
+            onClick={() => setPendingDeleteGoal(true)}
+            className="shrink-0 rounded-lg p-2 text-muted transition hover:bg-coral/10 hover:text-coral"
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
+      </div>
 
       {expanded && (
         <div className="space-y-6 border-t border-line/70 px-5 py-5">
@@ -378,6 +408,11 @@ export function GoalCard({
               setGoalStatus(goal.id, 'active')
               showSuccessToast('Goal reactivated.')
             }}
+            onDelete={
+              canDeleteGoal && goal.status === 'archived'
+                ? () => setPendingDeleteGoal(true)
+                : undefined
+            }
           />
 
           <div>
@@ -506,6 +541,15 @@ export function GoalCard({
           }
           onRemove={removeDependency}
           onClose={() => setDependencyTask(null)}
+        />
+      )}
+      {pendingDeleteGoal && (
+        <ConfirmModal
+          title="Delete this archived goal?"
+          message={`"${goal.name}" and all of its tasks will be permanently deleted. This can't be undone.`}
+          confirmLabel="Delete goal"
+          onConfirm={confirmDeleteGoal}
+          onClose={() => setPendingDeleteGoal(false)}
         />
       )}
     </div>

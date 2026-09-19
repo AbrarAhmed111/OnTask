@@ -93,6 +93,7 @@ export function WorkspaceOverviewClient() {
     createGoal,
     updateGoal,
     setGoalStatus,
+    deleteGoal,
   } = useWorkspaceGoals(workspaceId, user)
   const {
     resources,
@@ -351,6 +352,7 @@ export function WorkspaceOverviewClient() {
         members={members}
         updateGoal={updateGoal}
         setGoalStatus={setGoalStatus}
+        deleteGoal={deleteGoal}
         onWorkingTasksChange={handleWorkingTasksChange}
         onBlockedTasksChange={handleBlockedTasksChange}
         onAddGoal={openAddGoal}

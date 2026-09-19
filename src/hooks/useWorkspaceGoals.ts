@@ -96,10 +96,18 @@ export function useWorkspaceGoals(workspaceId: string, user: AuthUser | null) {
 
     const handleReconnect = () => fetchGoals()
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') handleReconnect()
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'visible'
+      )
+        handleReconnect()
     }
-    window.addEventListener('online', handleReconnect)
-    document.addEventListener('visibilitychange', handleVisibility)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', handleReconnect)
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibility)
+    }
 
     const channel = supabase
       .channel(`workspace-goals-${workspaceId}`)
@@ -132,8 +140,12 @@ export function useWorkspaceGoals(workspaceId: string, user: AuthUser | null) {
 
     return () => {
       cancelled = true
-      window.removeEventListener('online', handleReconnect)
-      document.removeEventListener('visibilitychange', handleVisibility)
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('online', handleReconnect)
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibility)
+      }
       supabase.removeChannel(channel)
     }
   }, [

@@ -4,6 +4,7 @@ import {
   CircleCheck,
   Pencil,
   RotateCcw,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ProgressBar } from '@/components/ui/ProgressBar'
@@ -21,6 +22,7 @@ export function GoalDetailHeader({
   onMarkComplete,
   onArchive,
   onReactivate,
+  onDelete,
 }: {
   goal: Goal
   progress: number
@@ -32,6 +34,7 @@ export function GoalDetailHeader({
   onMarkComplete: () => void
   onArchive: () => void
   onReactivate: () => void
+  onDelete?: () => void
 }) {
   return (
     <div className="rounded-2xl border border-line bg-panel p-5 shadow-sm sm:p-6">
@@ -75,9 +78,21 @@ export function GoalDetailHeader({
               <Archive size={15} /> Archive
             </Button>
           ) : (
-            <Button variant="ghost" onClick={onReactivate}>
-              <RotateCcw size={15} /> Reactivate
-            </Button>
+            <>
+              <Button variant="ghost" onClick={onReactivate}>
+                <RotateCcw size={15} /> Reactivate
+              </Button>
+              {onDelete && (
+                <Button
+                  variant="danger"
+                  onClick={onDelete}
+                  aria-label="Delete goal"
+                  className="gap-1.5"
+                >
+                  <Trash2 size={15} /> Delete
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
