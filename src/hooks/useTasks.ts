@@ -117,8 +117,6 @@ export function useTasks(
     })
 
   const finishTask = (task: Task, early = false) => {
-    notifyTaskCompletion(task.name)
-    onCompleteRef.current?.(task)
     updateTask(task.id, {
       status: early ? 'skipped' : 'completed',
       workedSeconds: Math.round(getLiveSeconds(task, now)),

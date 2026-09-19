@@ -350,8 +350,6 @@ export function useWorkspaceTaskActions({
     if (task.status === 'blocked') return
     // Finishing or skipping a task requires timer control permission.
     if (!canControlTimer(task, timerActor)) return
-    notifyTaskCompletion(task.name)
-    onComplete?.(task)
     const workedSeconds = Math.round(getWorkspaceLiveSeconds(task, now))
     setTasks(current =>
       current.map(t =>
