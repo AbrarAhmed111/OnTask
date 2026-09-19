@@ -381,18 +381,27 @@ export function SlackIntegrationCard({
 
               {/* Channel Picker */}
               <div className="space-y-2">
-                <label className="flex items-center justify-between text-xs font-semibold text-ink">
-                  <span>Destination Channel</span>
+                <label className="flex items-center justify-between text-xs font-semibold tracking-tight text-ink">
+                  <span className="flex items-center gap-1.5">
+                    <Hash size={13} className="text-accent" />
+                    Destination Channel
+                  </span>
                   {loadingChannels && (
-                    <Loader2 size={12} className="animate-spin text-muted" />
+                    <span className="flex items-center gap-1 text-[11px] text-muted">
+                      <Loader2 size={12} className="animate-spin" /> Fetching
+                      channels...
+                    </span>
                   )}
                 </label>
-                <div className="relative">
+                <div className="relative flex items-center">
+                  <div className="pointer-events-none absolute left-3 text-muted">
+                    <Hash size={14} />
+                  </div>
                   <select
                     value={selectedChannelId}
                     onChange={e => setSelectedChannelId(e.target.value)}
                     disabled={!canManage || loadingChannels}
-                    className="w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs font-medium text-ink focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="w-full appearance-none rounded-xl border border-line bg-panel pl-9 pr-8 py-2.5 text-xs font-semibold text-ink shadow-xs transition-all hover:border-line-hover focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <option value="">-- Select a Slack channel --</option>
                     {channels.map(channel => (
@@ -401,195 +410,218 @@ export function SlackIntegrationCard({
                       </option>
                     ))}
                   </select>
+                  <div className="pointer-events-none absolute right-3 text-muted">
+                    <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </div>
                 </div>
                 {status.channel_name && !selectedChannelId && (
                   <p className="text-[11px] text-muted">
-                    Currently posting to #{status.channel_name}
+                    Currently posting to{' '}
+                    <span className="font-semibold text-ink">
+                      #{status.channel_name}
+                    </span>
                   </p>
                 )}
               </div>
 
-              {/* Notification Preferences Toggles */}
-              <div className="space-y-2.5">
-                <p className="text-xs font-semibold text-ink">
-                  Notification Types
-                </p>
-                <div className="grid gap-2">
-                  {[
-                    {
-                      key: 'assigned',
-                      label: 'Task assignments & reassignments',
-                    },
-                    { key: 'completed', label: 'Task completions & reopens' },
-                    { key: 'blockers', label: 'Task blockers created' },
-                    {
-                      key: 'resolutions',
-                      label: 'Blocker resolutions & unblocks',
-                    },
-                    { key: 'daily_reports', label: 'Daily Reports' },
-                  ].map(({ key, label }) => (
-                    <label
-                      key={key}
-                      className="flex items-center gap-2.5 rounded-lg border border-line/50 px-3 py-2 text-xs text-ink hover:bg-subtle/40 cursor-pointer"
+              {/* Scrollable Container for Remaining Settings */}
+              <div className="max-h-[380px] overflow-y-auto pr-1 space-y-5 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">
+                {/* Notification Preferences Toggles */}
+                <div className="space-y-2.5">
+                  <p className="text-xs font-semibold text-ink">
+                    Notification Types
+                  </p>
+                  <div className="grid gap-2">
+                    {[
+                      {
+                        key: 'assigned',
+                        label: 'Task assignments & reassignments',
+                      },
+                      { key: 'completed', label: 'Task completions & reopens' },
+                      { key: 'blockers', label: 'Task blockers created' },
+                      {
+                        key: 'resolutions',
+                        label: 'Blocker resolutions & unblocks',
+                      },
+                      { key: 'daily_reports', label: 'Daily Reports' },
+                    ].map(({ key, label }) => (
+                      <label
+                        key={key}
+                        className="flex items-center gap-2.5 rounded-lg border border-line/50 px-3 py-2 text-xs text-ink hover:bg-subtle/40 cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={
+                            settings[key as keyof SlackNotificationSettings]
+                          }
+                          onChange={() =>
+                            toggleSetting(
+                              key as keyof SlackNotificationSettings,
+                            )
+                          }
+                          disabled={!canManage}
+                          className="h-4 w-4 rounded border-line text-accent focus:ring-ring"
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Save Action */}
+                {canManage && (
+                  <div className="flex items-center gap-3 pt-1">
+                    <Button
+                      variant="primary"
+                      onClick={handleSave}
+                      disabled={saving || !selectedChannelId}
+                      className="gap-2 text-xs py-2 px-4 shadow-sm"
                     >
-                      <input
-                        type="checkbox"
-                        checked={
-                          settings[key as keyof SlackNotificationSettings]
-                        }
-                        onChange={() =>
-                          toggleSetting(key as keyof SlackNotificationSettings)
-                        }
-                        disabled={!canManage}
-                        className="h-4 w-4 rounded border-line text-accent focus:ring-ring"
-                      />
-                      <span>{label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+                      {saving ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : savedSuccess ? (
+                        <Check size={13} />
+                      ) : (
+                        <RefreshCw size={13} />
+                      )}
+                      {savedSuccess ? 'Saved!' : 'Save Settings'}
+                    </Button>
+                  </div>
+                )}
 
-              {/* Save Action */}
-              {canManage && (
-                <div className="flex items-center gap-3 pt-2">
-                  <Button
-                    variant="primary"
-                    onClick={handleSave}
-                    disabled={saving || !selectedChannelId}
-                    className="gap-2 text-xs"
-                  >
-                    {saving ? (
-                      <Loader2 size={13} className="animate-spin" />
-                    ) : savedSuccess ? (
-                      <Check size={13} />
-                    ) : (
-                      <RefreshCw size={13} />
-                    )}
-                    {savedSuccess ? 'Saved!' : 'Save Settings'}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
+                {/* Share Your App with Any Workspace Section */}
+                {canManage && (
+                  <div className="rounded-2xl border border-line bg-subtle/30 p-4 space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <h3 className="flex items-center gap-2 text-xs font-bold tracking-tight text-ink">
+                          <Share2 size={14} className="text-accent" /> Share
+                          Your App with Any Workspace
+                        </h3>
+                      </div>
+                      <p className="text-xs leading-5 text-muted mt-1">
+                        Use the URL and Add to Slack button below to share your
+                        app with any Slack workspace.{' '}
+                        <a
+                          href="https://docs.slack.dev/legacy/legacy-slack-button/"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-0.5 text-accent hover:underline font-medium"
+                        >
+                          Learn more about sharing your app using these tools{' '}
+                          <ExternalLink size={11} />
+                        </a>
+                      </p>
+                    </div>
 
-          {/* Share Your App with Any Workspace Section */}
-          {canManage && (
-            <div className="rounded-2xl border border-line bg-subtle/30 p-5 space-y-5">
-              <div>
-                <div className="flex items-center justify-between">
-                  <h3 className="flex items-center gap-2 text-xs font-bold tracking-tight text-ink">
-                    <Share2 size={14} className="text-accent" /> Share Your App
-                    with Any Workspace
-                  </h3>
-                </div>
-                <p className="text-xs leading-5 text-muted mt-1">
-                  Use the URL and Add to Slack button below to share your app
-                  with any Slack workspace.{' '}
-                  <a
-                    href="https://docs.slack.dev/legacy/legacy-slack-button/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-0.5 text-accent hover:underline font-medium"
-                  >
-                    Learn more about sharing your app using these tools{' '}
-                    <ExternalLink size={11} />
-                  </a>
-                </p>
-              </div>
+                    {/* Embeddable Slack Button Sub-section */}
+                    <div className="space-y-2 rounded-xl border border-line bg-panel p-3.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-ink">
+                          Embeddable Slack Button
+                        </h4>
+                        <Button
+                          variant="ghost"
+                          onClick={handleCopyEmbedCode}
+                          className="gap-1 text-[11px] py-1 px-2.5 text-accent hover:bg-accent/10"
+                        >
+                          {copiedEmbed ? (
+                            <Check size={11} />
+                          ) : (
+                            <Copy size={11} />
+                          )}
+                          {copiedEmbed ? 'Copied HTML' : 'Copy HTML'}
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-3 py-1">
+                        {/* Visual preview of button */}
+                        <a href={getAuthorizeUrl()} className="inline-block">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            alt="Add to Slack"
+                            height="40"
+                            width="139"
+                            src="https://platform.slack-edge.com/img/add_to_slack.png"
+                            srcSet="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"
+                          />
+                        </a>
+                        <span className="text-[11px] text-muted italic">
+                          Interactive preview
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <pre className="overflow-x-auto rounded-lg border border-line bg-subtle p-3 text-[11px] font-mono text-muted select-all">
+                          {getEmbedCode()}
+                        </pre>
+                      </div>
+                    </div>
 
-              {/* Embeddable Slack Button Sub-section */}
-              <div className="space-y-2 rounded-xl border border-line bg-panel p-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-ink">
-                    Embeddable Slack Button
-                  </h4>
-                  <Button
-                    variant="ghost"
-                    onClick={handleCopyEmbedCode}
-                    className="gap-1 text-[11px] py-1 px-2.5 text-accent hover:bg-accent/10"
-                  >
-                    {copiedEmbed ? <Check size={11} /> : <Copy size={11} />}
-                    {copiedEmbed ? 'Copied HTML' : 'Copy HTML'}
-                  </Button>
-                </div>
-                <div className="flex items-center gap-3 py-1">
-                  {/* Visual preview of button */}
-                  <a href={getAuthorizeUrl()} className="inline-block">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      alt="Add to Slack"
-                      height="40"
-                      width="139"
-                      src="https://platform.slack-edge.com/img/add_to_slack.png"
-                      srcSet="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"
-                    />
-                  </a>
-                  <span className="text-[11px] text-muted italic">
-                    Interactive preview
-                  </span>
-                </div>
-                <div className="relative">
-                  <pre className="overflow-x-auto rounded-lg border border-line bg-subtle p-3 text-[11px] font-mono text-muted select-all">
-                    {getEmbedCode()}
-                  </pre>
-                </div>
-              </div>
+                    {/* Sharable URL Sub-section */}
+                    <div className="space-y-2 rounded-xl border border-line bg-panel p-3.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-ink">
+                          Sharable URL
+                        </h4>
+                        <Button
+                          variant="ghost"
+                          onClick={handleCopyShareUrl}
+                          className="gap-1 text-[11px] py-1 px-2.5 text-accent hover:bg-accent/10"
+                        >
+                          {copiedUrl ? <Check size={11} /> : <Copy size={11} />}
+                          {copiedUrl ? 'Copied URL' : 'Copy URL'}
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={getAuthorizeUrl()}
+                          className="w-full rounded-lg border border-line bg-subtle px-3 py-2 text-xs font-mono text-muted select-all focus:outline-none"
+                        />
+                      </div>
+                    </div>
 
-              {/* Sharable URL Sub-section */}
-              <div className="space-y-2 rounded-xl border border-line bg-panel p-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-ink">Sharable URL</h4>
-                  <Button
-                    variant="ghost"
-                    onClick={handleCopyShareUrl}
-                    className="gap-1 text-[11px] py-1 px-2.5 text-accent hover:bg-accent/10"
-                  >
-                    {copiedUrl ? <Check size={11} /> : <Copy size={11} />}
-                    {copiedUrl ? 'Copied URL' : 'Copy URL'}
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={getAuthorizeUrl()}
-                    className="w-full rounded-lg border border-line bg-subtle px-3 py-2 text-xs font-mono text-muted select-all focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* App Suggestions HTML Sub-section */}
-              <div className="space-y-2 rounded-xl border border-line bg-panel p-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-ink">
-                    App Suggestions HTML
-                  </h4>
-                  <Button
-                    variant="ghost"
-                    onClick={handleCopyMetaTag}
-                    className="gap-1 text-[11px] py-1 px-2.5 text-accent hover:bg-accent/10"
-                  >
-                    {copiedMeta ? <Check size={11} /> : <Copy size={11} />}
-                    {copiedMeta ? 'Copied Meta Tag' : 'Copy Meta Tag'}
-                  </Button>
-                </div>
-                <p className="text-[11px] leading-4 text-muted">
-                  Add this tag to suggest your app to new users when links from
-                  your domain are mentioned in Slack.{' '}
-                  <a
-                    href="https://docs.slack.dev/slack-marketplace/distributing-your-app-in-the-slack-marketplace/#suggestions"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-0.5 text-accent hover:underline font-medium"
-                  >
-                    Learn more <ExternalLink size={10} />
-                  </a>
-                </p>
-                <div className="relative">
-                  <pre className="overflow-x-auto rounded-lg border border-line bg-subtle p-3 text-[11px] font-mono text-muted select-all">
-                    {getMetaTagCode()}
-                  </pre>
-                </div>
+                    {/* App Suggestions HTML Sub-section */}
+                    <div className="space-y-2 rounded-xl border border-line bg-panel p-3.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-ink">
+                          App Suggestions HTML
+                        </h4>
+                        <Button
+                          variant="ghost"
+                          onClick={handleCopyMetaTag}
+                          className="gap-1 text-[11px] py-1 px-2.5 text-accent hover:bg-accent/10"
+                        >
+                          {copiedMeta ? (
+                            <Check size={11} />
+                          ) : (
+                            <Copy size={11} />
+                          )}
+                          {copiedMeta ? 'Copied Meta Tag' : 'Copy Meta Tag'}
+                        </Button>
+                      </div>
+                      <p className="text-[11px] leading-4 text-muted">
+                        Add this tag to suggest your app to new users when links
+                        from your domain are mentioned in Slack.{' '}
+                        <a
+                          href="https://docs.slack.dev/slack-marketplace/distributing-your-app-in-the-slack-marketplace/#suggestions"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-0.5 text-accent hover:underline font-medium"
+                        >
+                          Learn more <ExternalLink size={10} />
+                        </a>
+                      </p>
+                      <div className="relative">
+                        <pre className="overflow-x-auto rounded-lg border border-line bg-subtle p-3 text-[11px] font-mono text-muted select-all">
+                          {getMetaTagCode()}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
